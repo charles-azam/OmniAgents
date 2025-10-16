@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.12.0",
     "smolagents>=1.22.0",
     "e2b-code-interpreter>=1.0.0",
+    "pydantic-ai[examples]>=1.1.0",
 ]
 
 [project.scripts]
