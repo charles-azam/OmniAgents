@@ -101,7 +101,7 @@ Cart Summary:
 - Target Budget: ${self.metrics.target_budget:.2f}
 - Final Total: ${self.metrics.final_cart_total:.2f}
 - Distance from Target: ${self.metrics.distance_from_target:.2f}
-- Items: {self.cart_summary['item_count']}
+- Items: {self.cart_summary.item_count}
 
 Token Usage:
 - Total Tokens: {self.metrics.token_usage.get('total', 'N/A')}

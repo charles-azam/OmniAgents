@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """LangChain benchmark for shopping cart optimizer."""
 
-import asyncio
 import json
 import os
 import sys
@@ -12,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from langchain.agents import AgentExecutor
 from langchain.agents import create_tool_calling_agent
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
@@ -121,20 +121,21 @@ def list_categories_tool() -> list[str]:
     return list_categories()
 
 
-# Custom callback to track tool calls
-class ToolCallTracker:
-    """Tracks tool calls for metrics."""
+class ToolCallbackHandler(BaseCallbackHandler):
+    """Custom callback handler to track tool calls."""
 
     def __init__(self, metrics_tracker: MetricsTracker):
         """Initialize with a metrics tracker."""
+        super().__init__()
         self.metrics_tracker = metrics_tracker
 
-    def on_tool_start(self, tool_name: str) -> None:
+    def on_tool_start(self, serialized: dict, input_str: str, **kwargs) -> None:
         """Record when a tool is called."""
+        tool_name = serialized.get("name", "unknown")
         self.metrics_tracker.record_tool_call(tool_name=tool_name)
 
 
-async def run_benchmark() -> None:
+def run_benchmark() -> None:
     """Run the LangChain shopping cart benchmark."""
     # Check for OpenAI API key
     if not os.getenv("OPENAI_API_KEY"):
@@ -146,7 +147,7 @@ async def run_benchmark() -> None:
     metrics_tracker = MetricsTracker(target_budget=100.0)
 
     # Initialize LangChain components
-    model = ChatOpenAI(model="gpt-4o", temperature=0)
+    model = ChatOpenAI(model="gpt-5-mini", temperature=0)
 
     tools = [
         list_categories_tool,
@@ -180,6 +181,9 @@ Important: You must call the checkout tool when you're done selecting items.""",
         ]
     )
 
+    # Create callback handler for tracking tool calls
+    callback_handler = ToolCallbackHandler(metrics_tracker=metrics_tracker)
+
     # Create agent
     agent = create_tool_calling_agent(llm=model, tools=tools, prompt=prompt)
     agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
@@ -193,22 +197,9 @@ Important: You must call the checkout tool when you're done selecting items.""",
     print("=" * 60)
     print()
 
-    # Track tool calls by wrapping the agent executor
-    original_invoke = agent_executor.invoke
-
-    def tracked_invoke(*args, **kwargs):
-        result = original_invoke(*args, **kwargs)
-        # Extract tool calls from intermediate steps
-        if "intermediate_steps" in result:
-            for action, _ in result["intermediate_steps"]:
-                tool_name = action.tool
-                metrics_tracker.record_tool_call(tool_name=tool_name)
-        return result
-
-    agent_executor.invoke = tracked_invoke
-
     agent_executor.invoke(
-        {"input": "Fill the shopping cart to be as close to $100 as possible without going over."}
+        input={"input": "Fill the shopping cart to be as close to $100 as possible without going over."},
+        config={"callbacks": [callback_handler]}
     )
 
     # Stop metrics tracking
@@ -246,4 +237,4 @@ Important: You must call the checkout tool when you're done selecting items.""",
 
 
 if __name__ == "__main__":
-    asyncio.run(run_benchmark())
+    run_benchmark()
