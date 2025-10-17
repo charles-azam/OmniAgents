@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""LangChain benchmark for shopping cart optimizer."""
+"""Smolagents benchmark for shopping cart optimizer."""
 
 import json
 import os
@@ -9,26 +9,23 @@ from pathlib import Path
 # Add parent directory to path to import prompttodraft
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
-from langchain.agents import AgentExecutor
-from langchain.agents import create_tool_calling_agent
-from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.tools import tool
-from langchain_openai import ChatOpenAI
+from smolagents import CodeAgent
+from smolagents import HfApiModel
+from smolagents import tool
 
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
 
 
-def create_langchain_tools(session: ShoppingSession) -> list:
+def create_smolagents_tools(session: ShoppingSession) -> list:
     """
-    Create LangChain-compatible tools for a shopping session.
+    Create smolagents-compatible tools for a shopping session.
 
     Args:
         session: The shopping session instance.
 
     Returns:
-        List of LangChain tool objects.
+        List of smolagents tool objects.
     """
 
     @tool
@@ -42,7 +39,7 @@ def create_langchain_tools(session: ShoppingSession) -> list:
         return session.list_categories()
 
     @tool
-    def search_item_tool(category: str) -> list[dict[str, str | float]]:
+    def search_item_tool(category: str) -> list[dict]:
         """
         Search for items in a specific category.
         Available categories: electronics, books, clothing, food, toys.
@@ -127,78 +124,76 @@ def create_langchain_tools(session: ShoppingSession) -> list:
     ]
 
 
-class ToolCallbackHandler(BaseCallbackHandler):
-    """Custom callback handler to track tool calls."""
+class ToolCallTracker:
+    """Tracks tool calls for smolagents."""
 
     def __init__(self, metrics_tracker: MetricsTracker):
         """Initialize with a metrics tracker."""
-        super().__init__()
         self.metrics_tracker = metrics_tracker
+        self.original_tools = {}
 
-    def on_tool_start(self, serialized: dict, input_str: str, **kwargs) -> None:
-        """Record when a tool is called."""
-        tool_name = serialized.get("name", "unknown")
-        self.metrics_tracker.record_tool_call(tool_name=tool_name)
+    def wrap_tool(self, tool_obj):
+        """Wrap a tool to track its calls."""
+        original_forward = tool_obj.forward
+
+        def tracked_forward(*args, **kwargs):
+            self.metrics_tracker.record_tool_call(tool_name=tool_obj.name)
+            return original_forward(*args, **kwargs)
+
+        tool_obj.forward = tracked_forward
+        return tool_obj
 
 
 def run_benchmark() -> None:
-    """Run the LangChain shopping cart benchmark."""
-    # Check for OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        print("Error: OPENAI_API_KEY environment variable not set")
+    """Run the smolagents shopping cart benchmark."""
+    # Check for HuggingFace API token
+    if not os.getenv("HF_TOKEN"):
+        print("Error: HF_TOKEN environment variable not set")
         sys.exit(1)
 
     # Create new shopping session and initialize metrics tracker
     session = ShoppingSession()
     metrics_tracker = MetricsTracker(target_budget=100.0)
 
-    # Initialize LangChain components
-    model = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    # Create tool tracker
+    tool_tracker = ToolCallTracker(metrics_tracker=metrics_tracker)
 
     # Create tools for this session
-    tools = create_langchain_tools(session=session)
+    tools = create_smolagents_tools(session=session)
 
-    # Create the prompt
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                """You are a shopping assistant. Your goal is to fill a shopping cart
-to be as close to $100 as possible WITHOUT going over the budget.
+    # Wrap tools for tracking
+    tracked_tools = [tool_tracker.wrap_tool(tool_obj=t) for t in tools]
 
-Strategy suggestions:
-1. First, explore the available categories to understand what's available
-2. Search items in different categories to see prices
-3. Add items strategically to get close to $100
-4. You can remove items and add different ones to optimize
-5. When satisfied with your cart (close to $100 but not over), call checkout
-
-Important: You must call the checkout tool when you're done selecting items.""",
-            ),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ]
-    )
-
-    # Create callback handler for tracking tool calls
-    callback_handler = ToolCallbackHandler(metrics_tracker=metrics_tracker)
+    # Initialize smolagents model
+    model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
 
     # Create agent
-    agent = create_tool_calling_agent(llm=model, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    agent = CodeAgent(
+        tools=tracked_tools,
+        model=model,
+        max_steps=30,
+    )
 
     # Start metrics tracking
     metrics_tracker.start_timer()
 
     # Run the agent
     print("=" * 60)
-    print("Starting LangChain Shopping Cart Benchmark")
+    print("Starting Smolagents Shopping Cart Benchmark")
     print("=" * 60)
     print()
 
-    agent_executor.invoke(
-        input={"input": "Fill the shopping cart to be as close to $100 as possible without going over."},
-        config={"callbacks": [callback_handler]}
+    agent.run(
+        task="""Fill the shopping cart to be as close to $100 as possible WITHOUT going over the budget.
+
+Strategy:
+1. First, explore the available categories to understand what's available
+2. Search items in different categories to see prices
+3. Add items strategically to get close to $100
+4. You can remove items and add different ones to optimize
+5. When satisfied with your cart (close to $100 but not over), call checkout
+
+Important: You must call the checkout tool when you're done selecting items."""
     )
 
     # Stop metrics tracking
@@ -206,17 +201,17 @@ Important: You must call the checkout tool when you're done selecting items.""",
 
     # Build and display results
     benchmark_result = metrics_tracker.build_result(
-        framework="LangChain",
-        model="gpt-5-mini",
+        framework="Smolagents",
+        model="Qwen/Qwen2.5-Coder-32B-Instruct",
         task_description="Fill shopping cart to $100 without going over",
         cart=session.cart,
     )
 
-    # Calculate estimated cost (rough estimate based on GPT-4 pricing)
-    # Note: Without proper callback tracking, this is approximate
+    # Calculate estimated cost (rough estimate based on HuggingFace API pricing)
+    # Note: Pricing varies, this is an estimate
     metrics_tracker.calculate_cost(
-        prompt_cost_per_1k=0.003,
-        completion_cost_per_1k=0.015
+        prompt_cost_per_1k=0.001,
+        completion_cost_per_1k=0.002
     )
 
     print("\n" + "=" * 60)
@@ -227,7 +222,7 @@ Important: You must call the checkout tool when you're done selecting items.""",
     output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
-    output_file = output_dir / "langchain_result.json"
+    output_file = output_dir / "smolagents_result.json"
     with open(output_file, "w") as f:
         json.dump(benchmark_result.model_dump(), f, indent=2)
 

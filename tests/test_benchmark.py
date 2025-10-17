@@ -78,7 +78,7 @@ def test_metrics_tracker():
     tracker = MetricsTracker(target_budget=100.0)
 
     # Start tracking
-    tracker.start()
+    tracker.start_timer()
 
     # Record some tool calls
     tracker.record_tool_call(tool_name="search_item")
@@ -86,7 +86,7 @@ def test_metrics_tracker():
     tracker.record_tool_call(tool_name="add_to_cart")
 
     # Stop tracking
-    tracker.stop()
+    tracker.stop_timer()
 
     # Verify metrics
     assert tracker.get_execution_time() > 0

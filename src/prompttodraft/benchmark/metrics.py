@@ -24,11 +24,11 @@ class MetricsTracker:
         self.total_tokens: int = 0
         self.estimated_cost: float = 0.0
 
-    def start(self) -> None:
+    def start_timer(self) -> None:
         """Start tracking time."""
         self.start_time = time.time()
 
-    def stop(self) -> None:
+    def stop_timer(self) -> None:
         """Stop tracking time."""
         self.end_time = time.time()
 
