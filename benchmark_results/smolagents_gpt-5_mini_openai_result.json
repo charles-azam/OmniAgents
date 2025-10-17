@@ -1,32 +1,32 @@
 {
-  "framework": "LangChain (xai)",
+  "framework": "Smolagents (openai)",
   "metrics": {
     "tool_call_count": 11,
     "tool_call_breakdown": {
-      "list_categories_tool": 1,
-      "search_item_tool": 5,
-      "add_to_cart_tool": 4,
-      "checkout_tool": 1
+      "list_categories": 1,
+      "search_item": 5,
+      "add_to_cart": 4,
+      "checkout": 1
     },
-    "execution_time_seconds": 8.04,
+    "execution_time_seconds": 107.48,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 96.48,
-    "distance_from_target": 3.52,
+    "final_cart_total": 99.97,
+    "distance_from_target": 0.03,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 96.48,
+    "total": 99.97,
     "item_count": 4,
     "items": [
-      "Bluetooth Speaker",
       "Board Game",
+      "Bluetooth Speaker",
       "Python Programming Guide",
-      "Playing Cards"
+      "Children's Picture Book"
     ],
     "message": "Cart summary retrieved"
   },
   "task_description": "Fill shopping cart to $100 without going over",
-  "model": "Grok 4 Fast Non-Reasoning (X.AI)"
+  "model": "GPT-5 Mini (OpenAI)"
 }

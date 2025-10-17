@@ -1,16 +1,15 @@
 {
-  "framework": "LangChain (openai)",
+  "framework": "Pydantic AI (openai)",
   "metrics": {
-    "tool_call_count": 19,
+    "tool_call_count": 13,
     "tool_call_breakdown": {
-      "list_categories_tool": 1,
-      "search_item_tool": 6,
-      "add_to_cart_tool": 7,
-      "get_cart_total_tool": 3,
-      "get_price_tool": 1,
-      "remove_from_cart_tool": 1
+      "list_categories": 1,
+      "search_item": 5,
+      "add_to_cart": 4,
+      "get_cart_total": 2,
+      "checkout": 1
     },
-    "execution_time_seconds": 42.49,
+    "execution_time_seconds": 69.54,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
@@ -20,14 +19,12 @@
   },
   "cart_summary": {
     "total": 99.97,
-    "item_count": 6,
+    "item_count": 4,
     "items": [
+      "Board Game",
       "Bluetooth Speaker",
       "Python Programming Guide",
-      "Cotton T-Shirt",
-      "USB Cable",
-      "Chocolate Bar",
-      "Playing Cards"
+      "Children's Picture Book"
     ],
     "message": "Cart summary retrieved"
   },

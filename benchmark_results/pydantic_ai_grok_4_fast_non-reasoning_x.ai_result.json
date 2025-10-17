@@ -1,14 +1,14 @@
 {
-  "framework": "LangChain (xai)",
+  "framework": "Pydantic AI (xai)",
   "metrics": {
     "tool_call_count": 11,
     "tool_call_breakdown": {
-      "list_categories_tool": 1,
-      "search_item_tool": 5,
-      "add_to_cart_tool": 4,
-      "checkout_tool": 1
+      "list_categories": 1,
+      "search_item": 5,
+      "add_to_cart": 4,
+      "checkout": 1
     },
-    "execution_time_seconds": 8.04,
+    "execution_time_seconds": 7.73,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,

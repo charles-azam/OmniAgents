@@ -1,30 +1,29 @@
 {
   "framework": "LangChain (xai)",
   "metrics": {
-    "tool_call_count": 12,
+    "tool_call_count": 11,
     "tool_call_breakdown": {
       "list_categories_tool": 1,
       "search_item_tool": 5,
       "add_to_cart_tool": 4,
-      "get_cart_total_tool": 1,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 14.36,
+    "execution_time_seconds": 9.64,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.48,
-    "distance_from_target": 0.52,
+    "final_cart_total": 99.97,
+    "distance_from_target": 0.03,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.48,
+    "total": 99.97,
     "item_count": 4,
     "items": [
       "Bluetooth Speaker",
       "Board Game",
-      "Cookbook",
-      "Science Fiction Novel"
+      "Python Programming Guide",
+      "Children's Picture Book"
     ],
     "message": "Cart summary retrieved"
   },

@@ -4,27 +4,26 @@
     "tool_call_count": 11,
     "tool_call_breakdown": {
       "list_categories_tool": 1,
-      "search_item_tool": 4,
-      "add_to_cart_tool": 5,
+      "search_item_tool": 5,
+      "add_to_cart_tool": 4,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 28.26,
+    "execution_time_seconds": 26.24,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.98,
-    "distance_from_target": 0.02,
+    "final_cart_total": 99.97,
+    "distance_from_target": 0.03,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.98,
-    "item_count": 5,
+    "total": 99.97,
+    "item_count": 4,
     "items": [
       "Bluetooth Speaker",
       "Wireless Mouse",
-      "Python Programming Guide",
-      "Baseball Cap",
-      "USB Cable"
+      "Board Game",
+      "Olive Oil"
     ],
     "message": "Cart summary retrieved"
   },

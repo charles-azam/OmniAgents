@@ -1,16 +1,14 @@
 {
-  "framework": "LangChain (openai)",
+  "framework": "Smolagents (huggingface)",
   "metrics": {
-    "tool_call_count": 19,
+    "tool_call_count": 10,
     "tool_call_breakdown": {
-      "list_categories_tool": 1,
-      "search_item_tool": 6,
-      "add_to_cart_tool": 7,
-      "get_cart_total_tool": 3,
-      "get_price_tool": 1,
-      "remove_from_cart_tool": 1
+      "list_categories": 1,
+      "search_item": 3,
+      "add_to_cart": 5,
+      "checkout": 1
     },
-    "execution_time_seconds": 42.49,
+    "execution_time_seconds": 55.87,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
@@ -20,17 +18,16 @@
   },
   "cart_summary": {
     "total": 99.97,
-    "item_count": 6,
+    "item_count": 5,
     "items": [
       "Bluetooth Speaker",
       "Python Programming Guide",
       "Cotton T-Shirt",
-      "USB Cable",
-      "Chocolate Bar",
-      "Playing Cards"
+      "Baseball Cap",
+      "Webcam Cover"
     ],
     "message": "Cart summary retrieved"
   },
   "task_description": "Fill shopping cart to $100 without going over",
-  "model": "GPT-5 Mini (OpenAI)"
+  "model": "GPT OSS 120B (HuggingFace)"
 }

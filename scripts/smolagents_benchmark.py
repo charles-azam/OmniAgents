@@ -5,8 +5,9 @@ import json
 import os
 from pathlib import Path
 
-from smolagents import CodeAgent
+from smolagents import CodeAgent, ToolCallingAgent
 from smolagents import InferenceClientModel
+from smolagents import OpenAIModel, LiteLLMModel
 from smolagents import tool
 
 from prompttodraft.benchmark.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
@@ -129,6 +130,29 @@ def create_smolagents_tools(session: ShoppingSession, metrics_tracker: MetricsTr
     ]
 
 
+def create_model(provider: str, model_id: str):
+    """
+    Create a smolagents model from provider and model_id.
+
+    Args:
+        provider: Provider name (openai, huggingface, xai).
+        model_id: Model identifier.
+
+    Returns:
+        Configured smolagents model.
+    """
+    if provider == "openai":
+        return OpenAIModel(model_id=model_id)
+    elif provider == "huggingface":
+        return InferenceClientModel(model_id=model_id)
+    elif provider == "xai":
+        import litellm
+        litellm.drop_params = True
+        return LiteLLMModel(model_id=f"xai/{model_id}")
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+
+
 def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
     """
     Run a single benchmark with smolagents.
@@ -150,13 +174,13 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
     tools = create_smolagents_tools(session=session, metrics_tracker=metrics_tracker)
 
     # Initialize smolagents model
-    model = InferenceClientModel(model_id=model_id)
+    model = create_model(provider=provider, model_id=model_id)
 
     # Create agent
-    agent = CodeAgent(
+    agent = ToolCallingAgent(
         tools=tools,
         model=model,
-        max_steps=30,
+        max_steps=10,
     )
 
     # Start metrics tracking
@@ -202,28 +226,38 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
 
 def run_benchmark() -> None:
     """Run the smolagents shopping cart benchmark with multiple models."""
-    # Filter for HuggingFace models only (smolagents works best with HF)
-    hf_models = [m for m in MODEL_CONFIGS if m["provider"] == "huggingface"]
+    missing_keys = []
+    for model_config in MODEL_CONFIGS:
+        provider = model_config["provider"]
+        key = REQUIRED_API_KEYS[provider]
+        if not os.getenv(key):
+            missing_keys.append(f"{key} (for {model_config['display_name']})")
 
-    if not hf_models:
-        print("No HuggingFace models configured")
-        return
+    if missing_keys:
+        print("Warning: Missing API keys for some models:")
+        for key in missing_keys:
+            print(f"  - {key}")
+        print("\nSkipping models with missing keys...\n")
 
-    # Check for API key
-    if not os.getenv("HF_TOKEN"):
-        print("Error: HF_TOKEN environment variable not set")
-        return
+    # Run benchmarks for each model
+    completed_count = 0
+    for model_config in MODEL_CONFIGS:
+        provider = model_config["provider"]
+        key = REQUIRED_API_KEYS[provider]
 
-    # Run benchmarks for each HuggingFace model
-    for model_config in hf_models:
+        if not os.getenv(key):
+            print(f"\nSkipping {model_config['display_name']} (missing {key})")
+            continue
+
         run_single_benchmark(
-            provider=model_config["provider"],
+            provider=provider,
             model_id=model_config["model_id"],
             display_name=model_config["display_name"]
         )
+        completed_count += 1
 
     print("\n" + "=" * 60)
-    print(f"Completed {len(hf_models)} benchmark(s)!")
+    print(f"Completed {completed_count} benchmark(s)!")
     print("=" * 60)
 
 

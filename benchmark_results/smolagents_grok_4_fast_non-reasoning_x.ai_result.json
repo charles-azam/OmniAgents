@@ -1,0 +1,35 @@
+{
+  "framework": "Smolagents (xai)",
+  "metrics": {
+    "tool_call_count": 14,
+    "tool_call_breakdown": {
+      "list_categories": 1,
+      "search_item": 5,
+      "add_to_cart": 6,
+      "get_cart_total": 1,
+      "checkout": 1
+    },
+    "execution_time_seconds": 41.12,
+    "token_usage": {},
+    "estimated_cost": 0.0,
+    "success": true,
+    "final_cart_total": 99.99,
+    "distance_from_target": 0.01,
+    "target_budget": 100.0
+  },
+  "cart_summary": {
+    "total": 99.99,
+    "item_count": 6,
+    "items": [
+      "Baseball Cap",
+      "Bluetooth Speaker",
+      "Children's Picture Book",
+      "Science Fiction Novel",
+      "Self-Help Book",
+      "USB Cable"
+    ],
+    "message": "Cart summary retrieved"
+  },
+  "task_description": "Fill shopping cart to $100 without going over",
+  "model": "Grok 4 Fast Non-Reasoning (X.AI)"
+}
