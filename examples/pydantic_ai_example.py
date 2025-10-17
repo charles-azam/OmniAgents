@@ -1,28 +1,18 @@
-from pydantic_ai import Agent, RunContext
+import asyncio
+from pydantic_ai import Agent, AgentRunResultEvent, AgentStreamEvent
 
-roulette_agent = Agent(  
-    'openai:gpt-5-mini',
-    deps_type=int,
-    output_type=bool,
-    system_prompt=(
-        'Use the `roulette_wheel` function to see if the '
-        'customer has won based on the number they provide.'
-    ),
-)
+agent = Agent('openai:gpt-5-mini')
 
+async def main():
+    result = await agent.run('What is the capital of France?')
+    print(result.output)
+    #> The capital of France is Paris.
 
-@roulette_agent.tool
-async def roulette_wheel(ctx: RunContext[int], square: int) -> str:  
-    """check if the square is a winner"""
-    return 'winner' if square == ctx.deps else 'loser'
+    events: list[AgentStreamEvent | AgentRunResultEvent] = []
+    async for event in agent.run_stream_events('What is the capital of Mexico?'):
+        events.append(event)
+    print(events)
 
-
-# Run the agent
-success_number = 18  
-result = roulette_agent.run_sync('Put my money on square eighteen', deps=success_number)
-print(result.output)  
-#> True
-
-result = roulette_agent.run_sync('I bet five is the winner', deps=success_number)
-print(result.output)
-#> False
+    
+if __name__ == "__main__":
+    asyncio.run(main())
