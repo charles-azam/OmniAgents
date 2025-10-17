@@ -179,7 +179,7 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
     metrics_tracker.start_timer()
 
     # Run agent
-    result = await Runner.run(agent=agent, message=TASK_DESCRIPTION)
+    result = await Runner.run(agent, TASK_DESCRIPTION, max_turns=30)
 
     print(f"\nFinal output: {result.final_output}")
 
