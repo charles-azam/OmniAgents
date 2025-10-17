@@ -1,0 +1,34 @@
+{
+  "framework": "LangChain (openai)",
+  "metrics": {
+    "tool_call_count": 13,
+    "tool_call_breakdown": {
+      "list_categories_tool": 1,
+      "search_item_tool": 5,
+      "add_to_cart_tool": 5,
+      "get_cart_total_tool": 1,
+      "checkout_tool": 1
+    },
+    "execution_time_seconds": 153.09,
+    "token_usage": {},
+    "estimated_cost": 0.0,
+    "success": true,
+    "final_cart_total": 99.98,
+    "distance_from_target": 0.02,
+    "target_budget": 100.0
+  },
+  "cart_summary": {
+    "total": 99.98,
+    "item_count": 5,
+    "items": [
+      "Bluetooth Speaker",
+      "Board Game",
+      "Cookbook",
+      "USB Cable",
+      "Playing Cards"
+    ],
+    "message": "Cart summary retrieved"
+  },
+  "task_description": "Fill shopping cart to $100 without going over",
+  "model": "GPT-5 (OpenAI)"
+}

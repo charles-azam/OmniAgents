@@ -15,6 +15,9 @@ dependencies = [
     "pydantic-ai[examples]>=1.1.0",
     "langchain>=0.3.27",
     "langchain-openai>=0.2.0",
+    "langchain-huggingface>=0.1.0",
+    "langchain-xai>=0.2.0",
+    "huggingface-hub>=0.20.0",
 ]
 
 [project.scripts]

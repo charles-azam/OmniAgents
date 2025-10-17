@@ -141,19 +141,62 @@ class ToolCallbackHandler(BaseCallbackHandler):
         self.metrics_tracker.record_tool_call(tool_name=tool_name)
 
 
-def run_benchmark() -> None:
-    """Run the LangChain shopping cart benchmark."""
-    # Check for OpenAI API key
-    if not os.getenv("OPENAI_API_KEY"):
-        print("Error: OPENAI_API_KEY environment variable not set")
-        sys.exit(1)
+def create_model(provider: str, model_id: str):
+    """
+    Create a LangChain model from provider and model_id.
+
+    Args:
+        provider: Provider name (openai, huggingface, xai).
+        model_id: Model identifier.
+
+    Returns:
+        Configured LangChain model.
+    """
+    if provider == "openai":
+        return ChatOpenAI(
+            model=model_id,
+            temperature=0,
+        )
+    elif provider == "huggingface":
+        from langchain_huggingface import ChatHuggingFace
+        from langchain_huggingface import HuggingFaceEndpoint
+
+        llm = HuggingFaceEndpoint(
+            repo_id=model_id,
+            task="text-generation",
+            temperature=0,
+        )
+        return ChatHuggingFace(llm=llm)
+    elif provider == "xai":
+        from langchain_xai import ChatXAI
+
+        return ChatXAI(
+            model=model_id,
+            temperature=0,
+        )
+    else:
+        raise ValueError(f"Unsupported provider: {provider}")
+
+
+def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
+    """
+    Run a single benchmark with a specific model.
+
+    Args:
+        provider: Provider name.
+        model_id: Model identifier.
+        display_name: Display name for results.
+    """
+    print("\n" + "=" * 60)
+    print(f"Testing: {display_name}")
+    print("=" * 60)
 
     # Create new shopping session and initialize metrics tracker
     session = ShoppingSession()
     metrics_tracker = MetricsTracker(target_budget=100.0)
 
-    # Initialize LangChain components
-    model = ChatOpenAI(model="gpt-5-mini", temperature=0)
+    # Initialize model
+    model = create_model(provider=provider, model_id=model_id)
 
     # Create tools for this session
     tools = create_langchain_tools(session=session)
@@ -190,12 +233,6 @@ Important: You must call the checkout tool when you're done selecting items.""",
     # Start metrics tracking
     metrics_tracker.start_timer()
 
-    # Run the agent
-    print("=" * 60)
-    print("Starting LangChain Shopping Cart Benchmark")
-    print("=" * 60)
-    print()
-
     agent_executor.invoke(
         input={"input": "Fill the shopping cart to be as close to $100 as possible without going over."},
         config={"callbacks": [callback_handler]}
@@ -206,18 +243,32 @@ Important: You must call the checkout tool when you're done selecting items.""",
 
     # Build and display results
     benchmark_result = metrics_tracker.build_result(
-        framework="LangChain",
-        model="gpt-5-mini",
+        framework=f"LangChain ({provider})",
+        model=display_name,
         task_description="Fill shopping cart to $100 without going over",
         cart=session.cart,
     )
 
-    # Calculate estimated cost (rough estimate based on GPT-4 pricing)
-    # Note: Without proper callback tracking, this is approximate
-    metrics_tracker.calculate_cost(
-        prompt_cost_per_1k=0.003,
-        completion_cost_per_1k=0.015
-    )
+    # Calculate estimated cost based on provider
+    # Prices are per 1M tokens, converted to per 1K tokens
+    if provider == "openai":
+        # GPT-4o Mini: $0.25 input, $2.00 output per 1M tokens
+        metrics_tracker.calculate_cost(
+            prompt_cost_per_1k=0.25 / 1000,
+            completion_cost_per_1k=2.00 / 1000
+        )
+    elif provider == "xai":
+        # Grok 4 Fast: $0.20 input, $0.50 output per 1M tokens
+        metrics_tracker.calculate_cost(
+            prompt_cost_per_1k=0.20 / 1000,
+            completion_cost_per_1k=0.50 / 1000
+        )
+    else:
+        # GPT OSS 120B: $0.15 input, $0.60 output per 1M tokens
+        metrics_tracker.calculate_cost(
+            prompt_cost_per_1k=0.15 / 1000,
+            completion_cost_per_1k=0.60 / 1000
+        )
 
     print("\n" + "=" * 60)
     print(benchmark_result.to_summary())
@@ -227,11 +278,81 @@ Important: You must call the checkout tool when you're done selecting items.""",
     output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
-    output_file = output_dir / "langchain_result.json"
+    # Create safe filename from model display name
+    safe_filename = display_name.replace("/", "_").replace(" ", "_").replace("(", "").replace(")", "").lower()
+    output_file = output_dir / f"langchain_{safe_filename}_result.json"
     with open(output_file, "w") as f:
         json.dump(benchmark_result.model_dump(), f, indent=2)
 
     print(f"\nResults saved to: {output_file}")
+
+
+def run_benchmark() -> None:
+    """Run the LangChain shopping cart benchmark with multiple models."""
+    # Define models to test
+    models = [
+        {
+            "provider": "openai",
+            "model_id": "gpt-5-mini",
+            "display_name": "GPT-5 Mini (OpenAI)",
+        },
+        {
+            "provider": "huggingface",
+            "model_id": "openai/gpt-oss-120b",
+            "display_name": "GPT OSS 120B (HuggingFace)",
+        },
+        {
+            "provider": "xai",
+            "model_id": "grok-4-fast-reasoning",
+            "display_name": "Grok 4 Fast Reasoning (X.AI)",
+        },
+        {
+            "provider": "xai",
+            "model_id": "grok-4-fast-non-reasoning",
+            "display_name": "Grok 4 Fast Non-Reasoning (X.AI)",
+        },
+    ]
+
+    # Check for required API keys
+    required_keys = {
+        "openai": "OPENAI_API_KEY",
+        "huggingface": "HF_TOKEN",
+        "xai": "XAI_API_KEY",
+    }
+
+    missing_keys = []
+    for model_config in models:
+        provider = model_config["provider"]
+        key = required_keys[provider]
+        if not os.getenv(key):
+            missing_keys.append(f"{key} (for {model_config['display_name']})")
+
+    if missing_keys:
+        print("Warning: Missing API keys for some models:")
+        for key in missing_keys:
+            print(f"  - {key}")
+        print("\nSkipping models with missing keys...\n")
+
+    # Run benchmarks for each model
+    completed_count = 0
+    for model_config in models:
+        provider = model_config["provider"]
+        key = required_keys[provider]
+
+        if not os.getenv(key):
+            print(f"\nSkipping {model_config['display_name']} (missing {key})")
+            continue
+
+        run_single_benchmark(
+            provider=provider,
+            model_id=model_config["model_id"],
+            display_name=model_config["display_name"]
+        )
+        completed_count += 1
+
+    print("\n" + "=" * 60)
+    print(f"Completed {completed_count} benchmark(s)!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

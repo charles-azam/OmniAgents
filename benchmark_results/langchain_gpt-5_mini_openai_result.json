@@ -1,0 +1,35 @@
+{
+  "framework": "LangChain (openai)",
+  "metrics": {
+    "tool_call_count": 15,
+    "tool_call_breakdown": {
+      "list_categories_tool": 1,
+      "search_item_tool": 5,
+      "add_to_cart_tool": 6,
+      "get_cart_total_tool": 2,
+      "checkout_tool": 1
+    },
+    "execution_time_seconds": 32.43,
+    "token_usage": {},
+    "estimated_cost": 0.0,
+    "success": true,
+    "final_cart_total": 99.97,
+    "distance_from_target": 0.03,
+    "target_budget": 100.0
+  },
+  "cart_summary": {
+    "total": 99.97,
+    "item_count": 6,
+    "items": [
+      "Bluetooth Speaker",
+      "Python Programming Guide",
+      "Olive Oil",
+      "Playing Cards",
+      "USB Cable",
+      "Chocolate Bar"
+    ],
+    "message": "Cart summary retrieved"
+  },
+  "task_description": "Fill shopping cart to $100 without going over",
+  "model": "GPT-5 Mini (OpenAI)"
+}
