@@ -1,0 +1,33 @@
+{
+  "framework": "OpenAI Agents SDK (openai)",
+  "metrics": {
+    "tool_call_count": 12,
+    "tool_call_breakdown": {
+      "list_categories": 1,
+      "search_item": 5,
+      "add_to_cart": 4,
+      "get_cart_total": 1,
+      "checkout": 1
+    },
+    "execution_time_seconds": 56.93,
+    "token_usage": {},
+    "estimated_cost": 0.0,
+    "success": true,
+    "final_cart_total": 99.97,
+    "distance_from_target": 0.03,
+    "target_budget": 100.0
+  },
+  "cart_summary": {
+    "total": 99.97,
+    "item_count": 4,
+    "items": [
+      "Bluetooth Speaker",
+      "Board Game",
+      "Cookbook",
+      "Coffee Beans (1lb)"
+    ],
+    "message": "Cart summary retrieved"
+  },
+  "task_description": "Fill shopping cart to $100 without going over",
+  "model": "GPT-5 Mini (OpenAI)"
+}

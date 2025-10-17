@@ -3,26 +3,24 @@
 
 import json
 import os
-import sys
 from pathlib import Path
 
-# Add parent directory to path to import prompttodraft
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
-
 from smolagents import CodeAgent
-from smolagents import HfApiModel
+from smolagents import InferenceClientModel
 from smolagents import tool
 
+from prompttodraft.benchmark.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
 
 
-def create_smolagents_tools(session: ShoppingSession) -> list:
+def create_smolagents_tools(session: ShoppingSession, metrics_tracker: MetricsTracker) -> list:
     """
     Create smolagents-compatible tools for a shopping session.
 
     Args:
         session: The shopping session instance.
+        metrics_tracker: Metrics tracker to record tool calls.
 
     Returns:
         List of smolagents tool objects.
@@ -36,6 +34,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             List of category names.
         """
+        metrics_tracker.record_tool_call(tool_name="list_categories")
         return session.list_categories()
 
     @tool
@@ -50,6 +49,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             List of items with name, price, and description.
         """
+        metrics_tracker.record_tool_call(tool_name="search_item")
         return session.search_item(category=category)
 
     @tool
@@ -63,6 +63,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             The price of the item or error message.
         """
+        metrics_tracker.record_tool_call(tool_name="get_price")
         return session.get_price(item_name=item_name)
 
     @tool
@@ -76,6 +77,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             Success message with updated cart total.
         """
+        metrics_tracker.record_tool_call(tool_name="add_to_cart")
         return session.add_to_cart(item_name=item_name)
 
     @tool
@@ -89,6 +91,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             Success message with updated cart total.
         """
+        metrics_tracker.record_tool_call(tool_name="remove_from_cart")
         return session.remove_from_cart(item_name=item_name)
 
     @tool
@@ -99,6 +102,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             The total price of items in the cart.
         """
+        metrics_tracker.record_tool_call(tool_name="get_cart_total")
         return session.get_cart_total()
 
     @tool
@@ -110,6 +114,7 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
         Returns:
             Summary of the cart including total, item count, and items.
         """
+        metrics_tracker.record_tool_call(tool_name="checkout")
         result = session.checkout()
         return result.model_dump()
 
@@ -124,52 +129,32 @@ def create_smolagents_tools(session: ShoppingSession) -> list:
     ]
 
 
-class ToolCallTracker:
-    """Tracks tool calls for smolagents."""
+def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
+    """
+    Run a single benchmark with smolagents.
 
-    def __init__(self, metrics_tracker: MetricsTracker):
-        """Initialize with a metrics tracker."""
-        self.metrics_tracker = metrics_tracker
-        self.original_tools = {}
-
-    def wrap_tool(self, tool_obj):
-        """Wrap a tool to track its calls."""
-        original_forward = tool_obj.forward
-
-        def tracked_forward(*args, **kwargs):
-            self.metrics_tracker.record_tool_call(tool_name=tool_obj.name)
-            return original_forward(*args, **kwargs)
-
-        tool_obj.forward = tracked_forward
-        return tool_obj
-
-
-def run_benchmark() -> None:
-    """Run the smolagents shopping cart benchmark."""
-    # Check for HuggingFace API token
-    if not os.getenv("HF_TOKEN"):
-        print("Error: HF_TOKEN environment variable not set")
-        sys.exit(1)
+    Args:
+        provider: Provider name.
+        model_id: Model identifier.
+        display_name: Display name for results.
+    """
+    print("\n" + "=" * 60)
+    print(f"Testing: {display_name}")
+    print("=" * 60)
 
     # Create new shopping session and initialize metrics tracker
     session = ShoppingSession()
-    metrics_tracker = MetricsTracker(target_budget=100.0)
-
-    # Create tool tracker
-    tool_tracker = ToolCallTracker(metrics_tracker=metrics_tracker)
+    metrics_tracker = MetricsTracker(target_budget=TARGET_BUDGET)
 
     # Create tools for this session
-    tools = create_smolagents_tools(session=session)
-
-    # Wrap tools for tracking
-    tracked_tools = [tool_tracker.wrap_tool(tool_obj=t) for t in tools]
+    tools = create_smolagents_tools(session=session, metrics_tracker=metrics_tracker)
 
     # Initialize smolagents model
-    model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
+    model = InferenceClientModel(model_id=model_id)
 
     # Create agent
     agent = CodeAgent(
-        tools=tracked_tools,
+        tools=tools,
         model=model,
         max_steps=30,
     )
@@ -178,40 +163,24 @@ def run_benchmark() -> None:
     metrics_tracker.start_timer()
 
     # Run the agent
-    print("=" * 60)
-    print("Starting Smolagents Shopping Cart Benchmark")
-    print("=" * 60)
-    print()
-
-    agent.run(
-        task="""Fill the shopping cart to be as close to $100 as possible WITHOUT going over the budget.
-
-Strategy:
-1. First, explore the available categories to understand what's available
-2. Search items in different categories to see prices
-3. Add items strategically to get close to $100
-4. You can remove items and add different ones to optimize
-5. When satisfied with your cart (close to $100 but not over), call checkout
-
-Important: You must call the checkout tool when you're done selecting items."""
-    )
+    agent.run(task=TASK_DESCRIPTION)
 
     # Stop metrics tracking
     metrics_tracker.stop_timer()
 
     # Build and display results
     benchmark_result = metrics_tracker.build_result(
-        framework="Smolagents",
-        model="Qwen/Qwen2.5-Coder-32B-Instruct",
-        task_description="Fill shopping cart to $100 without going over",
+        framework=f"Smolagents ({provider})",
+        model=display_name,
+        task_description=TASK_DESCRIPTION,
         cart=session.cart,
     )
 
-    # Calculate estimated cost (rough estimate based on HuggingFace API pricing)
-    # Note: Pricing varies, this is an estimate
+    # Calculate estimated cost
+    prompt_cost, completion_cost = get_pricing_for_provider(provider=provider)
     metrics_tracker.calculate_cost(
-        prompt_cost_per_1k=0.001,
-        completion_cost_per_1k=0.002
+        prompt_cost_per_1k=prompt_cost,
+        completion_cost_per_1k=completion_cost
     )
 
     print("\n" + "=" * 60)
@@ -222,11 +191,40 @@ Important: You must call the checkout tool when you're done selecting items."""
     output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
-    output_file = output_dir / "smolagents_result.json"
+    # Create safe filename from model display name
+    safe_filename = display_name.replace("/", "_").replace(" ", "_").replace("(", "").replace(")", "").lower()
+    output_file = output_dir / f"smolagents_{safe_filename}_result.json"
     with open(output_file, "w") as f:
         json.dump(benchmark_result.model_dump(), f, indent=2)
 
     print(f"\nResults saved to: {output_file}")
+
+
+def run_benchmark() -> None:
+    """Run the smolagents shopping cart benchmark with multiple models."""
+    # Filter for HuggingFace models only (smolagents works best with HF)
+    hf_models = [m for m in MODEL_CONFIGS if m["provider"] == "huggingface"]
+
+    if not hf_models:
+        print("No HuggingFace models configured")
+        return
+
+    # Check for API key
+    if not os.getenv("HF_TOKEN"):
+        print("Error: HF_TOKEN environment variable not set")
+        return
+
+    # Run benchmarks for each HuggingFace model
+    for model_config in hf_models:
+        run_single_benchmark(
+            provider=model_config["provider"],
+            model_id=model_config["model_id"],
+            display_name=model_config["display_name"]
+        )
+
+    print("\n" + "=" * 60)
+    print(f"Completed {len(hf_models)} benchmark(s)!")
+    print("=" * 60)
 
 
 if __name__ == "__main__":

@@ -160,20 +160,27 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
     # Create tools for this session
     tools = create_agent_tools(session=session, metrics_tracker=metrics_tracker)
 
-    # Get API key for provider
-    api_key = get_api_key_for_provider(provider=provider)
+    # Create agent with appropriate model
+    if provider == "openai":
+        # For OpenAI, just pass model name as string (uses OPENAI_API_KEY by default)
+        agent = Agent(
+            name="shopping_assistant",
+            instructions=SYSTEM_PROMPT,
+            tools=tools,
+            model=model_id,
+        )
+    else:
+        # For other providers, use LiteLLM
+        api_key = get_api_key_for_provider(provider=provider)
+        litellm_model_name = get_litellm_model_name(provider=provider, model_id=model_id)
+        model = LitellmModel(model=litellm_model_name, api_key=api_key)
 
-    # Create LiteLLM model
-    litellm_model_name = get_litellm_model_name(provider=provider, model_id=model_id)
-    model = LitellmModel(model=litellm_model_name, api_key=api_key)
-
-    # Create agent
-    agent = Agent(
-        name="shopping_assistant",
-        instructions=SYSTEM_PROMPT,
-        tools=tools,
-        model=model,
-    )
+        agent = Agent(
+            name="shopping_assistant",
+            instructions=SYSTEM_PROMPT,
+            tools=tools,
+            model=model,
+        )
 
     # Start metrics tracking
     metrics_tracker.start_timer()
