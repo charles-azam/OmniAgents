@@ -30,8 +30,8 @@ def setup_logfire() -> None:
     This will enable detailed tracing of agent runs, tool calls, and model requests.
     """
     logfire.configure(
-        local=True,
         service_name="pydantic-ai-benchmark",
+        send_to_logfire=False,
         console=logfire.ConsoleOptions(
             verbose=True,
             colors="auto",
