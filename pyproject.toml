@@ -18,6 +18,8 @@ dependencies = [
     "langchain-huggingface>=0.1.0",
     "langchain-xai>=0.2.0",
     "huggingface-hub>=0.20.0",
+    "openai-agents>=0.3.3",
+    "litellm>=1.78.2",
 ]
 
 [project.scripts]

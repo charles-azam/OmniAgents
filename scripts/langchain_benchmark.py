@@ -3,11 +3,7 @@
 
 import json
 import os
-import sys
 from pathlib import Path
-
-# Add parent directory to path to import prompttodraft
-sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from langchain.agents import AgentExecutor
 from langchain.agents import create_tool_calling_agent, create_openai_functions_agent
@@ -18,11 +14,7 @@ from langchain_openai import ChatOpenAI
 
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
-from prompttodraft.benchmark.config import SYSTEM_PROMPT
-from prompttodraft.benchmark.config import TASK_DESCRIPTION
-from prompttodraft.benchmark.config import TARGET_BUDGET
-from prompttodraft.benchmark.config import MODEL_CONFIGS
-from prompttodraft.benchmark.config import REQUIRED_API_KEYS
+from prompttodraft.benchmark.config import SYSTEM_PROMPT, TASK_DESCRIPTION, TARGET_BUDGET, MODEL_CONFIGS, REQUIRED_API_KEYSn
 from prompttodraft.benchmark.config import get_pricing_for_provider
 
 
