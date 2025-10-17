@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from langchain.agents import AgentExecutor
-from langchain.agents import create_tool_calling_agent
+from langchain.agents import create_tool_calling_agent, create_openai_functions_agent
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
@@ -18,6 +18,12 @@ from langchain_openai import ChatOpenAI
 
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
+from prompttodraft.benchmark.config import SYSTEM_PROMPT
+from prompttodraft.benchmark.config import TASK_DESCRIPTION
+from prompttodraft.benchmark.config import TARGET_BUDGET
+from prompttodraft.benchmark.config import MODEL_CONFIGS
+from prompttodraft.benchmark.config import REQUIRED_API_KEYS
+from prompttodraft.benchmark.config import get_pricing_for_provider
 
 
 def create_langchain_tools(session: ShoppingSession) -> list:
@@ -193,7 +199,7 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
 
     # Create new shopping session and initialize metrics tracker
     session = ShoppingSession()
-    metrics_tracker = MetricsTracker(target_budget=100.0)
+    metrics_tracker = MetricsTracker(target_budget=TARGET_BUDGET)
 
     # Initialize model
     model = create_model(provider=provider, model_id=model_id)
@@ -204,20 +210,7 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
     # Create the prompt
     prompt = ChatPromptTemplate.from_messages(
         [
-            (
-                "system",
-                """You are a shopping assistant. Your goal is to fill a shopping cart
-to be as close to $100 as possible WITHOUT going over the budget.
-
-Strategy suggestions:
-1. First, explore the available categories to understand what's available
-2. Search items in different categories to see prices
-3. Add items strategically to get close to $100
-4. You can remove items and add different ones to optimize
-5. When satisfied with your cart (close to $100 but not over), call checkout
-
-Important: You must call the checkout tool when you're done selecting items.""",
-            ),
+            ("system", SYSTEM_PROMPT),
             ("human", "{input}"),
             ("placeholder", "{agent_scratchpad}"),
         ]
@@ -234,7 +227,7 @@ Important: You must call the checkout tool when you're done selecting items.""",
     metrics_tracker.start_timer()
 
     agent_executor.invoke(
-        input={"input": "Fill the shopping cart to be as close to $100 as possible without going over."},
+        input={"input": TASK_DESCRIPTION},
         config={"callbacks": [callback_handler]}
     )
 
@@ -245,30 +238,16 @@ Important: You must call the checkout tool when you're done selecting items.""",
     benchmark_result = metrics_tracker.build_result(
         framework=f"LangChain ({provider})",
         model=display_name,
-        task_description="Fill shopping cart to $100 without going over",
+        task_description=TASK_DESCRIPTION,
         cart=session.cart,
     )
 
     # Calculate estimated cost based on provider
-    # Prices are per 1M tokens, converted to per 1K tokens
-    if provider == "openai":
-        # GPT-4o Mini: $0.25 input, $2.00 output per 1M tokens
-        metrics_tracker.calculate_cost(
-            prompt_cost_per_1k=0.25 / 1000,
-            completion_cost_per_1k=2.00 / 1000
-        )
-    elif provider == "xai":
-        # Grok 4 Fast: $0.20 input, $0.50 output per 1M tokens
-        metrics_tracker.calculate_cost(
-            prompt_cost_per_1k=0.20 / 1000,
-            completion_cost_per_1k=0.50 / 1000
-        )
-    else:
-        # GPT OSS 120B: $0.15 input, $0.60 output per 1M tokens
-        metrics_tracker.calculate_cost(
-            prompt_cost_per_1k=0.15 / 1000,
-            completion_cost_per_1k=0.60 / 1000
-        )
+    prompt_cost, completion_cost = get_pricing_for_provider(provider=provider)
+    metrics_tracker.calculate_cost(
+        prompt_cost_per_1k=prompt_cost,
+        completion_cost_per_1k=completion_cost
+    )
 
     print("\n" + "=" * 60)
     print(benchmark_result.to_summary())
@@ -289,41 +268,10 @@ Important: You must call the checkout tool when you're done selecting items.""",
 
 def run_benchmark() -> None:
     """Run the LangChain shopping cart benchmark with multiple models."""
-    # Define models to test
-    models = [
-        {
-            "provider": "openai",
-            "model_id": "gpt-5-mini",
-            "display_name": "GPT-5 Mini (OpenAI)",
-        },
-        {
-            "provider": "huggingface",
-            "model_id": "openai/gpt-oss-120b",
-            "display_name": "GPT OSS 120B (HuggingFace)",
-        },
-        {
-            "provider": "xai",
-            "model_id": "grok-4-fast-reasoning",
-            "display_name": "Grok 4 Fast Reasoning (X.AI)",
-        },
-        {
-            "provider": "xai",
-            "model_id": "grok-4-fast-non-reasoning",
-            "display_name": "Grok 4 Fast Non-Reasoning (X.AI)",
-        },
-    ]
-
-    # Check for required API keys
-    required_keys = {
-        "openai": "OPENAI_API_KEY",
-        "huggingface": "HF_TOKEN",
-        "xai": "XAI_API_KEY",
-    }
-
     missing_keys = []
-    for model_config in models:
+    for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
-        key = required_keys[provider]
+        key = REQUIRED_API_KEYS[provider]
         if not os.getenv(key):
             missing_keys.append(f"{key} (for {model_config['display_name']})")
 
@@ -335,9 +283,9 @@ def run_benchmark() -> None:
 
     # Run benchmarks for each model
     completed_count = 0
-    for model_config in models:
+    for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
-        key = required_keys[provider]
+        key = REQUIRED_API_KEYS[provider]
 
         if not os.getenv(key):
             print(f"\nSkipping {model_config['display_name']} (missing {key})")

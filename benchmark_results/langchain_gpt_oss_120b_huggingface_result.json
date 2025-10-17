@@ -1,31 +1,30 @@
 {
   "framework": "LangChain (huggingface)",
   "metrics": {
-    "tool_call_count": 13,
+    "tool_call_count": 11,
     "tool_call_breakdown": {
       "list_categories_tool": 1,
-      "search_item_tool": 5,
-      "add_to_cart_tool": 6,
+      "search_item_tool": 4,
+      "add_to_cart_tool": 5,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 25.79,
+    "execution_time_seconds": 25.81,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.97,
-    "distance_from_target": 0.03,
+    "final_cart_total": 99.96,
+    "distance_from_target": 0.04,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.97,
-    "item_count": 6,
+    "total": 99.96,
+    "item_count": 5,
     "items": [
       "Bluetooth Speaker",
+      "Cotton T-Shirt",
+      "Phone Stand",
       "Wireless Mouse",
-      "Science Fiction Novel",
-      "Cookbook",
-      "Chocolate Bar",
-      "USB Cable"
+      "Tea Sampler"
     ],
     "message": "Cart summary retrieved"
   },

@@ -1,34 +1,33 @@
 {
-  "framework": "LangChain (openai)",
+  "framework": "LangChain (xai)",
   "metrics": {
-    "tool_call_count": 14,
+    "tool_call_count": 12,
     "tool_call_breakdown": {
       "list_categories_tool": 1,
       "search_item_tool": 5,
-      "add_to_cart_tool": 5,
-      "get_cart_total_tool": 2,
+      "add_to_cart_tool": 4,
+      "get_cart_total_tool": 1,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 29.4,
+    "execution_time_seconds": 22.62,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.96,
-    "distance_from_target": 0.04,
+    "final_cart_total": 98.97,
+    "distance_from_target": 1.03,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.96,
-    "item_count": 5,
+    "total": 98.97,
+    "item_count": 4,
     "items": [
       "Bluetooth Speaker",
-      "Python Programming Guide",
-      "Coffee Beans (1lb)",
-      "Puzzle (1000 pieces)",
-      "Screen Cleaner"
+      "Board Game",
+      "Cookbook",
+      "Gloves"
     ],
     "message": "Cart summary retrieved"
   },
   "task_description": "Fill shopping cart to $100 without going over",
-  "model": "GPT-5 Mini (OpenAI)"
+  "model": "Grok 4 Fast Reasoning (X.AI)"
 }
