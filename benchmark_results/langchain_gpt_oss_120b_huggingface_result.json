@@ -8,23 +8,23 @@
       "add_to_cart_tool": 5,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 25.81,
+    "execution_time_seconds": 28.26,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.96,
-    "distance_from_target": 0.04,
+    "final_cart_total": 99.98,
+    "distance_from_target": 0.02,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.96,
+    "total": 99.98,
     "item_count": 5,
     "items": [
       "Bluetooth Speaker",
-      "Cotton T-Shirt",
-      "Phone Stand",
       "Wireless Mouse",
-      "Tea Sampler"
+      "Python Programming Guide",
+      "Baseball Cap",
+      "USB Cable"
     ],
     "message": "Cart summary retrieved"
   },

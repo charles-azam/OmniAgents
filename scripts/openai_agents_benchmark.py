@@ -176,7 +176,7 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
     )
 
     # Start metrics tracking
-    metrics_tracker.start()
+    metrics_tracker.start_timer()
 
     # Run agent
     result = await Runner.run(agent=agent, message=TASK_DESCRIPTION)
@@ -184,7 +184,7 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
     print(f"\nFinal output: {result.final_output}")
 
     # Stop metrics tracking
-    metrics_tracker.stop()
+    metrics_tracker.stop_timer()
 
     # Build and display results
     benchmark_result = metrics_tracker.build_result(

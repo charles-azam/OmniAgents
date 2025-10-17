@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
-from prompttodraft.benchmark.config import SYSTEM_PROMPT, TASK_DESCRIPTION, TARGET_BUDGET, MODEL_CONFIGS, REQUIRED_API_KEYSn
+from prompttodraft.benchmark.config import SYSTEM_PROMPT, TASK_DESCRIPTION, TARGET_BUDGET, MODEL_CONFIGS, REQUIRED_API_KEYS
 from prompttodraft.benchmark.config import get_pricing_for_provider
 
 

@@ -9,22 +9,22 @@
       "get_cart_total_tool": 1,
       "checkout_tool": 1
     },
-    "execution_time_seconds": 22.62,
+    "execution_time_seconds": 14.36,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 98.97,
-    "distance_from_target": 1.03,
+    "final_cart_total": 99.48,
+    "distance_from_target": 0.52,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 98.97,
+    "total": 99.48,
     "item_count": 4,
     "items": [
       "Bluetooth Speaker",
       "Board Game",
       "Cookbook",
-      "Gloves"
+      "Science Fiction Novel"
     ],
     "message": "Cart summary retrieved"
   },

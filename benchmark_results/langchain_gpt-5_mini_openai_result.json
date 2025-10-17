@@ -1,31 +1,31 @@
 {
   "framework": "LangChain (openai)",
   "metrics": {
-    "tool_call_count": 14,
+    "tool_call_count": 19,
     "tool_call_breakdown": {
       "list_categories_tool": 1,
-      "search_item_tool": 5,
+      "search_item_tool": 7,
       "add_to_cart_tool": 5,
-      "get_cart_total_tool": 2,
-      "checkout_tool": 1
+      "get_cart_total_tool": 5,
+      "get_price_tool": 1
     },
-    "execution_time_seconds": 29.4,
+    "execution_time_seconds": 44.78,
     "token_usage": {},
     "estimated_cost": 0.0,
     "success": true,
-    "final_cart_total": 99.96,
-    "distance_from_target": 0.04,
+    "final_cart_total": 98.96,
+    "distance_from_target": 1.04,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.96,
+    "total": 98.96,
     "item_count": 5,
     "items": [
       "Bluetooth Speaker",
       "Python Programming Guide",
       "Coffee Beans (1lb)",
       "Puzzle (1000 pieces)",
-      "Screen Cleaner"
+      "Chocolate Bar"
     ],
     "message": "Cart summary retrieved"
   },
