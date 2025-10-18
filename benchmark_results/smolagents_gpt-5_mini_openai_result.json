@@ -1,29 +1,34 @@
 {
   "framework": "Smolagents (openai)",
   "metrics": {
-    "tool_call_count": 11,
+    "tool_call_count": 20,
     "tool_call_breakdown": {
       "list_categories": 1,
       "search_item": 5,
-      "add_to_cart": 4,
-      "checkout": 1
+      "add_to_cart": 9,
+      "get_cart_total": 2,
+      "get_price": 1,
+      "remove_from_cart": 2
     },
-    "execution_time_seconds": 107.48,
+    "execution_time_seconds": 256.8,
     "token_usage": {},
     "estimated_cost": 0.0,
-    "success": true,
-    "final_cart_total": 99.97,
-    "distance_from_target": 0.03,
+    "success": false,
+    "final_cart_total": 111.96,
+    "distance_from_target": 11.96,
     "target_budget": 100.0
   },
   "cart_summary": {
-    "total": 99.97,
-    "item_count": 4,
+    "total": 111.96,
+    "item_count": 7,
     "items": [
       "Board Game",
       "Bluetooth Speaker",
-      "Python Programming Guide",
-      "Children's Picture Book"
+      "Children's Picture Book",
+      "Playing Cards",
+      "Chocolate Bar",
+      "Toy Car",
+      "Honey Jar"
     ],
     "message": "Cart summary retrieved"
   },

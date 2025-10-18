@@ -7,12 +7,18 @@ from pathlib import Path
 
 from smolagents import CodeAgent, ToolCallingAgent
 from smolagents import InferenceClientModel
-from smolagents import OpenAIModel, LiteLLMModel
+from smolagents import OpenAIModel
 from smolagents import tool
 
-from prompttodraft.benchmark.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
+from prompttodraft.benchmark.config import MODEL_CONFIGS_NO_XAI, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
 from prompttodraft.benchmark.metrics import MetricsTracker
 from prompttodraft.benchmark.session import ShoppingSession
+
+from phoenix.otel import register
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+
+register()
+SmolagentsInstrumentor().instrument()
 
 
 def create_smolagents_tools(session: ShoppingSession, metrics_tracker: MetricsTracker) -> list:
@@ -146,9 +152,11 @@ def create_model(provider: str, model_id: str):
     elif provider == "huggingface":
         return InferenceClientModel(model_id=model_id)
     elif provider == "xai":
-        import litellm
-        litellm.drop_params = True
-        return LiteLLMModel(model_id=f"xai/{model_id}")
+        return OpenAIModel(
+            model_id=model_id,
+            api_key=os.getenv("XAI_API_KEY"),
+            api_base="https://api.x.ai/v1"
+        )
     else:
         raise ValueError(f"Unsupported provider: {provider}")
 
@@ -227,7 +235,7 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
 def run_benchmark() -> None:
     """Run the smolagents shopping cart benchmark with multiple models."""
     missing_keys = []
-    for model_config in MODEL_CONFIGS:
+    for model_config in MODEL_CONFIGS_NO_XAI:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
         if not os.getenv(key):
@@ -241,7 +249,7 @@ def run_benchmark() -> None:
 
     # Run benchmarks for each model
     completed_count = 0
-    for model_config in MODEL_CONFIGS:
+    for model_config in MODEL_CONFIGS_NO_XAI:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
 

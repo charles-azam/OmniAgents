@@ -43,6 +43,19 @@ MODEL_CONFIGS = [
     },
 ]
 
+MODEL_CONFIGS_NO_XAI = [
+    {
+        "provider": "openai",
+        "model_id": "gpt-5-mini",
+        "display_name": "GPT-5 Mini (OpenAI)",
+    },
+    {
+        "provider": "huggingface",
+        "model_id": "openai/gpt-oss-120b",
+        "display_name": "GPT OSS 120B (HuggingFace)",
+    },
+]
+
 # API key requirements per provider
 REQUIRED_API_KEYS = {
     "openai": "OPENAI_API_KEY",
