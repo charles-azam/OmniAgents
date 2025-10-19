@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, Union
 from pathlib import Path
 
 from smolagents import Tool
-from smolcc.tool_output import ToolOutput, CodeOutput, TextOutput
+from prompttodraft.smolcc.tool_output import ToolOutput, CodeOutput, TextOutput
 
 # Constants matching the original implementation
 MAX_LINES = 2000

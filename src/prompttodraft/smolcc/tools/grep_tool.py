@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import List, Optional, Dict, Any, Tuple, Union
 
 from smolagents import Tool
-from smolcc.tool_output import ToolOutput, CodeOutput, TextOutput, TableOutput, FileListOutput
+from prompttodraft.smolcc.tool_output import ToolOutput, CodeOutput, TextOutput, TableOutput, FileListOutput
 
 
 class GrepTool(Tool):

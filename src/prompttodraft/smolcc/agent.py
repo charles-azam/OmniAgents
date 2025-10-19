@@ -16,9 +16,9 @@ from rich.panel import Panel
 from rich.text import Text
 
 from smolagents import ToolCallingAgent, Tool, LogLevel, AgentLogger
-from smolcc.utils import strip_quotes
+from prompttodraft.smolcc.utils import strip_quotes
 
-from smolcc.tool_output import ToolOutput, ToolCallOutput, AssistantOutput, convert_to_tool_output
+from prompttodraft.smolcc.tool_output import ToolOutput, ToolCallOutput, AssistantOutput, convert_to_tool_output
 
 
 class RichConsoleLogger(AgentLogger):
@@ -239,7 +239,7 @@ def create_agent(cwd: Optional[str] = None, log_file: Optional[str] = "tool_agen
     from smolagents import LiteLLMModel
 
     # Import tool modules
-    from smolcc.tools import (
+    from prompttodraft.smolcc.tools import (
         BashTool,
         EditTool,
         GlobTool, 
@@ -251,7 +251,7 @@ def create_agent(cwd: Optional[str] = None, log_file: Optional[str] = "tool_agen
     )
     
     # Import system prompt utilities
-    from smolcc.system_prompt import get_system_prompt
+    from prompttodraft.smolcc.system_prompt import get_system_prompt
     
     # Initialize environment variables
     load_dotenv()

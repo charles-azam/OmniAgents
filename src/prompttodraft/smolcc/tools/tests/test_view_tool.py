@@ -12,8 +12,8 @@ import unittest
 import re
 from typing import Dict, Any, List
 
-from smolcc.tools.view_tool import view_tool
-from smolcc.tool_output import ToolOutput, TextOutput, CodeOutput
+from prompttodraft.smolcc.tools.view_tool import view_tool
+from prompttodraft.smolcc.tool_output import ToolOutput, TextOutput, CodeOutput
 
 # Constants
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))

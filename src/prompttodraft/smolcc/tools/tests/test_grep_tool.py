@@ -11,8 +11,8 @@ import unittest
 import re
 from typing import Dict, Any, List, Union
 
-from smolcc.tools.grep_tool import grep_tool
-from smolcc.tool_output import ToolOutput, CodeOutput
+from prompttodraft.smolcc.tools.grep_tool import grep_tool
+from prompttodraft.smolcc.tool_output import ToolOutput, CodeOutput
 
 # Constants
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))

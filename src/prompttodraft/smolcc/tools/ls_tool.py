@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import List, Dict, Any, Optional, Set, Tuple, Union
 
 from smolagents import Tool
-from smolcc.tool_output import FileListOutput, TextOutput, ToolOutput
+from prompttodraft.smolcc.tool_output import FileListOutput, TextOutput, ToolOutput
 
 # Constants
 MAX_FILES = 1000

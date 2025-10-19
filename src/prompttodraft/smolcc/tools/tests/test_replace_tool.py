@@ -12,7 +12,7 @@ import unittest
 import shutil
 from typing import Dict, Any
 
-from smolcc.tools.replace_tool import write_tool
+from prompttodraft.smolcc.tools.replace_tool import write_tool
 
 # Constants
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))

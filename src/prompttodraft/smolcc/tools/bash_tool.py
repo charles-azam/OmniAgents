@@ -15,7 +15,7 @@ import signal
 from typing import Optional, Dict, Any, Union, Tuple
 
 from smolagents import Tool
-from smolcc.tool_output import ToolOutput, CodeOutput, TextOutput
+from prompttodraft.smolcc.tool_output import ToolOutput, CodeOutput, TextOutput
 
 # Constants
 DEFAULT_TIMEOUT = 1800000  # 30 minutes in milliseconds

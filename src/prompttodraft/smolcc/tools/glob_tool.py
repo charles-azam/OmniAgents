@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any, Tuple, Union
 from datetime import datetime
 
 from smolagents import Tool
-from smolcc.tool_output import ToolOutput, FileListOutput, TextOutput
+from prompttodraft.smolcc.tool_output import ToolOutput, FileListOutput, TextOutput
 
 
 class GlobTool(Tool):

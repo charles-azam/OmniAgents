@@ -11,8 +11,8 @@ import unittest
 import json
 from typing import Dict, Any
 
-from smolcc.tools.bash_tool import bash_tool
-from smolcc.tool_output import ToolOutput, TextOutput
+from prompttodraft.smolcc.tools.bash_tool import bash_tool
+from prompttodraft.smolcc.tool_output import ToolOutput, TextOutput
 
 # Constants
 TEST_DIR = os.path.dirname(os.path.abspath(__file__))
