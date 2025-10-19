@@ -163,6 +163,11 @@ def test_text_output_multiline_short() -> None:
     assert "Line 2" in result
     assert "Line 3" in result
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_text_output_multiline_short:[/cyan]")
+    output.display(console=terminal_console)
+
 
 def test_text_output_multiline_long() -> None:
     """
@@ -184,6 +189,11 @@ def test_text_output_multiline_long() -> None:
     assert "Line 1" in result
     assert "..." in result
     assert "lines" in result
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_text_output_multiline_long:[/cyan]")
+    output.display(console=terminal_console)
 
 
 def test_code_output_short() -> None:
@@ -211,6 +221,11 @@ def test_code_output_short() -> None:
     assert "hello" in result
     assert "⎿" in result
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_code_output_short:[/cyan]")
+    output.display(console=terminal_console)
+
 
 def test_code_output_long() -> None:
     """
@@ -231,6 +246,11 @@ def test_code_output_long() -> None:
     # Should show preview and count
     assert "..." in result
     assert "more lines" in result
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_code_output_long:[/cyan]")
+    output.display(console=terminal_console)
 
 
 def test_table_output_with_headers() -> None:
@@ -265,6 +285,11 @@ def test_table_output_with_headers() -> None:
     assert "Bob" in result
     assert "Charlie" in result
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_table_output_with_headers:[/cyan]")
+    output.display(console=terminal_console)
+
 
 def test_table_output_without_headers() -> None:
     """
@@ -291,6 +316,11 @@ def test_table_output_without_headers() -> None:
     # Should contain the data
     assert "Value1" in result
     assert "Value6" in result
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_table_output_without_headers:[/cyan]")
+    output.display(console=terminal_console)
 
 
 def test_file_list_output_with_files() -> None:
@@ -326,6 +356,11 @@ def test_file_list_output_with_files() -> None:
     assert "[FILE]" in result
     assert "KB" in result  # Size formatting
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_file_list_output_with_files:[/cyan]")
+    output.display(console=terminal_console)
+
 
 def test_file_list_output_many_files() -> None:
     """
@@ -347,6 +382,11 @@ def test_file_list_output_many_files() -> None:
     assert "file_10.txt" in result
     assert "..." in result
     assert "more items" in result
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_file_list_output_many_files:[/cyan]")
+    output.display(console=terminal_console)
 
 
 def test_assistant_output() -> None:
@@ -370,6 +410,11 @@ def test_assistant_output() -> None:
     # Should contain the message
     assert "I've completed the task successfully!" in result
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_assistant_output:[/cyan]")
+    output.display(console=terminal_console)
+
 
 def test_convert_to_tool_output_already_tool_output() -> None:
     """
@@ -384,6 +429,11 @@ def test_convert_to_tool_output_already_tool_output() -> None:
     result = convert_to_tool_output(result=original)
 
     assert result is original
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_already_tool_output:[/cyan]")
+    result.display(console=terminal_console)
 
 
 def test_convert_to_tool_output_simple_string() -> None:
@@ -401,6 +451,11 @@ def test_convert_to_tool_output_simple_string() -> None:
     assert isinstance(result, TextOutput)
     assert result.data == text
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_simple_string:[/cyan]")
+    result.display(console=terminal_console)
+
 
 def test_convert_to_tool_output_code_string() -> None:
     """
@@ -416,6 +471,11 @@ def test_convert_to_tool_output_code_string() -> None:
 
     assert isinstance(result, CodeOutput)
     assert result.data == code
+
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_code_string:[/cyan]")
+    result.display(console=terminal_console)
 
 
 def test_convert_to_tool_output_table_list() -> None:
@@ -436,6 +496,11 @@ def test_convert_to_tool_output_table_list() -> None:
     assert isinstance(result, TableOutput)
     assert result.data == table_data
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_table_list:[/cyan]")
+    result.display(console=terminal_console)
+
 
 def test_convert_to_tool_output_file_list() -> None:
     """
@@ -455,6 +520,11 @@ def test_convert_to_tool_output_file_list() -> None:
     assert isinstance(result, FileListOutput)
     assert result.data == files
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_file_list:[/cyan]")
+    result.display(console=terminal_console)
+
 
 def test_convert_to_tool_output_other() -> None:
     """
@@ -471,7 +541,17 @@ def test_convert_to_tool_output_other() -> None:
     assert isinstance(result, TextOutput)
     assert result.data == number
 
+    # Display to actual terminal for debugging
+    terminal_console = Console()
+    terminal_console.print("\n[cyan]test_convert_to_tool_output_other:[/cyan]")
+    result.display(console=terminal_console)
+
+
 if __name__ == "__main__":
+    print("\n" + "="*70)
+    print("Running ToolOutput Tests with Visual Output")
+    print("="*70)
+
     test_tool_output_basic()
     test_tool_call_output_with_dict_params()
     test_tool_call_output_with_long_params()
@@ -483,3 +563,15 @@ if __name__ == "__main__":
     test_table_output_with_headers()
     test_table_output_without_headers()
     test_file_list_output_with_files()
+    test_file_list_output_many_files()
+    test_assistant_output()
+    test_convert_to_tool_output_already_tool_output()
+    test_convert_to_tool_output_simple_string()
+    test_convert_to_tool_output_code_string()
+    test_convert_to_tool_output_table_list()
+    test_convert_to_tool_output_file_list()
+    test_convert_to_tool_output_other()
+
+    print("\n" + "="*70)
+    print("All tests passed! ✓")
+    print("="*70 + "\n")
