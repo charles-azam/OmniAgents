@@ -20,6 +20,7 @@ dependencies = [
     "huggingface-hub>=0.20.0",
     "openai-agents>=0.3.3",
     "litellm>=1.78.2",
+    "pytest>=8.4.2",
 ]
 
 [project.scripts]
