@@ -81,7 +81,10 @@ src/prompttodraft/tools/
 ├── adapters/                  # Framework integration layer
 │   └── smolagents_adapter.py  # Smolagents framework adapter
 ├── coding_tools.py            # CodingTool abstract + implementations
-└── factory.py                 # ToolFactory for easy creation
+├── factory.py                 # ToolFactory for easy creation
+├── agent.py                   # ToolAgent with Rich output formatting
+├── system_prompt.py           # Dynamic system prompt generation
+└── system_message.txt         # System prompt template
 ```
 
 ## Layer Details
@@ -454,6 +457,67 @@ All functionality is preserved, but now with:
 - Easier to extend
 - Framework-agnostic core
 - Reusable across execution environments
+
+## Agent Integration
+
+### ToolAgent (`agent.py`)
+
+The `ToolAgent` class provides a complete agent implementation using smolagents with the 3-layer architecture:
+
+```python
+from prompttodraft.tools.agent import create_agent
+
+# Create an agent with all tools
+agent = create_agent(cwd="/path/to/project", log_file="agent.log")
+
+# Run a query
+result = agent.run("What files are in the current directory?")
+```
+
+#### Features
+
+- **Rich Terminal Output**: Uses Rich library for beautiful terminal formatting
+- **Tool Call Display**: Shows tool calls with parameters
+- **Smart Output Formatting**: Automatically formats outputs based on type (code, files, tables, text)
+- **Thinking Spinner**: Shows visual feedback during LLM processing
+- **Execution Timing**: Displays execution time for slow operations
+- **Error Handling**: Prominently displays errors
+
+#### System Prompt Generation (`system_prompt.py`)
+
+The agent uses dynamic system prompts that include:
+
+- Current working directory
+- Directory structure (with smart filtering)
+- Git repository status (if applicable)
+- Platform information
+- Current date
+
+```python
+from prompttodraft.tools.system_prompt import get_system_prompt
+
+# Generate a system prompt for a specific directory
+prompt = get_system_prompt(cwd="/path/to/project")
+```
+
+#### Custom Logger
+
+The `RichConsoleLogger` provides:
+
+- Suppression of default smolagents output
+- Rich console integration
+- Optional file logging
+- Formatted error display
+
+#### Display System
+
+The agent automatically formats different output types:
+
+- **TextOutputModel**: Simple text with line count for multiline
+- **CodeOutputModel**: Syntax-highlighted code with line numbers
+- **FileListOutputModel**: Tables with file names, types, and sizes
+- **ErrorOutputModel**: Prominently styled error messages
+- **TableOutputModel**: Formatted tables with headers
 
 ## Design Patterns Used
 
