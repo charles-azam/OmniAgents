@@ -173,19 +173,28 @@ GENERAL EDITING GUIDELINES
 
         # Read the file content
         try:
-            file_content = self.backend.read_file(file_path=file_path, offset=0, limit=None)
+            file_content_with_numbers = self.backend.read_file(file_path=file_path, offset=0, limit=None)
             # Remove line numbers that were added by read_file
-            lines_with_numbers = file_content.split('\n')
+            lines_with_numbers = file_content_with_numbers.split('\n')
             lines = []
             for line in lines_with_numbers:
-                # Skip empty lines and truncation messages
-                if not line or line.startswith('(Result truncated'):
+                # Skip truncation messages but keep empty lines
+                if line.startswith('(Result truncated'):
                     continue
-                # Remove line number prefix (format: "   123\t")
+                # Remove line number prefix (format: "     1\t")
                 if '\t' in line:
-                    lines.append(line.split('\t', 1)[1] if len(line.split('\t', 1)) > 1 else line)
+                    # Split by tab and take everything after the first tab
+                    parts = line.split('\t', 1)
+                    if len(parts) > 1:
+                        lines.append(parts[1])
+                    else:
+                        # Line with tab but no content after - keep empty
+                        lines.append('')
                 else:
-                    lines.append(line)
+                    # No tab means it's an empty line from line numbering
+                    # Only keep it if the line is truly empty
+                    if not line.strip():
+                        lines.append('')
             file_content = '\n'.join(lines)
 
         except Exception as e:

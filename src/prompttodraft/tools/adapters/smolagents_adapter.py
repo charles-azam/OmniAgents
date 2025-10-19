@@ -20,6 +20,9 @@ class SmolagentsToolAdapter(Tool):
     Base adapter for converting Core tools to smolagents format.
 
     This adapter wraps a core tool and exposes it as a smolagents Tool.
+
+    Note: Subclasses must define their own forward() method with the correct signature
+    to match smolagents validation requirements.
     """
 
     def __init__(self, core_tool):
@@ -38,23 +41,6 @@ class SmolagentsToolAdapter(Tool):
         self.inputs = core_tool.metadata.inputs
         self.output_type = core_tool.metadata.output_type
 
-    def forward(self, **kwargs):
-        """
-        Execute the core tool and return the result.
-
-        Args:
-            **kwargs: Tool parameters
-
-        Returns:
-            String representation of the output (for smolagents compatibility)
-        """
-        # Execute the core tool
-        output_model = self.core.execute(**kwargs)
-
-        # For smolagents, return string representation
-        # The output model's __str__ method provides a good default
-        return str(output_model)
-
 
 # Specific adapters for each tool type
 class SmolagentsBashTool(SmolagentsToolAdapter):
@@ -63,12 +49,20 @@ class SmolagentsBashTool(SmolagentsToolAdapter):
     def __init__(self, core: BashToolCore):
         super().__init__(core_tool=core)
 
+    def forward(self, command: str, timeout: int | None = None):
+        """Execute bash command."""
+        return str(self.core.execute(command=command, timeout=timeout))
+
 
 class SmolagentsViewTool(SmolagentsToolAdapter):
     """Smolagents adapter for ViewToolCore."""
 
     def __init__(self, core: ViewToolCore):
         super().__init__(core_tool=core)
+
+    def forward(self, file_path: str, offset: int | None = None, limit: int | None = None):
+        """Read a file."""
+        return str(self.core.execute(file_path=file_path, offset=offset, limit=limit))
 
 
 class SmolagentsEditTool(SmolagentsToolAdapter):
@@ -77,12 +71,20 @@ class SmolagentsEditTool(SmolagentsToolAdapter):
     def __init__(self, core: EditToolCore):
         super().__init__(core_tool=core)
 
+    def forward(self, file_path: str, old_string: str, new_string: str):
+        """Edit a file."""
+        return str(self.core.execute(file_path=file_path, old_string=old_string, new_string=new_string))
+
 
 class SmolagentsReplaceTool(SmolagentsToolAdapter):
     """Smolagents adapter for ReplaceToolCore."""
 
     def __init__(self, core: ReplaceToolCore):
         super().__init__(core_tool=core)
+
+    def forward(self, file_path: str, content: str):
+        """Replace file contents."""
+        return str(self.core.execute(file_path=file_path, content=content))
 
 
 class SmolagentsGlobTool(SmolagentsToolAdapter):
@@ -91,12 +93,20 @@ class SmolagentsGlobTool(SmolagentsToolAdapter):
     def __init__(self, core: GlobToolCore):
         super().__init__(core_tool=core)
 
+    def forward(self, pattern: str, path: str | None = None):
+        """Find files matching pattern."""
+        return str(self.core.execute(pattern=pattern, path=path))
+
 
 class SmolagentsGrepTool(SmolagentsToolAdapter):
     """Smolagents adapter for GrepToolCore."""
 
     def __init__(self, core: GrepToolCore):
         super().__init__(core_tool=core)
+
+    def forward(self, pattern: str, include: str | None = None, path: str | None = None):
+        """Search file contents."""
+        return str(self.core.execute(pattern=pattern, include=include, path=path))
 
 
 class SmolagentsLSTool(SmolagentsToolAdapter):
@@ -105,9 +115,17 @@ class SmolagentsLSTool(SmolagentsToolAdapter):
     def __init__(self, core: LSToolCore):
         super().__init__(core_tool=core)
 
+    def forward(self, path: str, ignore: list[str] | None = None):
+        """List directory contents."""
+        return str(self.core.execute(path=path, ignore=ignore))
+
 
 class SmolagentsUserInputTool(SmolagentsToolAdapter):
     """Smolagents adapter for UserInputToolCore."""
 
     def __init__(self, core: UserInputToolCore):
         super().__init__(core_tool=core)
+
+    def forward(self, question: str):
+        """Ask user for input."""
+        return str(self.core.execute(question=question))
