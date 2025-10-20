@@ -26,6 +26,12 @@ from prompttodraft.tools.outputs.models import (
     ToolOutputModel,
 )
 
+from phoenix.otel import register
+from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+
+register()
+SmolagentsInstrumentor().instrument()
+
 
 class RichConsoleLogger(AgentLogger):
     """
@@ -131,23 +137,30 @@ class ToolAgent(ToolCallingAgent):
     including spinners for long-running operations and formatted tool outputs.
     """
 
-    def __init__(self, *args: Any, **kwargs: Any):
+    def __init__(
+        self,
+        tools: list[Tool],
+        model: ApiModel,
+        system_prompt: str | None = None,
+        log_file: str | None = None,
+    ):
         """
         Initialize the ToolAgent.
 
         Args:
-            *args: Positional arguments for ToolCallingAgent
-            **kwargs: Keyword arguments for ToolCallingAgent
+            tools: List of tools available to the agent
+            model: The language model to use
+            system_prompt: Optional system prompt to prepend to user input
+            log_file: Optional path to log file
         """
-        # Extract log file if provided
-        log_file = kwargs.pop("log_file", None)
+        # Store application system prompt
+        self.app_system_prompt = system_prompt
 
         # Create our custom logger
-        if "logger" not in kwargs:
-            kwargs["logger"] = RichConsoleLogger(level=LogLevel.INFO, log_file=log_file)
+        logger = RichConsoleLogger(level=LogLevel.INFO, log_file=log_file)
 
         # Initialize the parent class
-        super().__init__(*args, **kwargs)
+        super().__init__(tools=tools, model=model, logger=logger)
 
         # Get the console from the logger
         self.console = self.logger.console
@@ -341,6 +354,10 @@ class ToolAgent(ToolCallingAgent):
         Returns:
             The agent's response
         """
+        # Prepend system prompt to user input if provided
+        if self.app_system_prompt:
+            user_input = f"{self.app_system_prompt}\n\n{user_input}"
+
         # Run the agent
         result = super().run(user_input, stream=stream)
 
@@ -410,7 +427,6 @@ def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(
         A ToolAgent instance
     """
     from dotenv import load_dotenv
-    from smolagents import LiteLLMModel
 
     from prompttodraft.tools.factory import ToolFactory
     from prompttodraft.tools.system_prompt import get_system_prompt
@@ -424,13 +440,11 @@ def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(
 
     # Get the dynamic system prompt
     system_prompt = get_system_prompt(cwd=cwd)
-    
-    model.system = system_prompt
 
     # Create tool instances using the ToolFactory
     tool_instances = ToolFactory.create_smolagents_tools(environment="local")
 
-    # Initialize the agent with all tools
-    agent = ToolAgent(tools=tool_instances, model=model, log_file=log_file)
+    # Initialize the agent with all tools and system prompt
+    agent = ToolAgent(tools=tool_instances, model=model, log_file=log_file, system_prompt=system_prompt)
 
     return agent
