@@ -15,7 +15,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
-from smolagents import AgentLogger, LogLevel, Tool, ToolCallingAgent
+from smolagents import AgentLogger, LogLevel, Tool, ToolCallingAgent, ApiModel, InferenceClientModel
 
 from prompttodraft.tools.outputs.models import (
     CodeOutputModel,
@@ -398,7 +398,7 @@ class ToolAgent(ToolCallingAgent):
         raise ValueError(f"Tool not found: {tool_name}")
 
 
-def create_agent(cwd: str | None = None, log_file: str | None = "tool_agent.log") -> ToolAgent:
+def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="groq"), log_file: str | None = "tool_agent.log") -> ToolAgent:
     """
     Create a tool agent with all available tools using the new 3-layer architecture.
 
@@ -424,16 +424,13 @@ def create_agent(cwd: str | None = None, log_file: str | None = "tool_agent.log"
 
     # Get the dynamic system prompt
     system_prompt = get_system_prompt(cwd=cwd)
-
-    # Create a model with the system prompt
-    agent_model = LiteLLMModel(
-        model_id="claude-3-7-sonnet-20250219", api_key=os.getenv("ANTHROPIC_API_KEY"), system=system_prompt
-    )
+    
+    model.system = system_prompt
 
     # Create tool instances using the ToolFactory
     tool_instances = ToolFactory.create_smolagents_tools(environment="local")
 
     # Initialize the agent with all tools
-    agent = ToolAgent(tools=tool_instances, model=agent_model, log_file=log_file)
+    agent = ToolAgent(tools=tool_instances, model=model, log_file=log_file)
 
     return agent
