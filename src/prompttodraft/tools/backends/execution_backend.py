@@ -7,6 +7,7 @@ All backends must implement these primitive operations.
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class BackendStatus(Enum):
@@ -36,8 +37,7 @@ class FileInfo:
 @dataclass
 class CommandResult:
     """Result of command execution."""
-    stdout: str
-    stderr: str
+    output: str
     exit_code: int
 
 
@@ -150,7 +150,7 @@ class ExecutionBackend(ABC):
             timeout: Optional timeout in milliseconds
 
         Returns:
-            CommandResult with stdout, stderr, and exit_code
+            CommandResult with output (stdout+stderr merged) and exit_code
         """
         pass
 
@@ -165,186 +165,66 @@ class ExecutionBackend(ABC):
             Absolute path to current working directory
         """
         pass
-
-    @abstractmethod
-    def set_working_directory(self, path: str) -> None:
+    
+    def convert_to_path(self, path: str | Path) -> Path:
         """
-        Change the current working directory.
-
-        Args:
-            path: Absolute path to new working directory
-
-        Raises:
-            FileNotFoundError: If path does not exist
-            NotADirectoryError: If path is not a directory
+        Convert a string path to a Path object.
         """
-        pass
+        path = Path(path)
+        working_dir = self.get_working_directory()
+        if path.is_relative_to(working_dir):
+            return path
+        else:
+            return working_dir / path
 
     # === File Operations ===
 
     @abstractmethod
-    def read_file(
-        self,
-        file_path: str,
-        offset: int = 0,
-        limit: int | None = None
-    ) -> str:
-        """
-        Read a file from the filesystem.
-
-        Args:
-            file_path: Absolute path to the file
-            offset: Line number to start reading from (0-indexed)
-            limit: Maximum number of lines to read
-
-        Returns:
-            File contents with line numbers
-        """
+    def read_file(self, file_path: str | Path) -> str:
+        """Read a file from the filesystem."""
         pass
 
     @abstractmethod
-    def write_file(
-        self,
-        file_path: str,
-        content: str
-    ) -> None:
-        """
-        Write content to a file, creating it if it doesn't exist.
-
-        Args:
-            file_path: Absolute path to the file
-            content: Content to write
-
-        Raises:
-            IOError: If file cannot be written
-        """
+    def write_file(self, file_path: str | Path, content: str) -> None:
+        """Write content to a file, creating it if it doesn't exist."""
         pass
 
     @abstractmethod
-    def delete_file(self, path: str) -> None:
-        """
-        Delete a file.
-
-        Args:
-            path: Absolute path to the file
-
-        Raises:
-            FileNotFoundError: If file does not exist
-            IsADirectoryError: If path is a directory
-        """
+    def delete_file(self, path: str | Path) -> None:
+        """Delete a file."""
         pass
 
     @abstractmethod
-    def delete_directory(self, path: str, recursive: bool = False) -> None:
-        """
-        Delete a directory.
-
-        Args:
-            path: Absolute path to the directory
-            recursive: If True, delete directory and all contents
-
-        Raises:
-            FileNotFoundError: If directory does not exist
-            OSError: If directory not empty and recursive=False
-        """
+    def delete_directory(self, path: str | Path) -> None:
+        """Delete a directory recursively."""
         pass
 
     @abstractmethod
-    def create_directory(self, path: str, parents: bool = False) -> None:
-        """
-        Create a directory.
-
-        Args:
-            path: Absolute path to the directory
-            parents: If True, create parent directories as needed
-
-        Raises:
-            FileExistsError: If directory already exists
-            FileNotFoundError: If parent doesn't exist and parents=False
-        """
+    def create_directory(self, path: str | Path, parents: bool = False) -> None:
+        """Create a directory."""
         pass
 
     @abstractmethod
-    def copy_file(self, src: str, dst: str) -> None:
-        """
-        Copy a file from src to dst.
-
-        Args:
-            src: Absolute path to source file
-            dst: Absolute path to destination file
-
-        Raises:
-            FileNotFoundError: If src does not exist
-            IsADirectoryError: If src is a directory
-        """
+    def copy_file(self, src: str | Path, dst: str | Path) -> None:
+        """Copy a file from src to dst."""
         pass
 
     @abstractmethod
-    def move_file(self, src: str, dst: str) -> None:
-        """
-        Move/rename a file from src to dst.
-
-        Args:
-            src: Absolute path to source file
-            dst: Absolute path to destination file
-
-        Raises:
-            FileNotFoundError: If src does not exist
-        """
-        pass
-
-    # === File Information ===
-
-    @abstractmethod
-    def list_directory(
-        self,
-        path: str,
-        recursive: bool = False
-    ) -> list[FileInfo]:
-        """
-        List contents of a directory.
-
-        Args:
-            path: Absolute path to the directory
-
-        Returns:
-            List of FileInfo objects for each entry in the directory
-        """
+    def move_file(self, src: str | Path, dst: str | Path) -> None:
+        """Move/rename a file from src to dst."""
         pass
 
     @abstractmethod
-    def file_exists(
-        self,
-        path: str
-    ) -> FileType | None:
-        """
-        Check if a file or directory exists and return its type.
-
-        Args:
-            path: Absolute path to check
-
-        Returns:
-            FileType if exists, None otherwise
-        """
+    def list_directory(self, path: str | Path, recursive: bool = False) -> list[FileInfo]:
+        """List contents of a directory."""
         pass
 
-
-    # === File Search ===
+    @abstractmethod
+    def file_exists(self, path: str | Path) -> FileType | None:
+        """Check if a file or directory exists and return its type."""
+        pass
 
     @abstractmethod
-    def glob_files(
-        self,
-        pattern: str,
-        path: str | None = None
-    ) -> list[str]:
-        """
-        Find files matching a glob pattern.
-
-        Args:
-            pattern: Glob pattern (e.g., "**/*.py")
-            path: Base directory to search (defaults to current working directory)
-
-        Returns:
-            List of matching file paths
-        """
+    def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
+        """Find files matching a glob pattern."""
         pass
