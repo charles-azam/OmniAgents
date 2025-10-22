@@ -13,10 +13,18 @@ import time
 import signal
 import glob as glob_module
 import fnmatch
+import shutil
 from pathlib import Path
 from datetime import datetime
 
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+from prompttodraft.tools.backends.execution_backend import (
+    ExecutionBackend,
+    BackendStatus,
+    FileType,
+    FileInfo,
+    CommandResult,
+)
+from prompttodraft.common import DATA_PATH
 
 # Constants
 DEFAULT_TIMEOUT = 1800000  # 30 minutes in milliseconds
@@ -30,11 +38,100 @@ TRUNCATED_LINE_SUFFIX = "... (line truncated)"
 class LocalBackend(ExecutionBackend):
     """Local execution backend using standard Python operations."""
 
-    def __init__(self):
-        """Initialize the local backend with a persistent shell."""
+    def __init__(self, project_id: str):
+        """
+        Create a local backend instance for a specific project.
+
+        Args:
+            project_id: Identifier for the project
+        """
+        self._project_id = project_id
         self.shell_process = None
         self.output_marker = None
+        self._status = BackendStatus.UNINITIALIZED
+
+    @property
+    def _project_path(self) -> Path:
+        """Get the project path from DATA_PATH and project_id."""
+        return DATA_PATH / self._project_id
+
+    def init(self) -> None:
+        """
+        Initialize the backend environment from scratch.
+
+        This creates a new execution environment with:
+        - Project directory at DATA_PATH/project_id
+        - Persistent shell process
+        - Working directory set to project path
+        """
+        # Create project directory if it doesn't exist
+        self._project_path.mkdir(parents=True, exist_ok=True)
+
+        # Initialize the shell
         self._initialize_shell()
+
+        # Set working directory to project path
+        self._execute_in_shell(command=f"cd {self._project_path}")
+
+        self._status = BackendStatus.RUNNING
+
+    def resume(self) -> None:
+        """Resume the backend after it has been paused."""
+        if self._status != BackendStatus.PAUSED:
+            raise RuntimeError(f"Cannot resume from status: {self._status}")
+
+        # Reinitialize shell if needed
+        if self.shell_process is None or self.shell_process.poll() is not None:
+            self._initialize_shell()
+            self._execute_in_shell(command=f"cd {self._project_path}")
+
+        self._status = BackendStatus.RUNNING
+
+    def pause(self) -> None:
+        """
+        Pause the backend and sync state to bucket.
+
+        For local backend, we just mark as paused.
+        State is already on disk.
+        """
+        if self._status != BackendStatus.RUNNING:
+            raise RuntimeError(f"Cannot pause from status: {self._status}")
+
+        self._status = BackendStatus.PAUSED
+
+    def shutdown(self) -> None:
+        """
+        Shutdown the backend completely.
+
+        This stops the shell process and marks as stopped.
+        """
+        if self.shell_process:
+            self.shell_process.terminate()
+            self.shell_process.wait(timeout=1)
+            self.shell_process = None
+
+        self._status = BackendStatus.STOPPED
+
+    def get_status(self) -> BackendStatus:
+        """
+        Get the current status of the backend.
+
+        Returns:
+            Current backend status
+        """
+        return self._status
+
+    def _execute_in_shell(self, command: str) -> None:
+        """Execute a command in the shell without returning output."""
+        full_command = f"{command}; echo {self.output_marker}\n"
+        self.shell_process.stdin.write(full_command)
+        self.shell_process.stdin.flush()
+
+        # Wait for marker
+        while True:
+            line = self.shell_process.stdout.readline()
+            if self.output_marker in line:
+                break
 
     def _initialize_shell(self) -> None:
         """Start a persistent shell session (from bash_tool.py:51-65)."""
@@ -56,16 +153,16 @@ class LocalBackend(ExecutionBackend):
         self,
         command: str,
         timeout: int | None = None
-    ) -> tuple[str, bool]:
+    ) -> CommandResult:
         """
-        Execute a bash command (from bash_tool.py:67-106).
+        Execute a bash command synchronously.
 
         Args:
             command: The bash command to execute
             timeout: Optional timeout in milliseconds
 
         Returns:
-            Tuple of (command output, is_error)
+            CommandResult with stdout, stderr, and exit_code
         """
         # Check if shell process is alive, restart if needed
         if self.shell_process is None or self.shell_process.poll() is not None:
@@ -79,26 +176,26 @@ class LocalBackend(ExecutionBackend):
         timeout_sec = timeout_ms / 1000
 
         # Execute command with timeout
-        output, is_error = self._execute_command_with_timeout(command=command, timeout_sec=timeout_sec)
-        return output, is_error
+        stdout, stderr, exit_code = self._execute_command_with_timeout(command=command, timeout_sec=timeout_sec)
+        return CommandResult(stdout=stdout, stderr=stderr, exit_code=exit_code)
 
     def _execute_command_with_timeout(
         self,
         command: str,
         timeout_sec: float
-    ) -> tuple[str, bool]:
+    ) -> tuple[str, str, int]:
         """
-        Execute a command with timeout (from bash_tool.py:108-181).
+        Execute a command with timeout.
 
         Args:
             command: The command to execute
             timeout_sec: Timeout in seconds
 
         Returns:
-            Tuple of (command output, is_error)
+            Tuple of (stdout, stderr, exit_code)
         """
-        # Add echo commands to mark the beginning and end of output
-        full_command = f"{command}; echo {self.output_marker}\n"
+        # Add echo commands to mark the beginning and end of output, and capture exit code
+        full_command = f"{command}; EXIT_CODE=$?; echo {self.output_marker}$EXIT_CODE\n"
 
         # Send the command to the shell process
         self.shell_process.stdin.write(full_command)
@@ -108,12 +205,13 @@ class LocalBackend(ExecutionBackend):
         stdout_lines = []
         stderr_lines = []
         start_time = time.time()
+        exit_code = 0
 
         while True:
             # Check if we've exceeded the timeout
             if time.time() - start_time > timeout_sec:
                 self._kill_current_command()
-                return f"Command timed out after {timeout_sec} seconds", True
+                return "", f"Command timed out after {timeout_sec} seconds", 124
 
             # Try to read a line from stdout or stderr
             output_line, is_stderr = self._read_line_nonblocking_with_source()
@@ -124,6 +222,12 @@ class LocalBackend(ExecutionBackend):
 
             # Check if we've reached our marker
             if self.output_marker in output_line:
+                # Extract exit code from marker line
+                try:
+                    exit_code_str = output_line.split(self.output_marker)[1].strip()
+                    exit_code = int(exit_code_str)
+                except (IndexError, ValueError):
+                    exit_code = 0
                 break
 
             # Add the line to our output (separate stdout and stderr)
@@ -144,17 +248,10 @@ class LocalBackend(ExecutionBackend):
                 break
 
         # Combine all output lines
-        stdout = "".join(stdout_lines)
-        stderr = "".join(stderr_lines)
+        stdout = "".join(stdout_lines).rstrip('\n')
+        stderr = "".join(stderr_lines).rstrip('\n')
 
-        # Remove trailing newline if present
-        stdout = stdout.rstrip('\n')
-
-        # If there's stderr content, combine them appropriately
-        if stderr:
-            return self._format_result_with_stderr(stdout=stdout, stderr=stderr), True
-
-        return stdout, False
+        return stdout, stderr, exit_code
 
     def _read_line_nonblocking_with_source(self) -> tuple[str | None, bool]:
         """
@@ -225,28 +322,33 @@ class LocalBackend(ExecutionBackend):
         truncated = f"{start}\n\n... [{truncated_lines} lines truncated] ...\n\n{end}"
         return truncated
 
-    def _format_result_with_stderr(self, stdout: str, stderr: str) -> str:
+    def get_working_directory(self) -> str:
         """
-        Format the result with both stdout and stderr (from bash_tool.py:398-419).
-
-        Args:
-            stdout: Standard output content
-            stderr: Standard error content
+        Get the current working directory.
 
         Returns:
-            Combined output string
+            Absolute path to current working directory
         """
-        # Trim whitespace from both
-        stdout_trimmed = stdout.strip()
-        stderr_trimmed = stderr.strip()
+        result = self.execute_command(command="pwd")
+        return result.stdout.strip()
 
-        # If both have content, combine them with a newline
-        if stdout_trimmed and stderr_trimmed:
-            return f"{stdout_trimmed}\n{stderr_trimmed}"
-        elif stderr_trimmed:
-            return stderr_trimmed
-        else:
-            return stdout_trimmed
+    def set_working_directory(self, path: str) -> None:
+        """
+        Change the current working directory.
+
+        Args:
+            path: Absolute path to new working directory
+
+        Raises:
+            FileNotFoundError: If path does not exist
+            NotADirectoryError: If path is not a directory
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Path does not exist: {path}")
+        if not os.path.isdir(path):
+            raise NotADirectoryError(f"Path is not a directory: {path}")
+
+        self._execute_in_shell(command=f"cd {path}")
 
     def read_file(
         self,
@@ -332,7 +434,7 @@ class LocalBackend(ExecutionBackend):
         content: str
     ) -> None:
         """
-        Write content to a file (from replace_tool.py:69-86).
+        Write content to a file, creating it if it doesn't exist.
 
         Args:
             file_path: Absolute path to the file
@@ -341,28 +443,128 @@ class LocalBackend(ExecutionBackend):
         Raises:
             IOError: If file cannot be written
         """
+        # Create parent directory if it doesn't exist
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, 'w', encoding='utf-8') as f:
             f.write(content)
 
-    def list_directory(
-        self,
-        path: str
-    ) -> list[dict[str, str | int | bool]]:
+    def delete_file(self, path: str) -> None:
         """
-        List contents of a directory (from ls_tool.py:61-117).
+        Delete a file.
+
+        Args:
+            path: Absolute path to the file
+
+        Raises:
+            FileNotFoundError: If file does not exist
+            IsADirectoryError: If path is a directory
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"File does not exist: {path}")
+        if os.path.isdir(path):
+            raise IsADirectoryError(f"Path is a directory: {path}")
+        os.remove(path)
+
+    def delete_directory(self, path: str, recursive: bool = False) -> None:
+        """
+        Delete a directory.
 
         Args:
             path: Absolute path to the directory
+            recursive: If True, delete directory and all contents
+
+        Raises:
+            FileNotFoundError: If directory does not exist
+            OSError: If directory not empty and recursive=False
+        """
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Directory does not exist: {path}")
+        if not os.path.isdir(path):
+            raise NotADirectoryError(f"Path is not a directory: {path}")
+
+        if recursive:
+            shutil.rmtree(path)
+        else:
+            os.rmdir(path)
+
+    def create_directory(self, path: str, parents: bool = False) -> None:
+        """
+        Create a directory.
+
+        Args:
+            path: Absolute path to the directory
+            parents: If True, create parent directories as needed
+
+        Raises:
+            FileExistsError: If directory already exists
+            FileNotFoundError: If parent doesn't exist and parents=False
+        """
+        if os.path.exists(path):
+            raise FileExistsError(f"Directory already exists: {path}")
+
+        if parents:
+            os.makedirs(path, exist_ok=False)
+        else:
+            os.mkdir(path)
+
+    def copy_file(self, src: str, dst: str) -> None:
+        """
+        Copy a file from src to dst.
+
+        Args:
+            src: Absolute path to source file
+            dst: Absolute path to destination file
+
+        Raises:
+            FileNotFoundError: If src does not exist
+            IsADirectoryError: If src is a directory
+        """
+        if not os.path.exists(src):
+            raise FileNotFoundError(f"Source file does not exist: {src}")
+        if os.path.isdir(src):
+            raise IsADirectoryError(f"Source is a directory: {src}")
+
+        # Create destination directory if needed
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy2(src, dst)
+
+    def move_file(self, src: str, dst: str) -> None:
+        """
+        Move/rename a file from src to dst.
+
+        Args:
+            src: Absolute path to source file
+            dst: Absolute path to destination file
+
+        Raises:
+            FileNotFoundError: If src does not exist
+        """
+        if not os.path.exists(src):
+            raise FileNotFoundError(f"Source file does not exist: {src}")
+
+        # Create destination directory if needed
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.move(src, dst)
+
+    def list_directory(
+        self,
+        path: str,
+        recursive: bool = False
+    ) -> list[FileInfo]:
+        """
+        List contents of a directory.
+
+        Args:
+            path: Absolute path to the directory
+            recursive: If True, list recursively
 
         Returns:
-            List of file info dictionaries
+            List of FileInfo objects for each entry in the directory
         """
         file_info = []
 
         # Get all entries in the directory
         entries = os.listdir(path)
-
-        # Sort entries alphabetically
         entries.sort()
 
         # Process each entry
@@ -370,21 +572,30 @@ class LocalBackend(ExecutionBackend):
             entry_path = os.path.join(path, entry)
 
             try:
-                # Get file stats
-                stats = os.stat(entry_path)
-                is_dir = os.path.isdir(entry_path)
+                # Determine file type
+                if os.path.islink(entry_path):
+                    file_type = FileType.SYMLINK
+                elif os.path.isfile(entry_path):
+                    file_type = FileType.FILE
+                elif os.path.isdir(entry_path):
+                    file_type = FileType.DIRECTORY
+                else:
+                    file_type = FileType.OTHER
 
-                # Create file info dictionary
-                info = {
-                    "name": entry,
-                    "is_dir": is_dir,
-                    "size": stats.st_size,
-                    "modified": int(stats.st_mtime),
-                    "modified_date": datetime.fromtimestamp(stats.st_mtime).strftime("%Y-%m-%d %H:%M:%S"),
-                    "path": entry_path
-                }
+                file_info.append(FileInfo(
+                    name=entry,
+                    path=entry_path,
+                    type=file_type
+                ))
 
-                file_info.append(info)
+                # If recursive and this is a directory, list it recursively
+                if recursive and file_type == FileType.DIRECTORY:
+                    try:
+                        subdirectory_entries = self.list_directory(path=entry_path, recursive=True)
+                        file_info.extend(subdirectory_entries)
+                    except (PermissionError, FileNotFoundError):
+                        # Skip subdirectories we can't access
+                        pass
 
                 if len(file_info) >= 1000:  # MAX_FILES
                     break
@@ -392,55 +603,32 @@ class LocalBackend(ExecutionBackend):
                 # Skip entries we can't access
                 continue
 
-        # Sort the list - directories first, then files alphabetically
-        file_info.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
-
         return file_info
 
     def file_exists(
         self,
         path: str
-    ) -> bool:
+    ) -> FileType | None:
         """
-        Check if a file or directory exists.
+        Check if a file or directory exists and return its type.
 
         Args:
             path: Absolute path to check
 
         Returns:
-            True if exists, False otherwise
+            FileType if exists, None otherwise
         """
-        return os.path.exists(path)
+        if not os.path.exists(path):
+            return None
 
-    def is_file(
-        self,
-        path: str
-    ) -> bool:
-        """
-        Check if a path is a file.
-
-        Args:
-            path: Absolute path to check
-
-        Returns:
-            True if path is a file, False otherwise
-        """
-        return os.path.isfile(path)
-
-    def is_directory(
-        self,
-        path: str
-    ) -> bool:
-        """
-        Check if a path is a directory.
-
-        Args:
-            path: Absolute path to check
-
-        Returns:
-            True if path is a directory, False otherwise
-        """
-        return os.path.isdir(path)
+        if os.path.isfile(path):
+            return FileType.FILE
+        elif os.path.isdir(path):
+            return FileType.DIRECTORY
+        elif os.path.islink(path):
+            return FileType.SYMLINK
+        else:
+            return FileType.OTHER
 
     def glob_files(
         self,
@@ -749,8 +937,6 @@ class LocalBackend(ExecutionBackend):
 
         except Exception:
             return True
-
-        return False
 
     def get_file_stats(
         self,

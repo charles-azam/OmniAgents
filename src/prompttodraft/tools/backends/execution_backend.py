@@ -45,19 +45,25 @@ class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
     @abstractmethod
-    def init(self, person_id: str | None = None, task_id: str | None = None) -> None:
+    def __init__(self, project_id: str) -> None:
+        """
+        Create a backend instance for a specific project.
+
+        Args:
+            project_id: Identifier for the project
+        """
+        pass
+
+    @abstractmethod
+    def init(self) -> None:
         """
         Initialize the backend environment from scratch.
 
         This creates a new execution environment with:
         - Base project structure and files
         - UV package manager initialization
-        - Bucket folder for persistence (person_id/task_id/)
+        - Bucket folder for persistence
         - Initial sync to bucket
-
-        Args:
-            person_id: Identifier for the user (used for bucket path)
-            task_id: Identifier for the specific task (used for bucket path)
         """
         pass
 
