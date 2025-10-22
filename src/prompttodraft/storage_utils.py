@@ -1,8 +1,6 @@
 """
 All of the data is stored in a bucket shared by all of the instances of the webportal crawlers.
 
-For local development, the data is stored in the data directory.
-
 This module contains utility functions for interacting with Google Cloud Storage.
 """
 
@@ -14,150 +12,78 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from google.cloud import storage
+from loguru import logger
+
+from prompttodraft.common import DATA_PATH
 
 load_dotenv()
-from google.api_core.exceptions import ClientError
-from google.cloud import storage
-
-from loguru import logger
-from prompttodraft.common import DATA_PATH
 
 BUCKET_ENV_VAR = "BUCKET_PROMPT_TO_DRAFT"
 
 
-# Automatically determine storage mode based on bucket availability
-def _storage_using_bucket() -> bool:
-    """Determine if we should use bucket storage based on environment variable."""
-    if os.environ.get("USE_LOCAL_STORAGE", "false").lower() == "true":
-        return False
+def _initialize_and_validate_storage() -> tuple[storage.Client, storage.Bucket]:
+    """
+    Initialize storage client and validate read/write access to bucket.
+
+    Returns:
+        Tuple of (storage_client, bucket)
+
+    Raises:
+        RuntimeError: If bucket is not configured or credentials are invalid
+        Exception: If read/write access validation fails
+    """
     if BUCKET_ENV_VAR not in os.environ:
-        logger.info(
-            f"Bucket environment variable {BUCKET_ENV_VAR} not set. Using local storage mode."
-        )
-        return False
-    return True
+        raise RuntimeError(f"Bucket not configured. Set {BUCKET_ENV_VAR} environment variable.")
+
+    # # Initialize client
+    # bucket_json_key = os.getenv("BUCKET_JSON_KEY")
+    # if bucket_json_key:
+    #     credentials_info = json.loads(s=bucket_json_key)
+    #     client = storage.Client.from_service_account_info(info=credentials_info)
+    # else:
+    client = storage.Client()
+
+    # Get bucket
+    bucket_name = os.getenv(key=BUCKET_ENV_VAR)
+    bucket = client.bucket(bucket_name=bucket_name)
+
+    # Test read access
+    list(bucket.list_blobs(max_results=1))
+
+    # Test write access
+    random_string = str(uuid.uuid4())
+    random_filename = str(uuid.uuid4())
+    blob = bucket.blob(blob_name=f"ping/{random_filename}.txt")
+    blob.upload_from_string(data=f"ping__{random_string}")
+    file_content = blob.download_as_bytes().decode(encoding="utf-8")
+    assert file_content == f"ping__{random_string}", f"Content mismatch: {file_content}"
+    blob.delete()
+
+    logger.info("Storage client initialized with read/write access")
+    return client, bucket
 
 
-STORAGE_MODE_BUCKET = _storage_using_bucket()
-
-try:
-    bucket_json_key = os.getenv("BUCKET_JSON_KEY")
-    if bucket_json_key:
-        credentials_info = json.loads(bucket_json_key)
-        STORAGE_CLIENT = storage.Client.from_service_account_info(credentials_info)
-    else:
-        STORAGE_CLIENT = storage.Client()
-except Exception as e:
-    logger.error(f"Error initializing storage client: {e}")
-    STORAGE_CLIENT = None
-
-
-@cache
-def get_bucket() -> storage.Bucket | None:
-    if STORAGE_CLIENT is None:
-        return None
-
-    if BUCKET_ENV_VAR not in os.environ:
-        print(
-            f"To enable bucket access please set the {BUCKET_ENV_VAR} environment variable, defaulting to data directory."
-        )
-        return None
-
-    bucket_name = os.getenv(BUCKET_ENV_VAR)
-    return STORAGE_CLIENT.bucket(bucket_name)
+STORAGE_CLIENT, BUCKET = _initialize_and_validate_storage()
 
 
 @cache
-def has_bucket_write_access() -> bool:
-    """
-    Check if the bucket is set and working with write access.
+def get_bucket() -> storage.Bucket:
+    """Get the GCS bucket."""
+    return BUCKET
 
-    If not set, the data is stored in the data directory.
 
-    If set but not working, raising an error.
-    """
 
+def _write_to_bucket(content: str, blob_name: str) -> None:
+    """Write content to bucket storage."""
     bucket = get_bucket()
-    if bucket is None:
-        return False
-
-    try:
-        random_string = str(uuid.uuid4())
-        random_filename = str(uuid.uuid4())
-        blob = bucket.blob(f"ping/{random_filename}.txt")
-        blob.upload_from_string(f"ping__{random_string}")
-        file_content = blob.download_as_bytes().decode("utf-8")
-        assert file_content == f"ping__{random_string}"
-        blob.delete()
-        return True
-    except ClientError as e:
-        print(f"Error accessing bucket {bucket.name}: {e}")
-        raise e
-    except AssertionError as e:
-        print(
-            f"Error while uploading file: {e}, file content is {file_content}, not 'ping__{random_string}'"
-        )
-        raise e
-    except Exception as e:
-        print(f"Error accessing bucket {bucket.name}: {e}")
-        return False
+    blob = bucket.blob(blob_name=blob_name)
+    blob.upload_from_string(data=content)
+    logger.info(f"Uploaded {blob_name} to bucket")
 
 
-@cache
-def has_bucket_read_access() -> bool:
+def write_to_storage(file_path: Path, content: str) -> None:
     """
-    Check if the bucket is set and working with read access only.
-
-    If not set, the data is stored in the data directory.
-
-    If set but not working, raising an error.
-    """
-
-    bucket = get_bucket()
-    if bucket is None:
-        return False
-
-    try:
-        # Just try to list some blobs to test read access
-        list(bucket.list_blobs(max_results=1))
-        return True
-    except ClientError as e:
-        print(f"Error accessing bucket {bucket.name}: {e}")
-        raise e
-    except Exception as e:
-        print(f"Error accessing bucket {bucket.name}: {e}")
-        return False
-
-
-
-def _write_to_bucket_or_data_dir(content: str, blob_name: str) -> bool:
-    """
-    Write content to either bucket or local storage based on STORAGE_MODE_BUCKET.
-    """
-    if STORAGE_MODE_BUCKET:
-        # Use bucket storage only
-        if has_bucket_write_access():
-            bucket = get_bucket()
-            blob = bucket.blob(blob_name)
-            blob.upload_from_string(content)
-            print(f"✅ Uploaded {blob_name} to bucket")
-        else:
-            raise RuntimeError(
-                f"Bucket storage mode enabled but GCP access not available. Set {BUCKET_ENV_VAR} environment variable or check GCP credentials."
-            )
-    else:
-        # Use local storage only
-        local_path = DATA_PATH / blob_name
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-        local_path.write_text(content)
-        print(f"✅ Saved {blob_name} locally")
-
-    return True
-
-
-def write_to_storage(file_path: Path, content: str) -> bool:
-    """
-    Write content to a file in storage at the given path relative to DATA_PATH.
+    Write content to a file in bucket storage.
 
     Args:
         file_path: Path object that must be relative to DATA_PATH
@@ -166,40 +92,23 @@ def write_to_storage(file_path: Path, content: str) -> bool:
     Raises:
         ValueError: If the path is not relative to DATA_PATH
     """
-    # Ensure the path is relative to DATA_PATH
     if not file_path.is_relative_to(DATA_PATH):
         raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
 
     relative_path = file_path.relative_to(DATA_PATH)
-    return _write_to_bucket_or_data_dir(content, str(relative_path))
+    _write_to_bucket(content=content, blob_name=str(relative_path))
 
 
-def _read_file_from_bucket_or_data_dir(blob_name: str) -> str:
-    """
-    Read a file from either bucket or local storage based on STORAGE_MODE_BUCKET.
-    """
-    if STORAGE_MODE_BUCKET:
-        # Use bucket storage only
-        if has_bucket_read_access():
-            bucket = get_bucket()
-            blob = bucket.blob(blob_name)
-            return blob.download_as_text()
-        else:
-            raise RuntimeError(
-                f"Bucket storage mode enabled but GCP access not available. Set {BUCKET_ENV_VAR} environment variable or check GCP credentials."
-            )
-    else:
-        # Use local storage only
-        local_path = DATA_PATH / blob_name
-        if local_path.exists():
-            return local_path.read_text()
-        else:
-            raise FileNotFoundError(f"File not found locally: {blob_name}")
+def _read_from_bucket(blob_name: str) -> str:
+    """Read a file from bucket storage."""
+    bucket = get_bucket()
+    blob = bucket.blob(blob_name=blob_name)
+    return blob.download_as_text()
 
 
 def read_from_storage(file_path: Path) -> str:
     """
-    Read a file from storage at the given path relative to DATA_PATH.
+    Read a file from bucket storage.
 
     Args:
         file_path: Path object that must be relative to DATA_PATH
@@ -209,22 +118,21 @@ def read_from_storage(file_path: Path) -> str:
 
     Raises:
         ValueError: If the path is not relative to DATA_PATH
-        FileNotFoundError: If the file is not found in storage
     """
-    # Ensure the path is relative to DATA_PATH
     if not file_path.is_relative_to(DATA_PATH):
         raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
 
     relative_path = file_path.relative_to(DATA_PATH)
-    return _read_file_from_bucket_or_data_dir(str(relative_path))
+    return _read_from_bucket(blob_name=str(relative_path))
 
 
 def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool:
     """
-    Check if a file exists in storage based on STORAGE_MODE_BUCKET.
+    Check if a file exists in bucket storage.
 
     Args:
         file_path: Path object that must be relative to DATA_PATH
+        force_rewrite: If True, always return False to force rewrite
 
     Returns:
         True if file exists, False otherwise
@@ -235,68 +143,40 @@ def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool
     if force_rewrite:
         return False
 
-    # Ensure the path is relative to DATA_PATH
     if not file_path.is_relative_to(DATA_PATH):
         raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
 
+    bucket = get_bucket()
     relative_path = file_path.relative_to(DATA_PATH)
-    blob_name = str(relative_path)
-
-    if STORAGE_MODE_BUCKET:
-        # Check bucket only
-        if has_bucket_read_access():
-            bucket = get_bucket()
-            blob = bucket.blob(blob_name)
-            return blob.exists()
-        else:
-            raise RuntimeError(
-                f"Bucket storage mode enabled but GCP access not available. Set {BUCKET_ENV_VAR} environment variable or check GCP credentials."
-            )
-    else:
-        # Check local only
-        return file_path.exists()
+    blob = bucket.blob(blob_name=str(relative_path))
+    return blob.exists()
 
 
 def delete_from_storage(file_path: Path) -> bool:
     """
-    Delete a file from storage based on STORAGE_MODE_BUCKET.
+    Delete a file from bucket storage.
 
     Args:
         file_path: Path object that must be relative to DATA_PATH
 
     Returns:
-        True if file was deleted successfully, False otherwise
+        True if file was deleted successfully, False if file didn't exist
 
     Raises:
         ValueError: If the path is not relative to DATA_PATH
     """
-    # Ensure the path is relative to DATA_PATH
     if not file_path.is_relative_to(DATA_PATH):
         raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
 
+    bucket = get_bucket()
     relative_path = file_path.relative_to(DATA_PATH)
-    blob_name = str(relative_path)
+    blob = bucket.blob(blob_name=str(relative_path))
 
-    if STORAGE_MODE_BUCKET:
-        # Delete from bucket only
-        if has_bucket_write_access():
-            bucket = get_bucket()
-            blob = bucket.blob(blob_name)
-            if blob.exists():
-                blob.delete()
-                return True
-            return False
-        else:
-            raise RuntimeError(
-                f"Bucket storage mode enabled but GCP access not available. Set {BUCKET_ENV_VAR} environment variable or check GCP credentials."
-            )
-    else:
-        # Delete from local only
-        if file_path.exists():
-            file_path.unlink()
-            return True
-        return False
+    if blob.exists():
+        blob.delete()
+        return True
+    return False
 
 
 if __name__ == "__main__":
-    print(has_bucket_write_access())
+    print(f"Storage initialized: {BUCKET.name}")
