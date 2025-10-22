@@ -71,7 +71,7 @@ class LocalBackend(ExecutionBackend):
         self._initialize_shell()
 
         # Set working directory to project path
-        self._execute_in_shell(command=f"cd {self._project_path}")
+        self.execute_command(command=f"cd {self._project_path}")
 
         self._status = BackendStatus.RUNNING
 
@@ -83,7 +83,7 @@ class LocalBackend(ExecutionBackend):
         # Reinitialize shell if needed
         if self.shell_process is None or self.shell_process.poll() is not None:
             self._initialize_shell()
-            self._execute_in_shell(command=f"cd {self._project_path}")
+            self.execute_command(command=f"cd {self._project_path}")
 
         self._status = BackendStatus.RUNNING
 
@@ -120,18 +120,6 @@ class LocalBackend(ExecutionBackend):
             Current backend status
         """
         return self._status
-
-    def _execute_in_shell(self, command: str) -> None:
-        """Execute a command in the shell without returning output."""
-        full_command = f"{command}; echo {self.output_marker}\n"
-        self.shell_process.stdin.write(full_command)
-        self.shell_process.stdin.flush()
-
-        # Wait for marker
-        while True:
-            line = self.shell_process.stdout.readline()
-            if self.output_marker in line:
-                break
 
     def _initialize_shell(self) -> None:
         """Start a persistent shell session (from bash_tool.py:51-65)."""
@@ -348,7 +336,7 @@ class LocalBackend(ExecutionBackend):
         if not os.path.isdir(path):
             raise NotADirectoryError(f"Path is not a directory: {path}")
 
-        self._execute_in_shell(command=f"cd {path}")
+        self.execute_command(command=f"cd {path}")
 
     def read_file(
         self,
@@ -378,7 +366,6 @@ class LocalBackend(ExecutionBackend):
 
         result = ""
         total_length = 0
-        line_count = 0
         displayed_lines = 0
         truncated = False
 
@@ -398,7 +385,6 @@ class LocalBackend(ExecutionBackend):
         if file_content is None:
             raise ValueError("This file contains binary content that cannot be displayed as text.")
 
-        line_count = len(file_content)
         # Prepare the formatted output with line numbers
         for i, line in enumerate(file_content):
 
