@@ -10,3 +10,5 @@ wheels/
 .venv
 *.stl
 *.step
+
+.env
