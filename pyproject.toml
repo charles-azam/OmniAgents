@@ -21,6 +21,7 @@ dependencies = [
     "openai-agents>=0.3.3",
     "litellm>=1.78.2",
     "pytest>=8.4.2",
+    "ipykernel>=7.0.1",
 ]
 
 [project.scripts]
