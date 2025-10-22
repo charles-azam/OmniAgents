@@ -139,7 +139,72 @@ def test_docker_backend_e2e():
     """Test DockerBackend implementation using generic backend test."""
     backend = DockerBackend(project_id="test_docker_backend_e2e")
     run_backend_e2e_test(backend=backend)
-    
+
+
+def test_docker_backend_container_reuse():
+    """Test that DockerBackend properly reuses existing containers."""
+    import docker
+
+    project_id = "test_docker_reuse"
+
+    try:
+        # Create first backend and initialize
+        backend1 = DockerBackend(project_id=project_id)
+        backend1.init()
+        assert backend1.get_status() == BackendStatus.RUNNING
+
+        # Write a test file
+        working_dir = backend1.get_working_directory()
+        test_file = f"{working_dir}/reuse_test.txt"
+        backend1.write_file(file_path=test_file, content="container reuse test")
+
+        # Execute a command to verify it's working
+        result = backend1.execute_command(command="echo 'first backend'")
+        assert result.exit_code == 0
+
+        # Get container name for verification
+        container_name = backend1._container_name
+
+        # Pause the backend (stops container but keeps it)
+        backend1.pause()
+        assert backend1.get_status() == BackendStatus.PAUSED
+
+        # Create second backend instance with same project_id
+        backend2 = DockerBackend(project_id=project_id)
+        assert backend2.get_status() == BackendStatus.UNINITIALIZED
+
+        # Init should connect to existing container
+        backend2.init()
+        assert backend2.get_status() == BackendStatus.RUNNING
+        assert backend2._container_name == container_name
+
+        # Verify the file from first backend is still there (container was reused)
+        content = backend2.read_file(file_path=test_file)
+        assert content == "container reuse test"
+
+        # Execute command on second backend
+        result2 = backend2.execute_command(command="echo 'second backend'")
+        assert result2.exit_code == 0
+
+        # Test idempotent init: calling init() again on already running container
+        backend2.init()  # Should not fail
+        assert backend2.get_status() == BackendStatus.RUNNING
+
+        # Cleanup
+        backend2.shutdown()
+
+    finally:
+        # Ensure cleanup even if test fails
+        try:
+            client = docker.from_env()
+            container = client.containers.get(f"prompttodraft-{project_id}")
+            container.stop()
+            container.remove()
+        except:
+            pass
+
+
 if __name__ == "__main__":
     # test_local_backend_e2e()
-    test_docker_backend_e2e()
+    # test_docker_backend_e2e()
+    test_docker_backend_container_reuse()

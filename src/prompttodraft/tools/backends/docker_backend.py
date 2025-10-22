@@ -49,6 +49,18 @@ class DockerBackend(ExecutionBackend):
         # Create project directory if it doesn't exist
         self._project_path.mkdir(parents=True, exist_ok=True)
 
+        # Check if container already exists
+        try:
+            self._container = self._client.containers.get(self._container_name)
+            # Container exists, reload and start if needed
+            self._container.reload()
+            if self._container.status != "running":
+                self._container.start()
+            self._status = BackendStatus.RUNNING
+            return
+        except docker.errors.NotFound:
+            pass  # Container doesn't exist, create it
+
         # Pull image if not present
         try:
             self._client.images.get(DOCKER_IMAGE)
@@ -76,7 +88,11 @@ class DockerBackend(ExecutionBackend):
             except docker.errors.NotFound:
                 raise RuntimeError("Container not found - call init() first")
 
-        self._container.start()
+        # Reload container state and start only if not running
+        self._container.reload()
+        if self._container.status != "running":
+            self._container.start()
+
         self._status = BackendStatus.RUNNING
 
     def pause(self) -> None:
