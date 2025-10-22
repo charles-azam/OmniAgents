@@ -1,0 +1,1 @@
+You need to create an abstract class for the backend that could work both for locally, e2b and docker, you want to implement the methods: init, start_after_paused, pause, kill. The thing is that  you want to save the files of each person in a S3. Then, do the backend and test it with the bare commands, meaning theone before plus read file, write file, list files, run command.

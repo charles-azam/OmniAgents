@@ -1,11 +1,13 @@
 """
-Local execution backend.
+Docker execution backend.
 
-This module implements the ExecutionBackend for local execution.
+This module implements the ExecutionBackend for Docker container execution.
 """
-import subprocess
 import shutil
 from pathlib import Path
+
+import docker
+from docker.models.containers import Container
 
 from prompttodraft.tools.backends.execution_backend import (
     ExecutionBackend,
@@ -17,18 +19,26 @@ from prompttodraft.tools.backends.execution_backend import (
 from prompttodraft.common import DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
+DOCKER_IMAGE = "ghcr.io/astral-sh/uv:debian"
+CONTAINER_WORKSPACE = "/workspace"
 
 
-class LocalBackend(ExecutionBackend):
-    """Local execution backend."""
+class DockerBackend(ExecutionBackend):
+    """Docker execution backend."""
 
     def __init__(self, project_id: str):
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
+        self._container: Container | None = None
+        self._client = docker.from_env()
 
     @property
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
+
+    @property
+    def _container_name(self) -> str:
+        return f"prompttodraft-{self._project_id}"
 
     @staticmethod
     def convert_to_path(path: str | Path) -> Path:
@@ -36,42 +46,91 @@ class LocalBackend(ExecutionBackend):
         return Path(path) if isinstance(path, str) else path
 
     def init(self) -> None:
+        # Create project directory if it doesn't exist
         self._project_path.mkdir(parents=True, exist_ok=True)
+
+        # Check if container already exists
+        try:
+            self._container = self._client.containers.get(self._container_name)
+            # Container exists, reload and start if needed
+            self._container.reload()
+            if self._container.status != "running":
+                self._container.start()
+            self._status = BackendStatus.RUNNING
+            return
+        except docker.errors.NotFound:
+            pass  # Container doesn't exist, create it
+
+        # Pull image if not present
+        try:
+            self._client.images.get(DOCKER_IMAGE)
+        except docker.errors.ImageNotFound:
+            self._client.images.pull(DOCKER_IMAGE)
+
+        # Create and start container with volume mount
+        self._container = self._client.containers.run(
+            image=DOCKER_IMAGE,
+            name=self._container_name,
+            command="sleep infinity",  # Keep container running
+            volumes={str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
+            working_dir=CONTAINER_WORKSPACE,
+            detach=True,
+            remove=False,
+        )
+
         self._status = BackendStatus.RUNNING
 
     def resume(self) -> None:
+        if self._container is None:
+            # Try to find existing container
+            try:
+                self._container = self._client.containers.get(self._container_name)
+            except docker.errors.NotFound:
+                raise RuntimeError("Container not found - call init() first")
+
+        # Reload container state and start only if not running
+        self._container.reload()
+        if self._container.status != "running":
+            self._container.start()
+
         self._status = BackendStatus.RUNNING
 
     def pause(self) -> None:
+        if self._container:
+            self._container.stop()
         self._status = BackendStatus.PAUSED
 
     def shutdown(self) -> None:
+        if self._container:
+            self._container.stop()
+            self._container.remove()
+            self._container = None
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:
         return self._status
 
     def sync_to_bucket(self) -> None:
-        pass  # No-op for local backend
+        pass  # No-op for docker backend
 
     def load_from_bucket(self, person_id: str, task_id: str) -> None:
-        pass  # No-op for local backend
+        pass  # No-op for docker backend
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
-        proc = subprocess.Popen(
-            ["/bin/bash", "-c", command],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd=self._project_path
+        if self._container is None:
+            raise RuntimeError("Container not initialized - call init() first")
+
+        exit_code, output = self._container.exec_run(
+            cmd=["/bin/bash", "-c", command],
+            workdir=CONTAINER_WORKSPACE,
+            demux=False,  # Merge stdout and stderr
         )
-        try:
-            output, _ = proc.communicate(timeout=timeout or DEFAULT_TIMEOUT)
-            return CommandResult(output=output, exit_code=proc.returncode)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            output, _ = proc.communicate()
-            return CommandResult(output=f"Timeout\n{output}", exit_code=124)
+
+        # Convert bytes to string if needed
+        if isinstance(output, bytes):
+            output = output.decode("utf-8")
+
+        return CommandResult(output=output.rstrip("\n") if output else "", exit_code=exit_code)
 
     def get_working_directory(self) -> str:
         return str(self._project_path)
