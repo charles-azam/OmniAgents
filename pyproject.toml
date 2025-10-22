@@ -22,6 +22,10 @@ dependencies = [
     "litellm>=1.78.2",
     "pytest>=8.4.2",
     "ipykernel>=7.0.1",
+    "google-api-python-client>=2.179.0",
+    "google-cloud-secret-manager>=2.24.0",
+    "google-cloud-storage>=3.3.0",
+    "loguru>=0.7.3",
 ]
 
 [project.scripts]

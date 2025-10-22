@@ -9,6 +9,27 @@ from abc import ABC, abstractmethod
 
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
+    
+    @abstractmethod
+    def init(self, person_id: str | None = None, task_id: str | None = None) -> None:
+        """
+        Initialize the backend, initialize the main files, initialise uv, create a folder on the bucket for the person. Initialize on 
+        """
+        pass
+    
+    @abstractmethod
+    def start_after_paused(self) -> None:
+        """
+        Start the backend after it has been paused.
+        """
+        pass
+
+    @abstractmethod
+    def pause(self) -> None:
+        """
+        Pause the backend.
+        """
+        pass
 
     @abstractmethod
     def execute_command(
