@@ -1,8 +1,9 @@
 from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 
 
-def test_backend_e2e(backend: ExecutionBackend):
+def run_backend_e2e_test(backend: ExecutionBackend):
     """
     Generic E2E test for any ExecutionBackend implementation.
 
@@ -131,4 +132,14 @@ def test_backend_e2e(backend: ExecutionBackend):
 def test_local_backend_e2e():
     """Test LocalBackend implementation using generic backend test."""
     backend = LocalBackend(project_id="test_backend_e2e")
-    test_backend_e2e(backend=backend)
+    run_backend_e2e_test(backend=backend)
+
+
+def test_docker_backend_e2e():
+    """Test DockerBackend implementation using generic backend test."""
+    backend = DockerBackend(project_id="test_docker_backend_e2e")
+    run_backend_e2e_test(backend=backend)
+    
+if __name__ == "__main__":
+    # test_local_backend_e2e()
+    test_docker_backend_e2e()
