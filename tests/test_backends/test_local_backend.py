@@ -1,16 +1,17 @@
 from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.execution_backend import BackendStatus, FileType
+from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 
 
-def test_local_backend_e2e():
-    """E2E test for LocalBackend using only public API methods."""
+def test_backend_e2e(backend: ExecutionBackend):
+    """
+    Generic E2E test for any ExecutionBackend implementation.
 
-    # Setup: Use a test project ID that will be created in DATA_PATH
-    project_id = "test_backend_e2e"
+    This function tests all backend API methods to ensure compliance with the interface.
+    Can be reused for local, docker, e2b, or any other backend implementation.
 
-    # Initialize backend
-    backend = LocalBackend(project_id=project_id)
-
+    Args:
+        backend: An initialized (but not yet init() called) ExecutionBackend instance
+    """
     try:
         # Test status before init
         assert backend.get_status() == BackendStatus.UNINITIALIZED
@@ -125,3 +126,9 @@ def test_local_backend_e2e():
         # Cleanup using public API
         working_dir = backend.get_working_directory()
         backend.delete_directory(path=working_dir)
+
+
+def test_local_backend_e2e():
+    """Test LocalBackend implementation using generic backend test."""
+    backend = LocalBackend(project_id="test_backend_e2e")
+    test_backend_e2e(backend=backend)
