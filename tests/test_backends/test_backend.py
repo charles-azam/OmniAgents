@@ -1,5 +1,6 @@
 from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
+from prompttodraft.tools.backends.e2b_backend import E2BBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 
 
@@ -141,6 +142,12 @@ def test_docker_backend_e2e():
     run_backend_e2e_test(backend=backend)
 
 
+def test_e2b_backend_e2e():
+    """Test E2BBackend implementation using generic backend test."""
+    backend = E2BBackend(project_id="test_e2b_backend_e2e")
+    run_backend_e2e_test(backend=backend)
+
+
 def test_docker_backend_container_reuse():
     """Test that DockerBackend properly reuses existing containers."""
     import docker
@@ -207,4 +214,4 @@ def test_docker_backend_container_reuse():
 if __name__ == "__main__":
     # test_local_backend_e2e()
     # test_docker_backend_e2e()
-    test_docker_backend_container_reuse()
+    test_e2b_backend_e2e()
