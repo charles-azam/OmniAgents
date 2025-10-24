@@ -17,7 +17,6 @@ class BackendStatus(Enum):
     """Status of the execution backend."""
     UNINITIALIZED = "uninitialized"
     RUNNING = "running"
-    PAUSED = "paused"
     STOPPED = "stopped"
 
 
@@ -64,32 +63,16 @@ class ExecutionBackend(ABC):
         pass
 
     @abstractmethod
-    def init(self) -> None:
+    def start(self) -> None:
         """
-        Initialize the backend environment from scratch.
+        Start or restart the backend environment.
 
-        This creates a new execution environment with:
-        - Base project structure and files
-        - UV package manager initialization
-        - Bucket folder for persistence
-        - Initial sync to bucket
-        """
-        pass
+        This creates or reconnects to an execution environment:
+        - Creates project directory/container/sandbox if needed
+        - Loads files from bucket if available
+        - Sets status to RUNNING
 
-    @abstractmethod
-    def resume(self) -> None:
-        """Resume the backend after it has been paused."""
-        pass
-
-    @abstractmethod
-    def pause(self) -> None:
-        """
-        Pause the backend and sync state to bucket.
-
-        This should:
-        - Stop any running processes
-        - Sync all modified files to bucket
-        - Keep container/environment for quick resume
+        Can be called after initialization or after shutdown to restart.
         """
         pass
 
@@ -99,9 +82,10 @@ class ExecutionBackend(ABC):
         Shutdown the backend completely and flush all state to bucket.
 
         This should:
-        - Stop all processes
         - Sync all files to bucket
+        - Stop all processes
         - Destroy the execution environment (container/sandbox)
+        - Set status to STOPPED
         """
         pass
 
