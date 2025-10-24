@@ -27,6 +27,10 @@ class LocalBackend(ExecutionBackend):
         self._status = BackendStatus.UNINITIALIZED
 
     @property
+    def project_id(self) -> str:
+        return self._project_id
+
+    @property
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
 
@@ -38,24 +42,26 @@ class LocalBackend(ExecutionBackend):
     def init(self) -> None:
         self._project_path.mkdir(parents=True, exist_ok=True)
         self._status = BackendStatus.RUNNING
+        # Load existing files from bucket if any
+        self.load_from_bucket()
 
     def resume(self) -> None:
         self._status = BackendStatus.RUNNING
+        # Load latest state from bucket
+        self.load_from_bucket()
 
     def pause(self) -> None:
+        # Sync current state to bucket before pausing
+        self.sync_to_bucket()
         self._status = BackendStatus.PAUSED
 
     def shutdown(self) -> None:
+        # Sync current state to bucket before shutdown
+        self.sync_to_bucket()
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:
         return self._status
-
-    def sync_to_bucket(self) -> None:
-        pass  # No-op for local backend
-
-    def load_from_bucket(self, person_id: str, task_id: str) -> None:
-        pass  # No-op for local backend
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         proc = subprocess.Popen(

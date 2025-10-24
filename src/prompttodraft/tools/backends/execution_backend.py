@@ -9,6 +9,9 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from prompttodraft.common import DATA_PATH
+from prompttodraft import storage_utils
+
 
 class BackendStatus(Enum):
     """Status of the execution backend."""
@@ -52,6 +55,12 @@ class ExecutionBackend(ABC):
         Args:
             project_id: Identifier for the project
         """
+        pass
+
+    @property
+    @abstractmethod
+    def project_id(self) -> str:
+        """Get the project ID for this backend instance."""
         pass
 
     @abstractmethod
@@ -108,31 +117,99 @@ class ExecutionBackend(ABC):
 
     # === State Management ===
 
-    @abstractmethod
-    def sync_to_bucket(self) -> None:
+    def _should_sync_file(self, file_path: str) -> bool:
         """
-        Incrementally sync changed files to bucket.
-
-        This should only upload files that have been modified since
-        the last sync to optimize performance.
-        """
-        pass
-
-    @abstractmethod
-    def load_from_bucket(self, person_id: str, task_id: str) -> None:
-        """
-        Load previously saved state from bucket.
-
-        This restores a paused/stopped backend from bucket storage:
-        - Downloads all files from person_id/task_id/ path
-        - Restores working directory state
-        - Prepares environment for execution
+        Check if a file should be synced to bucket based on gitignore-like rules.
 
         Args:
-            person_id: Identifier for the user
-            task_id: Identifier for the specific task
+            file_path: Relative file path from working directory
+
+        Returns:
+            True if file should be synced, False otherwise
         """
-        pass
+        path = Path(file_path)
+
+        # Ignore patterns
+        ignore_patterns = [
+            ".venv", "__pycache__", ".git", ".pytest_cache",
+            ".e2b_sandbox_id", "node_modules", ".DS_Store"
+        ]
+
+        for part in path.parts:
+            if part in ignore_patterns or part.endswith(".pyc"):
+                return False
+
+        # Include only specific extensions
+        allowed_extensions = {".py", ".txt", ".md", ".json", ".yaml", ".yml", ".toml"}
+        allowed_filenames = {"pyproject.toml"}
+
+        if path.name in allowed_filenames:
+            return True
+
+        return path.suffix in allowed_extensions
+
+    def sync_to_bucket(self) -> None:
+        """
+        Sync all relevant files from working directory to bucket.
+
+        Only syncs files matching allowed extensions (.py, .txt, .md, .json, .yaml, .toml)
+        and excludes common ignore patterns (.venv/, __pycache__/, etc.).
+        """
+        working_dir = Path(self.get_working_directory())
+        project_data_path = DATA_PATH / self.project_id
+
+        # List all files recursively
+        files = self.list_directory(path=working_dir, recursive=True)
+
+        for file_info in files:
+            if file_info.type != FileType.FILE:
+                continue
+
+            # Get relative path from working directory
+            file_path = Path(file_info.path)
+            relative_path = file_path.relative_to(working_dir)
+
+            # Check if file should be synced
+            if not self._should_sync_file(str(relative_path)):
+                continue
+
+            # Read file content
+            content = self.read_file(file_path=file_path)
+
+            # Write to bucket (storage_utils expects path relative to DATA_PATH)
+            bucket_path = project_data_path / relative_path
+            storage_utils.write_to_storage(file_path=bucket_path, content=content)
+
+    def load_from_bucket(self) -> None:
+        """
+        Load all files from bucket for this project into the working directory.
+
+        Downloads all files from the project's bucket path and writes them
+        to the working directory.
+        """
+        working_dir = Path(self.get_working_directory())
+        project_data_path = DATA_PATH / self.project_id
+
+        # List all blobs with project prefix
+        bucket = storage_utils.get_bucket()
+        prefix = f"{self.project_id}/"
+
+        for blob in bucket.list_blobs(prefix=prefix):
+            # Get relative path from project
+            blob_path = Path(blob.name)
+            relative_path = blob_path.relative_to(self.project_id)
+
+            # Check if file should be loaded (same filters as sync)
+            if not self._should_sync_file(str(relative_path)):
+                continue
+
+            # Read from bucket
+            bucket_file_path = project_data_path / relative_path
+            content = storage_utils.read_from_storage(file_path=bucket_file_path)
+
+            # Write to working directory
+            dest_path = working_dir / relative_path
+            self.write_file(file_path=dest_path, content=content)
 
     # === Command Execution ===
 
