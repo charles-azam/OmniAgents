@@ -30,94 +30,75 @@ class E2BBackend(ExecutionBackend):
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._sandbox: Sandbox | None = None
-        self._sandbox_id: str | None = None
+
+    @property
+    def project_id(self) -> str:
+        return self._project_id
 
     @property
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
-
-    @property
-    def _sandbox_id_file(self) -> Path:
-        """File to store sandbox ID for persistence."""
-        return self._project_path / ".e2b_sandbox_id"
 
     @staticmethod
     def convert_to_path(path: str | Path) -> Path:
         """Convert string or Path to Path object."""
         return Path(path) if isinstance(path, str) else path
 
-    def _save_sandbox_id(self) -> None:
-        """Save sandbox ID to local file for persistence."""
-        if self._sandbox_id:
-            self._project_path.mkdir(parents=True, exist_ok=True)
-            self._sandbox_id_file.write_text(self._sandbox_id)
-
-    def _load_sandbox_id(self) -> str | None:
-        """Load sandbox ID from local file."""
-        if self._sandbox_id_file.exists():
-            return self._sandbox_id_file.read_text().strip()
-        return None
-
     def init(self) -> None:
         # Create project directory if it doesn't exist
         self._project_path.mkdir(parents=True, exist_ok=True)
 
-        # Check if we have a saved sandbox ID
-        saved_id = self._load_sandbox_id()
-        if saved_id:
-            # Try to reconnect to existing sandbox
-            try:
-                self._sandbox = Sandbox.connect(sandbox_id=saved_id)
-                self._sandbox_id = saved_id
-                self._status = BackendStatus.RUNNING
-                return
-            except Exception:
-                # Sandbox no longer exists, create new one
-                pass
-
-        # Create new sandbox with metadata
+        # Always create new sandbox (ephemeral approach)
         self._sandbox = Sandbox.create(
             timeout=SANDBOX_TIMEOUT,
             metadata={"project_id": self._project_id}
         )
-        self._sandbox_id = self._sandbox.sandbox_id
-        self._save_sandbox_id()
 
         # Create working directory in sandbox
         self._sandbox.files.make_dir(path=SANDBOX_WORKING_DIR)
 
         self._status = BackendStatus.RUNNING
 
+        # Load existing files from bucket if any
+        self.load_from_bucket()
+
     def resume(self) -> None:
-        if self._sandbox is None:
-            # Try to load sandbox ID and reconnect
-            saved_id = self._load_sandbox_id()
-            if saved_id:
-                self._sandbox = Sandbox.connect(sandbox_id=saved_id)
-                self._sandbox_id = saved_id
-            else:
-                raise RuntimeError("Sandbox not found - call init() first")
+        # Create new sandbox and load state from bucket
+        self._sandbox = Sandbox.create(
+            timeout=SANDBOX_TIMEOUT,
+            metadata={"project_id": self._project_id}
+        )
+
+        # Create working directory in sandbox
+        self._sandbox.files.make_dir(path=SANDBOX_WORKING_DIR)
 
         self._status = BackendStatus.RUNNING
 
+        # Load latest state from bucket
+        self.load_from_bucket()
+
     def pause(self) -> None:
-        # E2B sandboxes stay alive, just mark as paused
+        # Sync files to bucket and kill sandbox (no real pause for E2B)
+        self.sync_to_bucket()
+
+        if self._sandbox:
+            self._sandbox.kill()
+            self._sandbox = None
+
         self._status = BackendStatus.PAUSED
 
     def shutdown(self) -> None:
-        # Don't kill sandbox immediately - let it timeout naturally
-        # This allows files to persist for verification
-        # The sandbox will auto-cleanup after SANDBOX_TIMEOUT
+        # Sync files to bucket and kill sandbox
+        self.sync_to_bucket()
+
+        if self._sandbox:
+            self._sandbox.kill()
+            self._sandbox = None
+
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:
         return self._status
-
-    def sync_to_bucket(self) -> None:
-        pass  # No-op for e2b backend
-
-    def load_from_bucket(self, person_id: str, task_id: str) -> None:
-        pass  # No-op for e2b backend
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         if self._sandbox is None:

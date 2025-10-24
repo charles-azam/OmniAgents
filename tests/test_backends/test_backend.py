@@ -27,6 +27,14 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert working_dir is not None
         assert len(working_dir) > 0
 
+        # Clean up any files loaded from previous test runs
+        files = backend.list_directory(path=working_dir, recursive=False)
+        for file_info in files:
+            if file_info.type == FileType.FILE:
+                backend.delete_file(path=file_info.path)
+            elif file_info.type == FileType.DIRECTORY:
+                backend.delete_directory(path=file_info.path)
+
         # Test write_file
         test_file = f"{working_dir}/test.txt"
         backend.write_file(file_path=test_file, content="Hello World")
@@ -100,9 +108,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
-        # Test state management methods
-        backend.sync_to_bucket()  # Should be no-op for local
-        backend.load_from_bucket(person_id="test_person", task_id="test_task")  # Should be no-op
+        # Test state management methods (sync/load happen automatically on pause/resume)
 
         # Test pause
         backend.pause()
@@ -112,11 +118,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.resume()
         assert backend.get_status() == BackendStatus.RUNNING
 
-        # Test shutdown
-        backend.shutdown()
-        assert backend.get_status() == BackendStatus.STOPPED
-
-        # Final verification using file_exists API
+        # Final verification using file_exists API (before shutdown)
         assert backend.file_exists(path=test_file) == FileType.FILE
         assert backend.file_exists(path=f"{working_dir}/file1.py") == FileType.FILE
         assert backend.file_exists(path=f"{working_dir}/file2.py") == FileType.FILE
@@ -124,10 +126,25 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert backend.file_exists(path=move_dest) is None  # was deleted
         assert backend.file_exists(path=test_subdir) is None  # was deleted
 
+        # Test shutdown
+        backend.shutdown()
+        assert backend.get_status() == BackendStatus.STOPPED
+
     finally:
         # Cleanup using public API
         working_dir = backend.get_working_directory()
-        backend.delete_directory(path=working_dir)
+        try:
+            backend.delete_directory(path=working_dir)
+        except:
+            pass  # May fail if backend is shutdown
+
+        # Cleanup bucket files
+        from prompttodraft import storage_utils
+        from prompttodraft.common import DATA_PATH
+        bucket = storage_utils.get_bucket()
+        prefix = f"{backend.project_id}/"
+        for blob in bucket.list_blobs(prefix=prefix):
+            blob.delete()
 
 
 def test_local_backend_e2e():

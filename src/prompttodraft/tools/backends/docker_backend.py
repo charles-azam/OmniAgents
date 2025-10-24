@@ -33,6 +33,10 @@ class DockerBackend(ExecutionBackend):
         self._client = docker.from_env()
 
     @property
+    def project_id(self) -> str:
+        return self._project_id
+
+    @property
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
 
@@ -79,6 +83,8 @@ class DockerBackend(ExecutionBackend):
         )
 
         self._status = BackendStatus.RUNNING
+        # Load existing files from bucket if any
+        self.load_from_bucket()
 
     def resume(self) -> None:
         if self._container is None:
@@ -94,13 +100,19 @@ class DockerBackend(ExecutionBackend):
             self._container.start()
 
         self._status = BackendStatus.RUNNING
+        # Load latest state from bucket
+        self.load_from_bucket()
 
     def pause(self) -> None:
+        # Sync current state to bucket before pausing
+        self.sync_to_bucket()
         if self._container:
             self._container.stop()
         self._status = BackendStatus.PAUSED
 
     def shutdown(self) -> None:
+        # Sync current state to bucket before shutdown
+        self.sync_to_bucket()
         if self._container:
             self._container.stop()
             self._container.remove()
@@ -109,12 +121,6 @@ class DockerBackend(ExecutionBackend):
 
     def get_status(self) -> BackendStatus:
         return self._status
-
-    def sync_to_bucket(self) -> None:
-        pass  # No-op for docker backend
-
-    def load_from_bucket(self, person_id: str, task_id: str) -> None:
-        pass  # No-op for docker backend
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         if self._container is None:
