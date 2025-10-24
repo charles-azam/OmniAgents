@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from datetime import datetime, timezone
 
 from prompttodraft.common import DATA_PATH
 from prompttodraft import storage_utils
@@ -134,13 +135,19 @@ class ExecutionBackend(ABC):
 
     def sync_to_bucket(self) -> None:
         """
-        Sync all relevant files from working directory to bucket.
+        Sync all relevant files from working directory to bucket with timestamp.
+
+        Files are saved under project_id/timestamp/ to create immutable snapshots.
+        This prevents deleted files from being restored on reload.
 
         Only syncs files matching allowed extensions (.py, .txt, .md, .json, .yaml, .toml)
         and excludes common ignore patterns (.venv/, __pycache__/, etc.).
         """
         working_dir = Path(self.get_working_directory())
-        project_data_path = DATA_PATH / self.project_id
+
+        # Create timestamp snapshot
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        project_data_path = DATA_PATH / self.project_id / timestamp
 
         # List all files recursively
         files = self.list_directory(path=working_dir, recursive=True)
@@ -160,28 +167,48 @@ class ExecutionBackend(ABC):
             # Read file content
             content = self.read_file(file_path=file_path)
 
-            # Write to bucket (storage_utils expects path relative to DATA_PATH)
+            # Write to bucket with timestamp (storage_utils expects path relative to DATA_PATH)
             bucket_path = project_data_path / relative_path
             storage_utils.write_to_storage(file_path=bucket_path, content=content)
 
     def load_from_bucket(self) -> None:
         """
-        Load all files from bucket for this project into the working directory.
+        Load all files from the latest snapshot in bucket into the working directory.
 
-        Downloads all files from the project's bucket path and writes them
-        to the working directory.
+        Finds the most recent timestamp snapshot under project_id/ and loads all files
+        from that snapshot. This ensures deleted files are not restored.
         """
         working_dir = Path(self.get_working_directory())
-        project_data_path = DATA_PATH / self.project_id
-
-        # List all blobs with project prefix
         bucket = storage_utils.get_bucket()
+
+        # Find all timestamp directories for this project
         prefix = f"{self.project_id}/"
+        timestamps = set()
 
         for blob in bucket.list_blobs(prefix=prefix):
-            # Get relative path from project
+            # Extract timestamp from blob path: project_id/timestamp/file/path
             blob_path = Path(blob.name)
-            relative_path = blob_path.relative_to(self.project_id)
+            parts = blob_path.parts
+
+            if len(parts) >= 2 and parts[0] == self.project_id:
+                timestamps.add(parts[1])
+
+        if not timestamps:
+            # No snapshots exist yet
+            return
+
+        # Get the latest timestamp (lexicographically sorted due to timestamp format)
+        latest_timestamp = max(timestamps)
+
+        # Load files from latest snapshot
+        snapshot_prefix = f"{self.project_id}/{latest_timestamp}/"
+        project_data_path = DATA_PATH / self.project_id / latest_timestamp
+
+        for blob in bucket.list_blobs(prefix=snapshot_prefix):
+            # Get relative path from snapshot directory
+            blob_path = Path(blob.name)
+            # Remove project_id/timestamp/ prefix to get file relative path
+            relative_path = blob_path.relative_to(self.project_id).relative_to(latest_timestamp)
 
             # Check if file should be loaded (same filters as sync)
             if not self._should_sync_file(str(relative_path)):
