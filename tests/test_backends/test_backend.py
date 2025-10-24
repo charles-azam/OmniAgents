@@ -14,11 +14,25 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     Args:
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
+    from prompttodraft import storage_utils
+    from prompttodraft.common import DATA_PATH
+
     try:
+        # Pre-populate bucket with test files to verify load_from_bucket works
+        project_data_path = DATA_PATH / backend.project_id
+        storage_utils.write_to_storage(
+            file_path=project_data_path / "preloaded.py",
+            content="# This file was preloaded from bucket"
+        )
+        storage_utils.write_to_storage(
+            file_path=project_data_path / "config.json",
+            content='{"preloaded": true}'
+        )
+
         # Test status before init
         assert backend.get_status() == BackendStatus.UNINITIALIZED
 
-        # Test init
+        # Test init (should load preloaded files from bucket)
         backend.init()
         assert backend.get_status() == BackendStatus.RUNNING
 
@@ -27,13 +41,17 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert working_dir is not None
         assert len(working_dir) > 0
 
-        # Clean up any files loaded from previous test runs
-        files = backend.list_directory(path=working_dir, recursive=False)
-        for file_info in files:
-            if file_info.type == FileType.FILE:
-                backend.delete_file(path=file_info.path)
-            elif file_info.type == FileType.DIRECTORY:
-                backend.delete_directory(path=file_info.path)
+        # Verify preloaded files were loaded from bucket
+        assert backend.file_exists(path=f"{working_dir}/preloaded.py") == FileType.FILE
+        assert backend.file_exists(path=f"{working_dir}/config.json") == FileType.FILE
+        preloaded_content = backend.read_file(file_path=f"{working_dir}/preloaded.py")
+        assert preloaded_content == "# This file was preloaded from bucket"
+        config_content = backend.read_file(file_path=f"{working_dir}/config.json")
+        assert config_content == '{"preloaded": true}'
+
+        # Clean up preloaded files for rest of test
+        backend.delete_file(path=f"{working_dir}/preloaded.py")
+        backend.delete_file(path=f"{working_dir}/config.json")
 
         # Test write_file
         test_file = f"{working_dir}/test.txt"
@@ -137,6 +155,8 @@ def run_backend_e2e_test(backend: ExecutionBackend):
             backend.delete_directory(path=working_dir)
         except:
             pass  # May fail if backend is shutdown
+        
+        backend.shutdown()
 
         # Cleanup bucket files
         from prompttodraft import storage_utils
