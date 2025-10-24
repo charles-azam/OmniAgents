@@ -34,11 +34,6 @@ class LocalBackend(ExecutionBackend):
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
 
-    @staticmethod
-    def convert_to_path(path: str | Path) -> Path:
-        """Convert string or Path to Path object."""
-        return Path(path) if isinstance(path, str) else path
-
     def init(self) -> None:
         self._project_path.mkdir(parents=True, exist_ok=True)
         self._status = BackendStatus.RUNNING

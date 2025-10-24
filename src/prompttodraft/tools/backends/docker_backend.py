@@ -44,11 +44,6 @@ class DockerBackend(ExecutionBackend):
     def _container_name(self) -> str:
         return f"prompttodraft-{self._project_id}"
 
-    @staticmethod
-    def convert_to_path(path: str | Path) -> Path:
-        """Convert string or Path to Path object."""
-        return Path(path) if isinstance(path, str) else path
-
     def init(self) -> None:
         # Create project directory if it doesn't exist
         self._project_path.mkdir(parents=True, exist_ok=True)
