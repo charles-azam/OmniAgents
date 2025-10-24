@@ -46,9 +46,12 @@ def run_backend_e2e_test(backend: ExecutionBackend):
             pass  # Container doesn't exist or already cleaned
 
     try:
-
         # Pre-populate bucket with test files to verify load_from_bucket works
-        project_data_path = DATA_PATH / backend.project_id
+        # Use timestamp format: project_id/timestamp/file.py
+        from datetime import datetime, timezone
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        project_data_path = DATA_PATH / backend.project_id / timestamp
+
         storage_utils.write_to_storage(
             file_path=project_data_path / "preloaded.py",
             content="# This file was preloaded from bucket"
@@ -224,14 +227,28 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
 
-        # Verify files were synced to bucket
+        # Verify files were synced to bucket under a timestamp directory
         bucket = storage_utils.get_bucket()
-        test_txt_blob = bucket.blob(blob_name=f"{backend.project_id}/test.txt")
-        assert test_txt_blob.exists()
+        prefix = f"{backend.project_id}/"
+
+        # Find the latest timestamp (there should be at least one from the shutdown)
+        timestamps = set()
+        for blob in bucket.list_blobs(prefix=prefix):
+            parts = blob.name.split('/')
+            if len(parts) >= 2:
+                timestamps.add(parts[1])
+
+        assert len(timestamps) > 0, "No timestamp directories found in bucket"
+        latest_timestamp = max(timestamps)
+
+        # Verify test.txt was synced
+        test_txt_blob = bucket.blob(blob_name=f"{backend.project_id}/{latest_timestamp}/test.txt")
+        assert test_txt_blob.exists(), f"test.txt not found in {backend.project_id}/{latest_timestamp}/"
         assert test_txt_blob.download_as_text() == "Modified content for sync test"
 
-        sync_test_blob = bucket.blob(blob_name=f"{backend.project_id}/sync_test.py")
-        assert sync_test_blob.exists()
+        # Verify sync_test.py was synced
+        sync_test_blob = bucket.blob(blob_name=f"{backend.project_id}/{latest_timestamp}/sync_test.py")
+        assert sync_test_blob.exists(), f"sync_test.py not found in {backend.project_id}/{latest_timestamp}/"
         assert sync_test_blob.download_as_text() == "# File created before shutdown"
 
         # Test start (should load files from bucket)
@@ -370,6 +387,6 @@ def test_docker_backend_container_reuse():
 
 if __name__ == "__main__":
     # test_local_backend_e2e()
-    test_docker_backend_e2e()
-    test_docker_backend_container_reuse()
-    # test_e2b_backend_e2e()
+    # test_docker_backend_e2e()
+    # test_docker_backend_container_reuse()
+    test_e2b_backend_e2e()
