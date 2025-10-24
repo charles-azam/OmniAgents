@@ -44,22 +44,28 @@ class DockerBackend(ExecutionBackend):
     def _container_name(self) -> str:
         return f"prompttodraft-{self._project_id}"
 
-    def init(self) -> None:
+    def start(self) -> None:
         # Create project directory if it doesn't exist
         self._project_path.mkdir(parents=True, exist_ok=True)
 
-        # Check if container already exists
-        try:
-            self._container = self._client.containers.get(self._container_name)
-            # Container exists, reload and start if needed
+        # Check if container already exists (for restart after shutdown)
+        if self._container is None:
+            try:
+                self._container = self._client.containers.get(self._container_name)
+            except docker.errors.NotFound:
+                pass  # Container doesn't exist, will create below
+
+        # If we have a container reference, try to start it
+        if self._container is not None:
             self._container.reload()
             if self._container.status != "running":
                 self._container.start()
             self._status = BackendStatus.RUNNING
+            # Load latest state from bucket
+            self.load_from_bucket()
             return
-        except docker.errors.NotFound:
-            pass  # Container doesn't exist, create it
 
+        # No container exists, create new one
         # Pull image if not present
         try:
             self._client.images.get(DOCKER_IMAGE)
@@ -81,30 +87,6 @@ class DockerBackend(ExecutionBackend):
         # Load existing files from bucket if any
         self.load_from_bucket()
 
-    def resume(self) -> None:
-        if self._container is None:
-            # Try to find existing container
-            try:
-                self._container = self._client.containers.get(self._container_name)
-            except docker.errors.NotFound:
-                raise RuntimeError("Container not found - call init() first")
-
-        # Reload container state and start only if not running
-        self._container.reload()
-        if self._container.status != "running":
-            self._container.start()
-
-        self._status = BackendStatus.RUNNING
-        # Load latest state from bucket
-        self.load_from_bucket()
-
-    def pause(self) -> None:
-        # Sync current state to bucket before pausing
-        self.sync_to_bucket()
-        if self._container:
-            self._container.stop()
-        self._status = BackendStatus.PAUSED
-
     def shutdown(self) -> None:
         # Sync current state to bucket before shutdown
         self.sync_to_bucket()
@@ -119,7 +101,7 @@ class DockerBackend(ExecutionBackend):
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         if self._container is None:
-            raise RuntimeError("Container not initialized - call init() first")
+            raise RuntimeError("Container not initialized - call start() first")
 
         exit_code, output = self._container.exec_run(
             cmd=["/bin/bash", "-c", command],
