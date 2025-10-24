@@ -96,6 +96,9 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         # Test write_file
         test_file = f"{working_dir}/test.txt"
         backend.write_file(file_path=test_file, content="Hello World")
+        backend.shutdown()
+        backend.start()
+        backend.start()
 
         # Test read_file
         content = backend.read_file(file_path=test_file)
@@ -368,4 +371,5 @@ def test_docker_backend_container_reuse():
 if __name__ == "__main__":
     # test_local_backend_e2e()
     test_docker_backend_e2e()
-    test_e2b_backend_e2e()
+    test_docker_backend_container_reuse()
+    # test_e2b_backend_e2e()
