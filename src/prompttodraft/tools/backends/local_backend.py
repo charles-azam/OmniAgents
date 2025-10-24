@@ -34,21 +34,11 @@ class LocalBackend(ExecutionBackend):
     def _project_path(self) -> Path:
         return DATA_PATH / self._project_id
 
-    def init(self) -> None:
+    def start(self) -> None:
         self._project_path.mkdir(parents=True, exist_ok=True)
         self._status = BackendStatus.RUNNING
         # Load existing files from bucket if any
         self.load_from_bucket()
-
-    def resume(self) -> None:
-        self._status = BackendStatus.RUNNING
-        # Load latest state from bucket
-        self.load_from_bucket()
-
-    def pause(self) -> None:
-        # Sync current state to bucket before pausing
-        self.sync_to_bucket()
-        self._status = BackendStatus.PAUSED
 
     def shutdown(self) -> None:
         # Sync current state to bucket before shutdown

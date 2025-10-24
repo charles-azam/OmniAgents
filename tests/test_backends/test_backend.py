@@ -62,11 +62,11 @@ def run_backend_e2e_test(backend: ExecutionBackend):
             content='{"preloaded": true}'
         )
 
-        # Test status before init
+        # Test status before start
         assert backend.get_status() == BackendStatus.UNINITIALIZED
 
-        # Test init (should load preloaded files from bucket)
-        backend.init()
+        # Test start (should load preloaded files from bucket)
+        backend.start()
         assert backend.get_status() == BackendStatus.RUNNING
 
         # Get working directory for constructing paths
@@ -209,17 +209,17 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
-        # Test sync/load with pause/resume cycle
-        # Modify test.txt before pausing
+        # Test sync/load with shutdown/start cycle
+        # Modify test.txt before shutdown
         backend.write_file(file_path=test_file, content="Modified content for sync test")
 
         # Create a new file that should be synced
         sync_test_file = f"{working_dir}/sync_test.py"
-        backend.write_file(file_path=sync_test_file, content="# File created before pause")
+        backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
 
-        # Test pause (should sync files to bucket)
-        backend.pause()
-        assert backend.get_status() == BackendStatus.PAUSED
+        # Test shutdown (should sync files to bucket)
+        backend.shutdown()
+        assert backend.get_status() == BackendStatus.STOPPED
 
         # Verify files were synced to bucket
         bucket = storage_utils.get_bucket()
@@ -229,10 +229,10 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         sync_test_blob = bucket.blob(blob_name=f"{backend.project_id}/sync_test.py")
         assert sync_test_blob.exists()
-        assert sync_test_blob.download_as_text() == "# File created before pause"
+        assert sync_test_blob.download_as_text() == "# File created before shutdown"
 
-        # Test resume (should load files from bucket)
-        backend.resume()
+        # Test start (should load files from bucket)
+        backend.start()
         assert backend.get_status() == BackendStatus.RUNNING
 
         # Verify files were loaded back and content persisted
@@ -242,7 +242,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         assert backend.file_exists(path=sync_test_file) == FileType.FILE
         sync_loaded_content = backend.read_file(file_path=sync_test_file)
-        assert sync_loaded_content == "# File created before pause"
+        assert sync_loaded_content == "# File created before shutdown"
 
         # Clean up sync test file
         backend.delete_file(path=sync_test_file)
@@ -309,9 +309,9 @@ def test_docker_backend_container_reuse():
     project_id = "test_docker_reuse"
 
     try:
-        # Create first backend and initialize
+        # Create first backend and start
         backend1 = DockerBackend(project_id=project_id)
-        backend1.init()
+        backend1.start()
         assert backend1.get_status() == BackendStatus.RUNNING
 
         # Write a test file
@@ -326,20 +326,20 @@ def test_docker_backend_container_reuse():
         # Get container name for verification
         container_name = backend1._container_name
 
-        # Pause the backend (stops container but keeps it)
-        backend1.pause()
-        assert backend1.get_status() == BackendStatus.PAUSED
+        # Shutdown the backend (stops container but keeps it, syncs to bucket)
+        backend1.shutdown()
+        assert backend1.get_status() == BackendStatus.STOPPED
 
         # Create second backend instance with same project_id
         backend2 = DockerBackend(project_id=project_id)
         assert backend2.get_status() == BackendStatus.UNINITIALIZED
 
-        # Init should connect to existing container
-        backend2.init()
+        # Start should connect to existing container
+        backend2.start()
         assert backend2.get_status() == BackendStatus.RUNNING
         assert backend2._container_name == container_name
 
-        # Verify the file from first backend is still there (container was reused)
+        # Verify the file from first backend is still there (loaded from bucket)
         content = backend2.read_file(file_path=test_file)
         assert content == "container reuse test"
 
@@ -347,8 +347,8 @@ def test_docker_backend_container_reuse():
         result2 = backend2.execute_command(command="echo 'second backend'")
         assert result2.exit_code == 0
 
-        # Test idempotent init: calling init() again on already running container
-        backend2.init()  # Should not fail
+        # Test idempotent start: calling start() again on already running container
+        backend2.start()  # Should not fail
         assert backend2.get_status() == BackendStatus.RUNNING
 
         # Cleanup
