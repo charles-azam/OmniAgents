@@ -2,7 +2,8 @@ from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-
+from pathlib import Path
+import pytest
 
 def run_backend_e2e_test(backend: ExecutionBackend):
     """
@@ -16,8 +17,36 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     """
     from prompttodraft import storage_utils
     from prompttodraft.common import DATA_PATH
+    import shutil
+
+    # === FRESH START CLEANUP ===
+    # Clean everything to ensure fresh test environment for debugging/reloading
+
+    # 1. Clean bucket files from previous runs
+    bucket = storage_utils.get_bucket()
+    prefix = f"{backend.project_id}/"
+    for blob in bucket.list_blobs(prefix=prefix):
+        blob.delete()
+
+    # 2. Clean local working directory
+    working_dir_path = DATA_PATH / backend.project_id
+    if working_dir_path.exists():
+        shutil.rmtree(working_dir_path)
+
+    # 3. Clean Docker container if exists (for DockerBackend)
+    if isinstance(backend, DockerBackend):
+        import docker
+        try:
+            client = docker.from_env()
+            container_name = f"prompttodraft-{backend.project_id}"
+            container = client.containers.get(container_name)
+            container.stop()
+            container.remove()
+        except:
+            pass  # Container doesn't exist or already cleaned
 
     try:
+
         # Pre-populate bucket with test files to verify load_from_bucket works
         project_data_path = DATA_PATH / backend.project_id
         storage_utils.write_to_storage(
@@ -26,6 +55,10 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         )
         storage_utils.write_to_storage(
             file_path=project_data_path / "config.json",
+            content='{"preloaded": true}'
+        )
+        storage_utils.write_to_storage(
+            file_path=project_data_path / "config_2.json",
             content='{"preloaded": true}'
         )
 
@@ -51,7 +84,14 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Clean up preloaded files for rest of test
         backend.delete_file(path=f"{working_dir}/preloaded.py")
-        backend.delete_file(path=f"{working_dir}/config.json")
+        backend.delete_file(path=f"./config.json") # relative path
+        backend.delete_file(path=Path(working_dir) / "config_2.json") # using pathlib
+        
+        with pytest.raises(FileNotFoundError):
+            backend.read_file(file_path=f"{working_dir}/config.json")
+            
+        with pytest.raises(FileNotFoundError):
+            backend.delete_file(path=Path(working_dir) / "config_2.json")
 
         # Test write_file
         test_file = f"{working_dir}/test.txt"
@@ -73,7 +113,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         # Test write file in subdirectory
         nested_file = f"{test_subdir}/nested.txt"
         backend.write_file(file_path=nested_file, content="Nested content")
-        assert backend.file_exists(path=nested_file) == FileType.FILE
+        assert backend.file_exists(path=Path("subdir") / "nested.txt") == FileType.FILE
 
         # Test list_directory (non-recursive)
         files = backend.list_directory(path=working_dir, recursive=False)
@@ -109,6 +149,49 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         result_error = backend.execute_command(command="exit 42", timeout=10)
         assert result_error.exit_code == 42
 
+        # Test command independence - each command should be independent
+        # Set an environment variable in first command
+        result1 = backend.execute_command(command="export TEST_VAR=hello", timeout=10)
+        assert result1.exit_code == 0
+
+        # Try to access it in second command - should not exist (commands are independent)
+        result2 = backend.execute_command(command="echo $TEST_VAR", timeout=10)
+        assert result2.exit_code == 0
+        assert result2.output.strip() == ""  # Variable should not persist
+        
+            
+        result2 = backend.execute_command(command="export TEST_VAR=hello && echo $TEST_VAR", timeout=10)
+        assert result2.exit_code == 0
+        assert result2.output.strip() == "hello"  # Variable should persist
+        
+            
+
+        # Test working directory independence
+        # Get initial working directory
+        result3 = backend.execute_command(command="pwd", timeout=10)
+        assert result3.exit_code == 0
+        initial_pwd = result3.output.strip()
+
+        # Change directory in next command
+        result4 = backend.execute_command(command="cd /tmp && pwd", timeout=10)
+        assert result4.exit_code == 0
+        assert "/tmp" in result4.output
+
+        # Check working directory in next command - should be back to initial
+        result5 = backend.execute_command(command="pwd", timeout=10)
+        assert result5.exit_code == 0
+        assert result5.output.strip() == initial_pwd
+
+        # Test shell variable independence
+        result6 = backend.execute_command(command="MY_VAR=test; echo $MY_VAR", timeout=10)
+        assert result6.exit_code == 0
+        assert "test" in result6.output
+
+        # Variable should not persist to next command
+        result7 = backend.execute_command(command="echo $MY_VAR", timeout=10)
+        assert result7.exit_code == 0
+        assert result7.output.strip() == ""
+
         # Test glob_files
         backend.write_file(file_path=f"{working_dir}/file1.py", content="# python")
         backend.write_file(file_path=f"{working_dir}/file2.py", content="# python")
@@ -126,15 +209,46 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
-        # Test state management methods (sync/load happen automatically on pause/resume)
+        # Test sync/load with pause/resume cycle
+        # Modify test.txt before pausing
+        backend.write_file(file_path=test_file, content="Modified content for sync test")
 
-        # Test pause
+        # Create a new file that should be synced
+        sync_test_file = f"{working_dir}/sync_test.py"
+        backend.write_file(file_path=sync_test_file, content="# File created before pause")
+
+        # Test pause (should sync files to bucket)
         backend.pause()
         assert backend.get_status() == BackendStatus.PAUSED
 
-        # Test resume
+        # Verify files were synced to bucket
+        bucket = storage_utils.get_bucket()
+        test_txt_blob = bucket.blob(blob_name=f"{backend.project_id}/test.txt")
+        assert test_txt_blob.exists()
+        assert test_txt_blob.download_as_text() == "Modified content for sync test"
+
+        sync_test_blob = bucket.blob(blob_name=f"{backend.project_id}/sync_test.py")
+        assert sync_test_blob.exists()
+        assert sync_test_blob.download_as_text() == "# File created before pause"
+
+        # Test resume (should load files from bucket)
         backend.resume()
         assert backend.get_status() == BackendStatus.RUNNING
+
+        # Verify files were loaded back and content persisted
+        assert backend.file_exists(path=test_file) == FileType.FILE
+        loaded_content = backend.read_file(file_path=test_file)
+        assert loaded_content == "Modified content for sync test"
+
+        assert backend.file_exists(path=sync_test_file) == FileType.FILE
+        sync_loaded_content = backend.read_file(file_path=sync_test_file)
+        assert sync_loaded_content == "# File created before pause"
+
+        # Clean up sync test file
+        backend.delete_file(path=sync_test_file)
+
+        # Restore test.txt to original content for final verification
+        backend.write_file(file_path=test_file, content="Hello World")
 
         # Final verification using file_exists API (before shutdown)
         assert backend.file_exists(path=test_file) == FileType.FILE
@@ -149,14 +263,17 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert backend.get_status() == BackendStatus.STOPPED
 
     finally:
-        # Cleanup using public API
+        # Cleanup: shutdown first (syncs files), then delete local directory
+        try:
+            backend.shutdown()
+        except:
+            pass  # May fail if already shutdown
+
         working_dir = backend.get_working_directory()
         try:
             backend.delete_directory(path=working_dir)
         except:
-            pass  # May fail if backend is shutdown
-        
-        backend.shutdown()
+            pass  # May fail if directory doesn't exist
 
         # Cleanup bucket files
         from prompttodraft import storage_utils
@@ -250,5 +367,5 @@ def test_docker_backend_container_reuse():
 
 if __name__ == "__main__":
     # test_local_backend_e2e()
-    # test_docker_backend_e2e()
+    test_docker_backend_e2e()
     test_e2b_backend_e2e()
