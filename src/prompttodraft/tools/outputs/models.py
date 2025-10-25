@@ -20,7 +20,7 @@ class DisplayMode(Enum):
     HYBRID = "hybrid"    # API mode but also log to console for debugging
 
 
-class BaseOutputModel(BaseModel):
+class ToolOutputModel(BaseModel):
     """Base class for all tool output models."""
 
     metadata: dict[str, str | int | float | bool] | None = Field(
@@ -83,7 +83,7 @@ class BaseOutputModel(BaseModel):
         pass
 
 
-class TextOutputModel(BaseOutputModel):
+class TextOutputModel(ToolOutputModel):
     """Simple text output model."""
 
     content: str = Field(description="The text content")
@@ -119,7 +119,7 @@ class TextOutputModel(BaseOutputModel):
         }
 
 
-class CodeOutputModel(BaseOutputModel):
+class CodeOutputModel(ToolOutputModel):
     """Code output model with syntax highlighting information."""
 
     content: str = Field(description="The code content")
@@ -200,7 +200,7 @@ class FileInfo(BaseModel):
         extra = "allow"  # Allow additional fields like matches, first_match, etc.
 
 
-class FileListOutputModel(BaseOutputModel):
+class FileListOutputModel(ToolOutputModel):
     """File listing output model."""
 
     files: list[FileInfo] = Field(
@@ -284,7 +284,7 @@ class FileListOutputModel(BaseOutputModel):
         }
 
 
-class TableOutputModel(BaseOutputModel):
+class TableOutputModel(ToolOutputModel):
     """Tabular data output model."""
 
     rows: list[list[str]] = Field(
@@ -336,7 +336,7 @@ class TableOutputModel(BaseOutputModel):
         }
 
 
-class ErrorOutputModel(BaseOutputModel):
+class ErrorOutputModel(ToolOutputModel):
     """Error output model."""
 
     error: str = Field(description="Error message")
@@ -373,7 +373,7 @@ class ErrorOutputModel(BaseOutputModel):
         }
 
 
-class MediaOutputModel(BaseOutputModel):
+class MediaOutputModel(ToolOutputModel):
     """Media output model for images, PDFs, and other binary files."""
 
     filename: str = Field(description="The name of the media file")
@@ -418,14 +418,3 @@ class MediaOutputModel(BaseOutputModel):
             "size_bytes": self.size_bytes,
             "metadata": self.metadata,
         }
-
-
-# Type alias for any output model
-ToolOutputModel = (
-    TextOutputModel |
-    CodeOutputModel |
-    FileListOutputModel |
-    TableOutputModel |
-    ErrorOutputModel |
-    MediaOutputModel
-)
