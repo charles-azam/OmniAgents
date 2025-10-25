@@ -24,11 +24,11 @@ class SaveMemoryTool:
 
     metadata = ToolMetadata(
         name="save_memory",
-        description="Saves and recalls information across sessions. Appends the provided fact to a special memory file that can be loaded in subsequent sessions, providing personalized and directed assistance.",
+        description="Saves and recalls information across sessions. Use this to direct the assistant to remember key details, enabling personalized and context-aware assistance in subsequent sessions. The tool appends the provided fact to a special memory file (GEMINI.md) located in the user's home directory (~/.gemini/). Once added, the facts are stored under a '## Gemini Added Memories' section and loaded as context in future sessions.",
         inputs={
             "fact": {
                 "type": "string",
-                "description": "The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language.",
+                "description": "The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').",
                 "nullable": False,
             },
         },

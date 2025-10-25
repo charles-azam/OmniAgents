@@ -26,22 +26,22 @@ class ListDirectoryTool:
 
     metadata = ToolMetadata(
         name="list_directory",
-        description="Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns and respect .gitignore patterns.",
+        description="Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns. Returns entries sorted with directories first, then alphabetically.",
         inputs={
             "path": {
                 "type": "string",
-                "description": "The absolute path to the directory to list",
+                "description": "The absolute path to the directory to list (must be absolute, not relative).",
                 "nullable": False,
             },
             "ignore": {
                 "type": "array",
-                "description": "A list of glob patterns to exclude from the listing (e.g., ['*.log', '.git'])",
+                "description": "Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).",
                 "items": {"type": "string"},
                 "nullable": True,
             },
             "respect_git_ignore": {
                 "type": "boolean",
-                "description": "Whether to respect .gitignore patterns when listing files. Defaults to true",
+                "description": "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
                 "nullable": True,
             },
         },

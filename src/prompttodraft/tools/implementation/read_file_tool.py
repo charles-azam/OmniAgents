@@ -31,21 +31,21 @@ class ReadFileTool:
 
     metadata = ToolMetadata(
         name="read_file",
-        description="Reads and returns the content of a specified file. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit.",
+        description="Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit.",
         inputs={
-            "path": {
+            "absolute_path": {
                 "type": "string",
-                "description": "The absolute path to the file to read",
+                "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
                 "nullable": False,
             },
             "offset": {
                 "type": "number",
-                "description": "For text files, the 0-based line number to start reading from. Requires limit to be set.",
+                "description": "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
                 "nullable": True,
             },
             "limit": {
                 "type": "number",
-                "description": "For text files, the maximum number of lines to read. If omitted, reads up to 2000 lines by default.",
+                "description": "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).",
                 "nullable": True,
             },
         },
@@ -111,7 +111,7 @@ class ReadFileTool:
 
     def execute(
         self,
-        path: str,
+        absolute_path: str,
         offset: int | None = None,
         limit: int | None = None,
     ) -> ToolOutputModel:
@@ -119,7 +119,7 @@ class ReadFileTool:
         Execute the read_file tool.
 
         Args:
-            path: The absolute path to the file to read
+            absolute_path: The absolute path to the file to read
             offset: For text files, the 0-based line number to start reading from
             limit: For text files, the maximum number of lines to read
 
@@ -127,30 +127,30 @@ class ReadFileTool:
             TextOutputModel with file content or ErrorOutputModel on failure
         """
         # Check if file exists
-        file_type = self.backend.file_exists(path=path)
+        file_type = self.backend.file_exists(path=absolute_path)
         if file_type is None:
             return ErrorOutputModel(
-                error=f"File does not exist: {path}",
+                error=f"File does not exist: {absolute_path}",
                 error_type="FileNotFoundError",
             )
 
         if file_type != FileType.FILE:
             return ErrorOutputModel(
-                error=f"Path is not a file: {path}",
+                error=f"Path is not a file: {absolute_path}",
                 error_type="NotAFileError",
             )
 
         # Check if this is a media file (image or PDF)
-        if self._is_media_file(file_path=path):
+        if self._is_media_file(file_path=absolute_path):
             # Read file as binary and encode to base64
-            content = self.backend.read_file(file_path=path)
+            content = self.backend.read_file(file_path=absolute_path)
             # For media files, we need to read as bytes
             # Since backend returns string, we'll need to encode the path and use a command
-            mime_type = self._get_mime_type(file_path=path)
+            mime_type = self._get_mime_type(file_path=absolute_path)
 
             # Use execute_command to read binary file
             result = self.backend.execute_command(
-                command=f'base64 "{path}"',
+                command=f'base64 "{absolute_path}"',
                 timeout=30000,
             )
 
@@ -163,17 +163,17 @@ class ReadFileTool:
             base64_data = result.output.strip()
 
             return TextOutputModel(
-                content=f"[Media File: {Path(path).name}]\nMIME Type: {mime_type}\nBase64 Data: {base64_data}",
+                content=f"[Media File: {Path(absolute_path).name}]\nMIME Type: {mime_type}\nBase64 Data: {base64_data}",
                 metadata={"mime_type": mime_type, "is_media": True},
             )
 
         # Read text file
-        content = self.backend.read_file(file_path=path)
+        content = self.backend.read_file(file_path=absolute_path)
 
         # Check if it's a binary file
         if self._is_binary_file(content=content):
             return TextOutputModel(
-                content=f"Cannot display content of binary file: {path}",
+                content=f"Cannot display content of binary file: {absolute_path}",
             )
 
         # Handle line offset and limit for text files

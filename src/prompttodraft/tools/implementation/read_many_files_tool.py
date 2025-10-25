@@ -42,39 +42,39 @@ class ReadManyFilesTool:
 
     metadata = ToolMetadata(
         name="read_many_files",
-        description="Reads content from multiple files specified by paths or glob patterns. For text files, concatenates their content into a single string. For image, PDF, audio, and video files, reads and returns them as base64-encoded data if explicitly requested by name or extension.",
+        description="Reads content from multiple files specified by paths or glob patterns. The behavior depends on the provided files: for text files, concatenates their content into a single string; for image (PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, reads and returns them as base64-encoded data if explicitly requested by name or extension. Can be used to get an overview of a codebase, find where specific functionality is implemented, review documentation, or gather context from multiple configuration files.",
         inputs={
             "paths": {
                 "type": "array",
-                "description": "An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png'])",
+                "description": "An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png']). Note: A directory path such as '/docs' will return an empty result; use a pattern such as '/docs/*' or '/docs/*.md'.",
                 "items": {"type": "string"},
                 "nullable": False,
             },
             "exclude": {
                 "type": "array",
-                "description": "Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.",
+                "description": "Optional: Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.",
                 "items": {"type": "string"},
                 "nullable": True,
             },
             "include": {
                 "type": "array",
-                "description": "Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files)",
+                "description": "Optional: Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files if they were broadly excluded, or ['images/*.jpg'] to include specific image types).",
                 "items": {"type": "string"},
                 "nullable": True,
             },
             "recursive": {
                 "type": "boolean",
-                "description": "Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.",
+                "description": "Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.",
                 "nullable": True,
             },
             "useDefaultExcludes": {
                 "type": "boolean",
-                "description": "Whether to apply a list of default exclusion patterns (e.g., node_modules, .git). Defaults to true.",
+                "description": "Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.",
                 "nullable": True,
             },
             "respect_git_ignore": {
                 "type": "boolean",
-                "description": "Whether to respect .gitignore patterns when finding files. Defaults to true.",
+                "description": "Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.",
                 "nullable": True,
             },
         },
