@@ -373,11 +373,59 @@ class ErrorOutputModel(BaseOutputModel):
         }
 
 
+class MediaOutputModel(BaseOutputModel):
+    """Media output model for images, PDFs, and other binary files."""
+
+    filename: str = Field(description="The name of the media file")
+    mime_type: str = Field(description="MIME type of the media (e.g., 'image/png', 'application/pdf')")
+    base64_data: str = Field(description="Base64-encoded binary data")
+    size_bytes: int | None = Field(
+        default=None,
+        description="Size of the file in bytes"
+    )
+
+    def __str__(self) -> str:
+        size_str = f" ({self.size_bytes} bytes)" if self.size_bytes else ""
+        return f"Media file: {self.filename} ({self.mime_type}){size_str}"
+
+    def handle_console(self) -> str:
+        """Display media file info in console."""
+        console = Console()
+
+        # Show basic file info
+        size_str = ""
+        if self.size_bytes:
+            if self.size_bytes < 1024:
+                size_str = f" ({self.size_bytes} B)"
+            elif self.size_bytes < 1024 * 1024:
+                size_str = f" ({self.size_bytes / 1024:.1f} KB)"
+            else:
+                size_str = f" ({self.size_bytes / (1024 * 1024):.1f} MB)"
+
+        console.print(f"  ⎿  Media File: {self.filename}", style="bright_black")
+        console.print(f"     MIME Type: {self.mime_type}{size_str}", style="bright_black")
+        console.print(f"     Base64 data available ({len(self.base64_data)} characters)", style="bright_black")
+
+        return f"Media file: {self.filename} ({self.mime_type})"
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured media data for API."""
+        return {
+            "type": "media",
+            "filename": self.filename,
+            "mime_type": self.mime_type,
+            "base64_data": self.base64_data,
+            "size_bytes": self.size_bytes,
+            "metadata": self.metadata,
+        }
+
+
 # Type alias for any output model
 ToolOutputModel = (
     TextOutputModel |
     CodeOutputModel |
     FileListOutputModel |
     TableOutputModel |
-    ErrorOutputModel
+    ErrorOutputModel |
+    MediaOutputModel
 )
