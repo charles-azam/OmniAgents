@@ -4,8 +4,20 @@ Output data models for tools.
 This module defines Pydantic models for tool outputs, separating data from presentation.
 These models can be rendered differently for console, file, or API responses.
 """
+import os
+from abc import abstractmethod
+from enum import Enum
+from typing import Any
+
 from pydantic import BaseModel, Field
-from datetime import datetime
+from rich.console import Console
+
+
+class DisplayMode(Enum):
+    """Display mode for output handling."""
+    CONSOLE = "console"  # CLI application - print to terminal
+    API = "api"          # FastAPI backend - return structured data
+    HYBRID = "hybrid"    # API mode but also log to console for debugging
 
 
 class BaseOutputModel(BaseModel):
@@ -20,6 +32,56 @@ class BaseOutputModel(BaseModel):
         frozen = False  # Allow modification if needed
         extra = "allow"  # Allow additional fields
 
+    def handle(self) -> dict[str, Any] | str:
+        """
+        Main entry point - routes to appropriate handler based on DISPLAY_MODE env var.
+
+        Returns:
+            - str: In CONSOLE mode (formatted for terminal)
+            - dict: In API/HYBRID mode (structured data for FastAPI)
+        """
+        mode_str = os.getenv("DISPLAY_MODE", "console").lower()
+        mode = DisplayMode(mode_str)
+
+        match mode:
+            case DisplayMode.CONSOLE:
+                return self.handle_console()
+
+            case DisplayMode.API:
+                return self.handle_api()
+
+            case DisplayMode.HYBRID:
+                # Log to console for debugging
+                self.handle_console()
+                # Return structured data for API response
+                return self.handle_api()
+
+    @abstractmethod
+    def handle_console(self) -> str:
+        """
+        Handle console display (prints to terminal).
+
+        This method has side effects - it prints to the console.
+        Returns a string representation for compatibility.
+
+        Returns:
+            String representation of the output
+        """
+        pass
+
+    @abstractmethod
+    def handle_api(self) -> dict[str, Any]:
+        """
+        Handle API mode (returns structured data).
+
+        Pure function - no side effects.
+        Returns dict that FastAPI will serialize to JSON.
+
+        Returns:
+            Dict with structured data for JSON serialization
+        """
+        pass
+
 
 class TextOutputModel(BaseOutputModel):
     """Simple text output model."""
@@ -28,6 +90,33 @@ class TextOutputModel(BaseOutputModel):
 
     def __str__(self) -> str:
         return self.content
+
+    def handle_console(self) -> str:
+        """Display text to console with Rich styling."""
+        console = Console()
+
+        if "\n" in self.content:
+            lines = self.content.split("\n")
+            first_line = lines[0]
+            line_count = len(lines) - 1
+
+            if line_count > 3:
+                console.print(f"  ⎿  {first_line}", style="bright_black")
+                console.print(f"     ... (+{line_count} lines)", style="bright_black")
+            else:
+                console.print(f"  ⎿  {self.content}", style="bright_black")
+        else:
+            console.print(f"  ⎿  {self.content}", style="bright_black")
+
+        return self.content
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured data for API."""
+        return {
+            "type": "text",
+            "content": self.content,
+            "metadata": self.metadata,
+        }
 
 
 class CodeOutputModel(BaseOutputModel):
@@ -45,6 +134,47 @@ class CodeOutputModel(BaseOutputModel):
 
     def __str__(self) -> str:
         return self.content
+
+    def handle_console(self) -> str:
+        """Display code with syntax highlighting."""
+        from rich.syntax import Syntax
+
+        console = Console()
+        console.print("  ⎿", style="bright_black")
+
+        if self.content.count("\n") > 10:
+            lines = self.content.split("\n")
+            first_few_lines = "\n".join(lines[:3])
+            line_count = len(lines)
+
+            syntax = Syntax(
+                first_few_lines,
+                self.language,
+                theme="monokai",
+                line_numbers=True
+            )
+            console.print(syntax)
+            console.print(f"     ... (+{line_count-3} more lines)", style="bright_black")
+        else:
+            syntax = Syntax(
+                self.content,
+                self.language,
+                theme="monokai",
+                line_numbers=self.line_numbers
+            )
+            console.print(syntax)
+
+        return self.content
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured data for API."""
+        return {
+            "type": "code",
+            "content": self.content,
+            "language": self.language,
+            "line_numbers": self.line_numbers,
+            "metadata": self.metadata,
+        }
 
 
 class FileInfo(BaseModel):
@@ -93,6 +223,66 @@ class FileListOutputModel(BaseOutputModel):
     def __str__(self) -> str:
         return f"{len(self.files)} items in {self.path}"
 
+    def handle_console(self) -> str:
+        """Display file list as table."""
+        from rich.table import Table
+
+        console = Console()
+
+        if self.path:
+            console.print(f"  ⎿ Directory: {self.path}", style="bright_black")
+        else:
+            console.print("  ⎿", style="bright_black")
+
+        table = Table(box=None, show_header=True, show_edge=False)
+        table.add_column("Name", style="cyan")
+        table.add_column("Type", style="green")
+        table.add_column("Size", style="magenta")
+
+        total_items = len(self.files)
+        shown_items = min(10, total_items)
+
+        for file in self.files[:shown_items]:
+            file_type = "[DIR]" if file.is_dir else "[FILE]"
+            size = file.size
+            if isinstance(size, int):
+                if size < 1024:
+                    size = f"{size} B"
+                elif size < 1024 * 1024:
+                    size = f"{size / 1024:.1f} KB"
+                else:
+                    size = f"{size / (1024 * 1024):.1f} MB"
+
+            table.add_row(file.name, file_type, str(size))
+
+        console.print(table)
+
+        if total_items > shown_items:
+            console.print(f"... (+{total_items - shown_items} more items)", style="bright_black")
+
+        return f"{total_items} items in {self.path}"
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured data for API."""
+        return {
+            "type": "file_list",
+            "files": [
+                {
+                    "name": f.name,
+                    "path": f.path,
+                    "is_dir": f.is_dir,
+                    "size": f.size,
+                    "modified": f.modified,
+                    "modified_date": f.modified_date,
+                }
+                for f in self.files
+            ],
+            "path": self.path,
+            "total_count": self.total_count,
+            "truncated": self.truncated,
+            "metadata": self.metadata,
+        }
+
 
 class TableOutputModel(BaseOutputModel):
     """Tabular data output model."""
@@ -111,6 +301,40 @@ class TableOutputModel(BaseOutputModel):
             return f"Table with {len(self.rows)} rows and {len(self.headers)} columns"
         return f"Table with {len(self.rows)} rows"
 
+    def handle_console(self) -> str:
+        """Display tabular data with UI styling."""
+        from rich.table import Table
+        from rich.box import ROUNDED
+
+        console = Console()
+        console.print("  ⎿", style="bright_black")
+
+        table = Table(box=ROUNDED, show_header=bool(self.headers))
+
+        if self.headers:
+            for header in self.headers:
+                table.add_column(header, style="cyan bold")
+        else:
+            if self.rows and self.rows[0]:
+                for _ in range(len(self.rows[0])):
+                    table.add_column()
+
+        for row in self.rows:
+            table.add_row(*[str(cell) for cell in row])
+
+        console.print(table)
+
+        return f"Table with {len(self.rows)} rows"
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured data for API."""
+        return {
+            "type": "table",
+            "rows": self.rows,
+            "headers": self.headers,
+            "metadata": self.metadata,
+        }
+
 
 class ErrorOutputModel(BaseOutputModel):
     """Error output model."""
@@ -127,6 +351,26 @@ class ErrorOutputModel(BaseOutputModel):
 
     def __str__(self) -> str:
         return f"{self.error_type}: {self.error}"
+
+    def handle_console(self) -> str:
+        """Display error with red styling."""
+        console = Console()
+        console.print(f"  ⎿  {self.error_type}: {self.error}", style="red")
+
+        if self.traceback:
+            console.print(f"     {self.traceback}", style="bright_black")
+
+        return f"{self.error_type}: {self.error}"
+
+    def handle_api(self) -> dict[str, Any]:
+        """Return structured error for API."""
+        return {
+            "type": "error",
+            "error": self.error,
+            "error_type": self.error_type,
+            "traceback": self.traceback,
+            "metadata": self.metadata,
+        }
 
 
 # Type alias for any output model
