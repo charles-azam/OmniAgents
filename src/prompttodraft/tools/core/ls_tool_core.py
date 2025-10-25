@@ -34,8 +34,12 @@ glob patterns.
   - `path` (string, required): The absolute path to the directory to list.
   - `ignore` (array of strings, optional): A list of glob patterns to exclude
     from the listing (e.g., `["*.log", ".git"]`).
-  - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
-    patterns when listing files. Defaults to `true`.
+  - `file_filtering_options` (object, optional): Whether to respect ignore
+    patterns from .gitignore or .geminiignore.
+    - `respect_git_ignore` (boolean, optional): Whether to respect `.gitignore`
+      patterns. Defaults to `true`.
+    - `respect_gemini_ignore` (boolean, optional): Whether to respect
+      `.geminiignore` patterns. Defaults to `true`.
 - **Behavior:**
   - Returns a list of file and directory names.
   - Indicates whether each entry is a directory.
@@ -54,9 +58,19 @@ glob patterns.
                 "items": {"type": "string"},
                 "nullable": True
             },
-            "respect_git_ignore": {
-                "type": "boolean",
-                "description": "Whether to respect .gitignore patterns when listing files. Defaults to true.",
+            "file_filtering_options": {
+                "type": "object",
+                "description": "Optional: Whether to respect ignore patterns from .gitignore or .geminiignore",
+                "properties": {
+                    "respect_git_ignore": {
+                        "type": "boolean",
+                        "description": "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true."
+                    },
+                    "respect_gemini_ignore": {
+                        "type": "boolean",
+                        "description": "Optional: Whether to respect .geminiignore patterns when listing files. Defaults to true."
+                    }
+                },
                 "nullable": True
             }
         },
@@ -76,7 +90,7 @@ glob patterns.
         self,
         path: str,
         ignore: list[str] | None = None,
-        respect_git_ignore: bool = True
+        file_filtering_options: dict[str, bool] | None = None
     ) -> ToolOutputModel:
         """
         List files and directories in the given path.
@@ -84,11 +98,17 @@ glob patterns.
         Args:
             path: The absolute path to the directory to list
             ignore: Optional list of glob patterns to ignore
-            respect_git_ignore: Whether to respect .gitignore patterns
+            file_filtering_options: Optional dict with respect_git_ignore and respect_gemini_ignore
 
         Returns:
             A TextOutputModel or ErrorOutputModel
         """
+        # Extract filtering options with defaults
+        respect_git_ignore = True
+        respect_gemini_ignore = True
+        if file_filtering_options:
+            respect_git_ignore = file_filtering_options.get('respect_git_ignore', True)
+            respect_gemini_ignore = file_filtering_options.get('respect_gemini_ignore', True)
         # Ensure path is absolute
         if not Path(path).is_absolute():
             path = str(Path(self.backend.get_working_directory()) / path)

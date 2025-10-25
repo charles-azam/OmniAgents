@@ -60,6 +60,16 @@ recall the saved information.
             "fact": {
                 "type": "string",
                 "description": "The specific fact or piece of information to remember. Should be a clear, self-contained statement."
+            },
+            "modified_by_user": {
+                "type": "boolean",
+                "description": "Whether the proposed content was modified by the user.",
+                "nullable": True
+            },
+            "modified_content": {
+                "type": "string",
+                "description": "The modified content if user made changes.",
+                "nullable": True
             }
         },
         output_type="string"
@@ -74,12 +84,19 @@ recall the saved information.
         """
         self.backend = backend
 
-    def execute(self, fact: str) -> ToolOutputModel:
+    def execute(
+        self,
+        fact: str,
+        modified_by_user: bool = False,
+        modified_content: str | None = None
+    ) -> ToolOutputModel:
         """
         Save a fact to the memory file.
 
         Args:
             fact: The fact to remember
+            modified_by_user: Whether the user modified the content
+            modified_content: The modified content if user made changes
 
         Returns:
             A ToolOutputModel indicating success or failure
@@ -111,6 +128,20 @@ recall the saved information.
                         error_type="IOError"
                     )
 
+            # Handle user-modified content
+            if modified_by_user and modified_content is not None:
+                # User modified the entire file content, write it directly
+                try:
+                    self.backend.write_file(file_path=str(memory_file), content=modified_content)
+                except Exception as e:
+                    return ErrorOutputModel(
+                        error=f"Failed to write memory file: {str(e)}",
+                        error_type="IOError"
+                    )
+                return TextOutputModel(
+                    content="Okay, I've updated the memory file with your modifications."
+                )
+
             # Read existing file content or create new
             if self.backend.file_exists(path=str(memory_file)) == FileType.FILE:
                 try:
@@ -123,9 +154,13 @@ recall the saved information.
             else:
                 existing_content = ""
 
-            # Add the new fact
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            new_fact_entry = f"- [{timestamp}] {fact}\n"
+            # Process the fact - remove existing dashes/bullets before adding new one
+            import re
+            processed_fact = fact.strip()
+            processed_fact = re.sub(r'^(-+\s*)+', '', processed_fact).strip()
+
+            # Add the new fact entry (without timestamp per Gemini spec)
+            new_fact_entry = f"- {processed_fact}\n"
 
             # Check if memory section exists
             if MEMORY_SECTION in existing_content:
@@ -162,7 +197,7 @@ recall the saved information.
                 )
 
             return TextOutputModel(
-                content=f"Successfully saved fact to memory: {fact}"
+                content=f'Okay, I\'ve remembered that: "{processed_fact}"'
             )
 
         except Exception as e:

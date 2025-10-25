@@ -38,6 +38,8 @@ class GlobToolCore:
     case-sensitive. Defaults to `false`.
   - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
     patterns when finding files. Defaults to `true`.
+  - `respect_gemini_ignore` (boolean, optional): Whether to respect .geminiignore
+    patterns when finding files. Defaults to `true`.
 - **Behavior:**
   - Searches for files matching the glob pattern within the specified directory.
   - Returns a list of absolute paths, sorted with the most recently modified
@@ -66,6 +68,11 @@ class GlobToolCore:
                 "type": "boolean",
                 "description": "Whether to respect .gitignore patterns when finding files. Defaults to true.",
                 "nullable": True
+            },
+            "respect_gemini_ignore": {
+                "type": "boolean",
+                "description": "Whether to respect .geminiignore patterns when finding files. Defaults to true.",
+                "nullable": True
             }
         },
         output_type="string"
@@ -85,7 +92,8 @@ class GlobToolCore:
         pattern: str,
         path: str | None = None,
         case_sensitive: bool = False,
-        respect_git_ignore: bool = True
+        respect_git_ignore: bool = True,
+        respect_gemini_ignore: bool = True
     ) -> ToolOutputModel:
         """
         Find files matching the given glob pattern.
@@ -95,6 +103,7 @@ class GlobToolCore:
             path: The directory to search in (defaults to working directory)
             case_sensitive: Whether search should be case-sensitive
             respect_git_ignore: Whether to respect .gitignore patterns
+            respect_gemini_ignore: Whether to respect .geminiignore patterns
 
         Returns:
             A TextOutputModel or ErrorOutputModel

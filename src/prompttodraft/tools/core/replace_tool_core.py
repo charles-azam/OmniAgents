@@ -86,6 +86,16 @@ context around the `old_string` to ensure it modifies the correct location.
                 "type": "number",
                 "description": "The number of occurrences to replace. Defaults to 1.",
                 "nullable": True
+            },
+            "modified_by_user": {
+                "type": "boolean",
+                "description": "Whether the edit was modified manually by the user.",
+                "nullable": True
+            },
+            "ai_proposed_content": {
+                "type": "string",
+                "description": "Initially proposed content.",
+                "nullable": True
             }
         },
         output_type="string"
@@ -105,7 +115,9 @@ context around the `old_string` to ensure it modifies the correct location.
         file_path: str,
         old_string: str,
         new_string: str,
-        expected_replacements: int = 1
+        expected_replacements: int = 1,
+        modified_by_user: bool = False,
+        ai_proposed_content: str | None = None
     ) -> ToolOutputModel:
         """
         Replace text in a file with targeted edits.
@@ -115,6 +127,8 @@ context around the `old_string` to ensure it modifies the correct location.
             old_string: The text to replace
             new_string: The replacement text
             expected_replacements: Number of expected replacements (default 1)
+            modified_by_user: Whether the user modified the edit
+            ai_proposed_content: Initially proposed content
 
         Returns:
             A ToolOutputModel (TextOutput or ErrorOutput)
@@ -186,8 +200,16 @@ context around the `old_string` to ensure it modifies the correct location.
             )
 
         # Return success message
+        success_message_parts = [
+            f"Successfully modified file: {file_path} ({expected_replacements} replacements)."
+        ]
+        if modified_by_user:
+            success_message_parts.append(
+                f"User modified the `new_string` content to be: {new_string}."
+            )
+
         return TextOutputModel(
-            content=f"Successfully modified file: {file_path} ({expected_replacements} replacements)."
+            content=" ".join(success_message_parts)
         )
 
     def _create_new_file(

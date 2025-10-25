@@ -48,6 +48,16 @@ directories) will be created.
             "content": {
                 "type": "string",
                 "description": "The content to write into the file."
+            },
+            "modified_by_user": {
+                "type": "boolean",
+                "description": "Whether the proposed content was modified by the user.",
+                "nullable": True
+            },
+            "ai_proposed_content": {
+                "type": "string",
+                "description": "Initially proposed content.",
+                "nullable": True
             }
         },
         output_type="string"
@@ -65,7 +75,9 @@ directories) will be created.
     def execute(
         self,
         file_path: str,
-        content: str
+        content: str,
+        modified_by_user: bool = False,
+        ai_proposed_content: str | None = None
     ) -> ToolOutputModel:
         """
         Write content to a file.
@@ -73,6 +85,8 @@ directories) will be created.
         Args:
             file_path: The absolute path to the file to write to
             content: The content to write into the file
+            modified_by_user: Whether the user modified the content
+            ai_proposed_content: Initially proposed content
 
         Returns:
             A ToolOutputModel (TextOutput or ErrorOutput)
@@ -113,11 +127,17 @@ directories) will be created.
             )
 
         # Return success message
+        success_message_parts = []
         if file_existed:
-            return TextOutputModel(
-                content=f"Successfully overwrote file: {file_path}"
-            )
+            success_message_parts.append(f"Successfully overwrote file: {file_path}.")
         else:
-            return TextOutputModel(
-                content=f"Successfully created and wrote to new file: {file_path}"
+            success_message_parts.append(f"Successfully created and wrote to new file: {file_path}.")
+
+        if modified_by_user:
+            success_message_parts.append(
+                f"User modified the `content` to be: {content}"
             )
+
+        return TextOutputModel(
+            content=" ".join(success_message_parts)
+        )

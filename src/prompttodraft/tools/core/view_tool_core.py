@@ -37,7 +37,7 @@ can read specific line ranges. Other binary file types are generally skipped.
 - **Tool name:** `read_file`
 - **Display name:** ReadFile
 - **Parameters:**
-  - `path` (string, required): The absolute path to the file to read.
+  - `absolute_path` (string, required): The absolute path to the file to read.
   - `offset` (number, optional): For text files, the 0-based line number to
     start reading from. Requires `limit` to be set.
   - `limit` (number, optional): For text files, the maximum number of lines to
@@ -60,9 +60,9 @@ can read specific line ranges. Other binary file types are generally skipped.
     `Cannot display content of binary file: /path/to/data.bin`.
 - **Confirmation:** No.""",
         inputs={
-            "path": {
+            "absolute_path": {
                 "type": "string",
-                "description": "The absolute path to the file to read."
+                "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported."
             },
             "offset": {
                 "type": "number",
@@ -89,7 +89,7 @@ can read specific line ranges. Other binary file types are generally skipped.
 
     def execute(
         self,
-        path: str,
+        absolute_path: str,
         offset: int | None = None,
         limit: int | None = None
     ) -> ToolOutputModel:
@@ -97,7 +97,7 @@ can read specific line ranges. Other binary file types are generally skipped.
         Read a file with validation and formatting.
 
         Args:
-            path: The absolute path to the file to read
+            absolute_path: The absolute path to the file to read
             offset: The line number to start reading from (0-indexed)
             limit: The maximum number of lines to read
 
@@ -105,6 +105,7 @@ can read specific line ranges. Other binary file types are generally skipped.
             A ToolOutputModel (TextOutput or ErrorOutput)
         """
         # Ensure path is absolute
+        path = absolute_path
         if not Path(path).is_absolute():
             path = str(Path(self.backend.get_working_directory()) / path)
 
