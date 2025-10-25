@@ -10,7 +10,6 @@ from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import (
     FileInfo,
     FileListOutputModel,
-    ErrorOutputModel,
     ToolOutputModel,
 )
 
@@ -25,26 +24,26 @@ class GlobTool:
 
     metadata = ToolMetadata(
         name="glob",
-        description="Finds files matching specific glob patterns (e.g., '*.py', 'src/**/*.js'), returning absolute paths sorted by modification time (newest first).",
+        description="Efficiently finds files matching specific glob patterns (e.g., '**/*.py', 'docs/*.md'), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
         inputs={
             "pattern": {
                 "type": "string",
-                "description": "The glob pattern to match against (e.g., '*.py', 'src/**/*.js')",
+                "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
                 "nullable": False,
             },
             "path": {
                 "type": "string",
-                "description": "The absolute path to the directory to search within. If omitted, searches the tool's root directory.",
+                "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
                 "nullable": True,
             },
             "case_sensitive": {
                 "type": "boolean",
-                "description": "Whether the search should be case-sensitive. Defaults to false.",
+                "description": "Optional: Whether the search should be case-sensitive. Defaults to false.",
                 "nullable": True,
             },
             "respect_git_ignore": {
                 "type": "boolean",
-                "description": "Whether to respect .gitignore patterns when finding files. Defaults to true.",
+                "description": "Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.",
                 "nullable": True,
             },
         },
@@ -73,11 +72,15 @@ class GlobTool:
         Args:
             pattern: The glob pattern to match against
             path: Optional directory to search within
-            case_sensitive: Whether the search should be case-sensitive
-            respect_git_ignore: Whether to respect .gitignore patterns
+            case_sensitive: Whether the search should be case-sensitive (not currently implemented)
+            respect_git_ignore: Whether to respect .gitignore patterns (not currently implemented)
 
         Returns:
-            FileListOutputModel with matching files or ErrorOutputModel on failure
+            FileListOutputModel with matching files
+
+        Note:
+            case_sensitive and respect_git_ignore parameters are accepted for API compatibility
+            but not currently implemented in this backend-based approach.
         """
         # Get matched file paths
         matched_paths = self.backend.glob_files(pattern=pattern, path=path)

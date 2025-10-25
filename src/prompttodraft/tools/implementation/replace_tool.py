@@ -24,11 +24,11 @@ class ReplaceTool:
 
     metadata = ToolMetadata(
         name="replace",
-        description="Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when expected_replacements is specified. This tool is designed for precise, targeted changes and requires significant context around the old_string to ensure it modifies the correct location.",
+        description="Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when expected_replacements is specified. This tool is designed for precise, targeted changes and requires significant context around the old_string to ensure it modifies the correct location. CRITICAL: Include at least 3 lines of context before and after the target text, matching whitespace and indentation precisely.",
         inputs={
             "file_path": {
                 "type": "string",
-                "description": "The absolute path to the file to modify",
+                "description": "The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Relative paths are not supported.",
                 "nullable": False,
             },
             "old_string": {
@@ -38,12 +38,12 @@ class ReplaceTool:
             },
             "new_string": {
                 "type": "string",
-                "description": "The exact literal text to replace old_string with",
+                "description": "The exact literal text to replace old_string with.",
                 "nullable": False,
             },
             "expected_replacements": {
                 "type": "number",
-                "description": "The number of occurrences to replace. Defaults to 1.",
+                "description": "Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.",
                 "nullable": True,
             },
         },
@@ -120,10 +120,16 @@ class ReplaceTool:
             )
 
         if occurrences != expected_replacements:
-            return ErrorOutputModel(
-                error=f"Failed to edit, expected {expected_replacements} occurrences but found {occurrences}. Please provide more context in old_string to make it unique.",
-                error_type="AmbiguousMatchError",
-            )
+            if occurrences > expected_replacements:
+                return ErrorOutputModel(
+                    error=f"Failed to edit, expected {expected_replacements} occurrences but found {occurrences}. The old_string matches multiple locations in the file. Please provide more context in old_string to make it unique (include at least 3 lines of surrounding context before and after).",
+                    error_type="AmbiguousMatchError",
+                )
+            else:
+                return ErrorOutputModel(
+                    error=f"Failed to edit, expected {expected_replacements} occurrences but found {occurrences}.",
+                    error_type="AmbiguousMatchError",
+                )
 
         # Perform replacement
         new_content = content.replace(old_string, new_string, expected_replacements)

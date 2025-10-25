@@ -24,21 +24,21 @@ class SearchFileContentTool:
 
     metadata = ToolMetadata(
         name="search_file_content",
-        description="Searches for a regular expression pattern within the content of files in a specified directory. Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.",
+        description="Searches for a regular expression pattern within the content of files in a specified directory. Uses git grep if available in a Git repository for speed; otherwise, falls back to system grep. Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.",
         inputs={
             "pattern": {
                 "type": "string",
-                "description": "The regular expression (regex) to search for (e.g., 'function\\s+myFunction')",
+                "description": "The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').",
                 "nullable": False,
             },
             "path": {
                 "type": "string",
-                "description": "The absolute path to the directory to search within. Defaults to the current working directory.",
+                "description": "Optional: The absolute path to the directory to search within. Defaults to the current working directory.",
                 "nullable": True,
             },
             "include": {
                 "type": "string",
-                "description": "A glob pattern to filter which files are searched (e.g., '*.js', 'src/**/*.{ts,tsx}'). If omitted, searches most files.",
+                "description": "Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.",
                 "nullable": True,
             },
         },

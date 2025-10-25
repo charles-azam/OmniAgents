@@ -9,7 +9,6 @@ from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import (
     TextOutputModel,
-    ErrorOutputModel,
     ToolOutputModel,
 )
 
@@ -24,21 +23,21 @@ class RunShellCommandTool:
 
     metadata = ToolMetadata(
         name="run_shell_command",
-        description="Executes a shell command in the execution environment. Returns detailed information about the execution including command, directory, stdout, stderr, exit code, and any errors. On Windows, commands are executed with powershell.exe. On other platforms, they are executed with bash -c.",
+        description="Executes a shell command in the execution environment. Use this to interact with the underlying system, run scripts, or perform command-line operations. Returns detailed information about the execution including stdout, stderr, exit code, and any errors. Commands are executed with bash -c on Unix-like systems.",
         inputs={
             "command": {
                 "type": "string",
-                "description": "The exact shell command to execute",
+                "description": "The exact shell command to execute.",
                 "nullable": False,
             },
             "description": {
                 "type": "string",
-                "description": "A brief description of the command's purpose, which will be shown to the user",
+                "description": "Optional: A brief description of the command's purpose, which will be shown to the user.",
                 "nullable": True,
             },
             "directory": {
                 "type": "string",
-                "description": "The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.",
+                "description": "Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.",
                 "nullable": True,
             },
         },
