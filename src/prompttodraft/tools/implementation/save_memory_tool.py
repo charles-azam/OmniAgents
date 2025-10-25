@@ -1,0 +1,119 @@
+"""
+Save memory tool implementation.
+
+This tool saves and recalls information across sessions by appending to a memory file.
+"""
+from pathlib import Path
+
+from prompttodraft.tools.core.metadata import ToolMetadata
+from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.tools.outputs.models import (
+    TextOutputModel,
+    ErrorOutputModel,
+    ToolOutputModel,
+)
+
+
+class SaveMemoryTool:
+    """
+    Framework-agnostic memory persistence tool.
+
+    Saves and recalls information across sessions by appending facts to a
+    memory file. This allows the system to remember key details across sessions.
+    """
+
+    metadata = ToolMetadata(
+        name="save_memory",
+        description="Saves and recalls information across sessions. Appends the provided fact to a special memory file that can be loaded in subsequent sessions, providing personalized and directed assistance.",
+        inputs={
+            "fact": {
+                "type": "string",
+                "description": "The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language.",
+                "nullable": False,
+            },
+        },
+        output_type="string",
+    )
+
+    # Default memory file location (in user's home directory)
+    MEMORY_FILE_DIR = ".gemini"
+    MEMORY_FILE_NAME = "GEMINI.md"
+    MEMORY_SECTION_HEADER = "## Gemini Added Memories"
+
+    def __init__(self, backend: ExecutionBackend):
+        """
+        Initialize SaveMemoryTool with an execution backend.
+
+        Args:
+            backend: The execution backend to use (local, docker, e2b)
+        """
+        self.backend = backend
+
+    def _get_memory_file_path(self) -> str:
+        """
+        Get the path to the memory file.
+
+        Returns:
+            Absolute path to the memory file
+        """
+        # Get home directory
+        home_result = self.backend.execute_command(
+            command="echo $HOME",
+            timeout=5000,
+        )
+
+        if home_result.exit_code != 0 or not home_result.output:
+            # Fallback to working directory
+            return str(Path(self.backend.get_working_directory()) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
+
+        home_dir = home_result.output.strip()
+        return str(Path(home_dir) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
+
+    def execute(self, fact: str) -> ToolOutputModel:
+        """
+        Execute the save_memory tool.
+
+        Args:
+            fact: The specific fact or piece of information to remember
+
+        Returns:
+            TextOutputModel with success message or ErrorOutputModel on failure
+        """
+        memory_file_path = self._get_memory_file_path()
+
+        # Ensure the directory exists
+        memory_dir = str(Path(memory_file_path).parent)
+        dir_exists = self.backend.file_exists(path=memory_dir)
+
+        if dir_exists is None:
+            self.backend.create_directory(path=memory_dir, parents=True)
+
+        # Check if memory file exists
+        file_exists = self.backend.file_exists(path=memory_file_path)
+
+        if file_exists is None:
+            # Create new memory file with header
+            initial_content = f"# Gemini Memory File\n\n{self.MEMORY_SECTION_HEADER}\n\n- {fact}\n"
+            self.backend.write_file(file_path=memory_file_path, content=initial_content)
+            return TextOutputModel(
+                content=f"Memory saved: '{fact}' (created new memory file at {memory_file_path})",
+            )
+
+        # File exists, read current content
+        content = self.backend.read_file(file_path=memory_file_path)
+
+        # Check if the memories section exists
+        if self.MEMORY_SECTION_HEADER in content:
+            # Append to existing section
+            # Find the section and append after it
+            new_content = content.rstrip() + f"\n- {fact}\n"
+        else:
+            # Add the section header and fact
+            new_content = content.rstrip() + f"\n\n{self.MEMORY_SECTION_HEADER}\n\n- {fact}\n"
+
+        # Write updated content
+        self.backend.write_file(file_path=memory_file_path, content=new_content)
+
+        return TextOutputModel(
+            content=f"Memory saved: '{fact}' (appended to {memory_file_path})",
+        )

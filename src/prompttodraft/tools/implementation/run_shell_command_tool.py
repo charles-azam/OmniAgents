@@ -1,0 +1,119 @@
+"""
+Run shell command tool implementation.
+
+This tool executes shell commands in the execution environment.
+"""
+from pathlib import Path
+
+from prompttodraft.tools.core.metadata import ToolMetadata
+from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+from prompttodraft.tools.outputs.models import (
+    TextOutputModel,
+    ErrorOutputModel,
+    ToolOutputModel,
+)
+
+
+class RunShellCommandTool:
+    """
+    Framework-agnostic shell command execution tool.
+
+    Executes shell commands in the execution environment, returning detailed
+    information about the execution including stdout, stderr, and exit code.
+    """
+
+    metadata = ToolMetadata(
+        name="run_shell_command",
+        description="Executes a shell command in the execution environment. Returns detailed information about the execution including command, directory, stdout, stderr, exit code, and any errors. On Windows, commands are executed with powershell.exe. On other platforms, they are executed with bash -c.",
+        inputs={
+            "command": {
+                "type": "string",
+                "description": "The exact shell command to execute",
+                "nullable": False,
+            },
+            "description": {
+                "type": "string",
+                "description": "A brief description of the command's purpose, which will be shown to the user",
+                "nullable": True,
+            },
+            "directory": {
+                "type": "string",
+                "description": "The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.",
+                "nullable": True,
+            },
+        },
+        output_type="string",
+    )
+
+    def __init__(self, backend: ExecutionBackend):
+        """
+        Initialize RunShellCommandTool with an execution backend.
+
+        Args:
+            backend: The execution backend to use (local, docker, e2b)
+        """
+        self.backend = backend
+
+    def execute(
+        self,
+        command: str,
+        description: str | None = None,
+        directory: str | None = None,
+    ) -> ToolOutputModel:
+        """
+        Execute the run_shell_command tool.
+
+        Args:
+            command: The exact shell command to execute
+            description: Optional description of the command's purpose
+            directory: Optional directory to execute the command in
+
+        Returns:
+            TextOutputModel with command output or ErrorOutputModel on failure
+        """
+        # Determine execution directory
+        working_dir = self.backend.get_working_directory()
+        exec_dir = working_dir
+
+        if directory:
+            # Convert relative directory to absolute
+            exec_dir = str(Path(working_dir) / directory)
+
+        # Build the full command with directory change if needed
+        if directory:
+            full_command = f'cd "{exec_dir}" && {command}'
+        else:
+            full_command = command
+
+        # Execute command
+        result = self.backend.execute_command(
+            command=full_command,
+            timeout=120000,  # 2 minutes default
+        )
+
+        # Format output
+        output_lines = []
+
+        if description:
+            output_lines.append(f"Description: {description}")
+
+        output_lines.append(f"Command: {command}")
+        output_lines.append(f"Directory: {exec_dir}")
+        output_lines.append("")
+
+        if result.output:
+            output_lines.append("Output:")
+            output_lines.append(result.output)
+            output_lines.append("")
+
+        output_lines.append(f"Exit Code: {result.exit_code}")
+
+        # Check for non-zero exit code
+        if result.exit_code != 0:
+            output_lines.append("")
+            output_lines.append(f"Warning: Command exited with non-zero status code {result.exit_code}")
+
+        return TextOutputModel(
+            content="\n".join(output_lines),
+            metadata={"exit_code": result.exit_code, "command": command},
+        )
