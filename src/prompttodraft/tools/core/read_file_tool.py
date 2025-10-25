@@ -12,6 +12,7 @@ from prompttodraft.tools.backends.execution_backend import ExecutionBackend, Fil
 from prompttodraft.tools.outputs.models import (
     TextOutputModel,
     ErrorOutputModel,
+    MediaOutputModel,
     ToolOutputModel,
 )
 
@@ -142,13 +143,10 @@ class ReadFileTool:
 
         # Check if this is a media file (image or PDF)
         if self._is_media_file(file_path=absolute_path):
-            # Read file as binary and encode to base64
-            content = self.backend.read_file(file_path=absolute_path)
-            # For media files, we need to read as bytes
-            # Since backend returns string, we'll need to encode the path and use a command
+            # Get mime type
             mime_type = self._get_mime_type(file_path=absolute_path)
 
-            # Use execute_command to read binary file
+            # Use execute_command to read binary file and encode to base64
             result = self.backend.execute_command(
                 command=f'base64 "{absolute_path}"',
                 timeout=30000,
@@ -162,9 +160,23 @@ class ReadFileTool:
 
             base64_data = result.output.strip()
 
-            return TextOutputModel(
-                content=f"[Media File: {Path(absolute_path).name}]\nMIME Type: {mime_type}\nBase64 Data: {base64_data}",
-                metadata={"mime_type": mime_type, "is_media": True},
+            # Get file size
+            size_result = self.backend.execute_command(
+                command=f'wc -c < "{absolute_path}"',
+                timeout=5000,
+            )
+            size_bytes = None
+            if size_result.exit_code == 0:
+                try:
+                    size_bytes = int(size_result.output.strip())
+                except ValueError:
+                    pass
+
+            return MediaOutputModel(
+                filename=Path(absolute_path).name,
+                mime_type=mime_type,
+                base64_data=base64_data,
+                size_bytes=size_bytes,
             )
 
         # Read text file
