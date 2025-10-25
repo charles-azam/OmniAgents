@@ -1,17 +1,14 @@
 """
-GlobToolCore - Framework-agnostic file pattern matching tool.
+glob tool - Framework-agnostic file pattern matching tool.
 
-Extracted from smolcc/tools/glob_tool.py with business logic separated from execution.
+Implements the Gemini CLI FindFiles tool specification.
 """
-import os
-import time
-from datetime import datetime
+from pathlib import Path
+import fnmatch
 
 from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.tools.outputs.models import (
-    FileInfo,
-    FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,
@@ -20,27 +17,54 @@ from prompttodraft.tools.outputs.models import (
 
 class GlobToolCore:
     """
-    Framework-agnostic file pattern matching tool.
+    glob tool for finding files by pattern.
 
-    Extracted from smolcc/tools/glob_tool.py:19-208
+    Implements the Gemini CLI FindFiles specification.
     """
 
-    # Metadata (from glob_tool.py:25-36)
     metadata = ToolMetadata(
-        name="GlobTool",
-        description="""- Lightning-quick file-pattern matcher that scales to projects of any size
-- Understands glob expressions such as "**/*.js" and "src/**/*.ts"
-- Returns matching file paths in descending order of last-modified time
-- Reach for this tool whenever you need to locate files by name patterns
-- For exploratory searches that may involve several rounds of globbing and grepping, use the Agent tool instead""",
+        name="glob",
+        description="""glob finds files matching specific glob patterns (e.g., `src/**/*.ts`,
+`*.md`), returning absolute paths sorted by modification time (newest first).
+
+- **Tool name:** `glob`
+- **Display name:** FindFiles
+- **Parameters:**
+  - `pattern` (string, required): The glob pattern to match against (e.g.,
+    `"*.py"`, `"src/**/*.js"`).
+  - `path` (string, optional): The absolute path to the directory to search
+    within. If omitted, searches the tool's root directory.
+  - `case_sensitive` (boolean, optional): Whether the search should be
+    case-sensitive. Defaults to `false`.
+  - `respect_git_ignore` (boolean, optional): Whether to respect .gitignore
+    patterns when finding files. Defaults to `true`.
+- **Behavior:**
+  - Searches for files matching the glob pattern within the specified directory.
+  - Returns a list of absolute paths, sorted with the most recently modified
+    files first.
+  - Ignores common nuisance directories like `node_modules` and `.git` by
+    default.
+- **Output (`llmContent`):** A message like:
+  `Found 5 file(s) matching "*.ts" within src, sorted by modification time (newest first):\nsrc/file1.ts\nsrc/subdir/file2.ts...`
+- **Confirmation:** No.""",
         inputs={
             "pattern": {
                 "type": "string",
-                "description": "The glob pattern to match files against"
+                "description": "The glob pattern to match against (e.g., \"*.py\", \"src/**/*.js\")"
             },
             "path": {
                 "type": "string",
-                "description": "The directory to search in. Defaults to the current working directory.",
+                "description": "The absolute path to the directory to search within. If omitted, searches the tool's root directory.",
+                "nullable": True
+            },
+            "case_sensitive": {
+                "type": "boolean",
+                "description": "Whether the search should be case-sensitive. Defaults to false.",
+                "nullable": True
+            },
+            "respect_git_ignore": {
+                "type": "boolean",
+                "description": "Whether to respect .gitignore patterns when finding files. Defaults to true.",
                 "nullable": True
             }
         },
@@ -59,111 +83,190 @@ class GlobToolCore:
     def execute(
         self,
         pattern: str,
-        path: str | None = None
+        path: str | None = None,
+        case_sensitive: bool = False,
+        respect_git_ignore: bool = True
     ) -> ToolOutputModel:
         """
-        Find files matching the given glob pattern (from glob_tool.py:39-87).
+        Find files matching the given glob pattern.
 
         Args:
-            pattern: The glob pattern to match files against (e.g. "**/*.py")
-            path: The directory to search in (defaults to current working directory)
+            pattern: The glob pattern to match files against
+            path: The directory to search in (defaults to working directory)
+            case_sensitive: Whether search should be case-sensitive
+            respect_git_ignore: Whether to respect .gitignore patterns
 
         Returns:
-            A FileListOutputModel or ErrorOutputModel
+            A TextOutputModel or ErrorOutputModel
         """
-        start_time = time.time()
-        search_path = path or os.getcwd()
+        # Determine search path
+        if path is None:
+            search_path = self.backend.get_working_directory()
+        elif not Path(path).is_absolute():
+            search_path = str(Path(self.backend.get_working_directory()) / path)
+        else:
+            search_path = path
 
-        # Make sure search_path is absolute
-        search_path = os.path.abspath(search_path) if not os.path.isabs(search_path) else search_path
-
-        # Verify path exists
-        if not self.backend.file_exists(path=search_path):
-            return ErrorOutputModel(error=f"Path '{search_path}' does not exist", error_type="FileNotFoundError")
-        if not self.backend.is_directory(path=search_path):
-            return ErrorOutputModel(error=f"Path '{search_path}' is not a directory", error_type="ValueError")
-
-        # Find matching files via backend
-        matching_files = self.backend.glob_files(pattern=pattern, path=search_path)
-
-        # Limit results
-        truncated = len(matching_files) > 100
-        matching_files = matching_files[:100]
-
-        # If no files found, return a simple message
-        if not matching_files:
-            return TextOutputModel(content=f"No files found matching pattern '{pattern}' in '{search_path}'")
-
-        # Convert to rich file info format
-        file_info_list = self._convert_to_file_info(matching_files=matching_files)
-
-        # Calculate duration in milliseconds
-        duration_ms = int((time.time() - start_time) * 1000)
-
-        # Add a note about truncation if needed
-        if truncated:
-            truncation_note = "(Results limited to 100 files. Consider using a more specific pattern.)"
-            file_info_list.append(
-                FileInfo(
-                    name=truncation_note,
-                    path="",
-                    is_dir=False,
-                    size="",
-                    modified=None,
-                    modified_date=None
-                )
+        # Verify path exists and is directory
+        file_type = self.backend.file_exists(path=search_path)
+        if file_type is None:
+            return ErrorOutputModel(
+                error=f"Path '{search_path}' does not exist",
+                error_type="FileNotFoundError"
+            )
+        if file_type != FileType.DIRECTORY:
+            return ErrorOutputModel(
+                error=f"Path '{search_path}' is not a directory",
+                error_type="ValueError"
             )
 
-        # Return as FileListOutputModel
-        return FileListOutputModel(
-            files=file_info_list,
-            path=f"{search_path} (pattern: {pattern}, {duration_ms}ms)",
-            total_count=len(file_info_list),
-            truncated=truncated
-        )
+        # Find matching files via backend
+        try:
+            matching_files = self.backend.glob_files(
+                pattern=pattern,
+                path=search_path
+            )
+        except Exception as e:
+            return ErrorOutputModel(
+                error=f"Error finding files: {str(e)}",
+                error_type="IOError"
+            )
 
-    def _convert_to_file_info(self, matching_files: list[str]) -> list[FileInfo]:
+        # Filter by case sensitivity
+        if not case_sensitive:
+            # For case-insensitive matching, filter using fnmatch
+            pattern_lower = pattern.lower()
+            filtered_files = []
+            for file_path in matching_files:
+                # Get relative path for matching
+                rel_path = Path(file_path).relative_to(search_path)
+                if fnmatch.fnmatch(str(rel_path).lower(), pattern_lower):
+                    filtered_files.append(file_path)
+            matching_files = filtered_files
+
+        # Filter out common nuisance directories and files
+        matching_files = [
+            f for f in matching_files
+            if not self._is_nuisance_path(path=f)
+        ]
+
+        # Apply gitignore filtering
+        if respect_git_ignore:
+            matching_files = self._filter_git_ignored(
+                files=matching_files,
+                search_path=search_path
+            )
+
+        # If no files found
+        if not matching_files:
+            return TextOutputModel(
+                content=f'Found 0 file(s) matching "{pattern}" within {search_path}'
+            )
+
+        # Sort by modification time (newest first)
+        sorted_files = self._sort_by_modification_time(files=matching_files)
+
+        # Format output
+        file_count = len(sorted_files)
+        output_lines = [
+            f'Found {file_count} file(s) matching "{pattern}" within {search_path}, sorted by modification time (newest first):'
+        ]
+        output_lines.extend(sorted_files)
+
+        return TextOutputModel(content="\n".join(output_lines))
+
+    def _is_nuisance_path(self, path: str) -> bool:
         """
-        Convert file paths to rich file info objects (from glob_tool.py:158-203).
+        Check if a path contains common nuisance directories.
 
         Args:
-            matching_files: List of file paths
+            path: File path to check
 
         Returns:
-            List of FileInfo objects
+            True if path contains nuisance directories
         """
-        file_info_list = []
+        nuisance_dirs = {
+            'node_modules', '.git', '__pycache__', '.venv', 'venv',
+            '.pytest_cache', '.mypy_cache', '.tox', 'dist', 'build',
+            '.eggs', '*.egg-info'
+        }
 
-        for file_path in matching_files:
-            try:
-                # Get file stats
-                stats = self.backend.get_file_stats(path=file_path)
+        path_parts = Path(path).parts
+        return any(part in nuisance_dirs for part in path_parts)
 
-                # Format size
-                size = stats["size"]
-                if size < 1024:
-                    size_str = f"{size} B"
-                elif size < 1024 * 1024:
-                    size_str = f"{size / 1024:.1f} KB"
-                else:
-                    size_str = f"{size / (1024 * 1024):.1f} MB"
+    def _filter_git_ignored(self, files: list[str], search_path: str) -> list[str]:
+        """
+        Filter out files that are git-ignored.
 
-                # Format modification time
-                modified_date = datetime.fromtimestamp(stats["modified"]).strftime("%Y-%m-%d %H:%M:%S")
+        Args:
+            files: List of file paths to filter
+            search_path: Base search directory
 
-                # Create file info
-                file_info = FileInfo(
-                    name=os.path.basename(file_path),
-                    is_dir=False,  # We only match files, not directories
-                    size=size,
-                    modified=stats["modified"],
-                    modified_date=modified_date,
-                    path=file_path
+        Returns:
+            Filtered list of files
+        """
+        try:
+            # Check if we're in a git repository
+            result = self.backend.execute_command(
+                command=f"cd '{search_path}' && git rev-parse --git-dir",
+                timeout=5000
+            )
+            if result.exit_code != 0:
+                return files  # Not a git repo, return all files
+
+            # Check each file against git check-ignore
+            filtered_files = []
+            for file_path in files:
+                # Get relative path for git check-ignore
+                try:
+                    rel_path = Path(file_path).relative_to(search_path)
+                except ValueError:
+                    # File not under search_path, keep it
+                    filtered_files.append(file_path)
+                    continue
+
+                result = self.backend.execute_command(
+                    command=f"cd '{search_path}' && git check-ignore '{rel_path}'",
+                    timeout=5000
                 )
+                # Exit code 0 means the file is ignored, so skip it
+                if result.exit_code != 0:
+                    filtered_files.append(file_path)
 
-                file_info_list.append(file_info)
-            except (PermissionError, FileNotFoundError):
-                # Skip files we can't access
-                continue
+            return filtered_files
 
-        return file_info_list
+        except Exception:
+            return files  # On error, return all files
+
+    def _sort_by_modification_time(self, files: list[str]) -> list[str]:
+        """
+        Sort files by modification time (newest first).
+
+        Args:
+            files: List of file paths
+
+        Returns:
+            Sorted list of file paths
+        """
+        # Get modification times for all files
+        file_times = []
+        for file_path in files:
+            try:
+                # Use stat command to get modification time
+                result = self.backend.execute_command(
+                    command=f"stat -f %m '{file_path}' 2>/dev/null || stat -c %Y '{file_path}' 2>/dev/null",
+                    timeout=5000
+                )
+                if result.exit_code == 0:
+                    mtime = int(result.output.strip())
+                    file_times.append((file_path, mtime))
+                else:
+                    # If stat fails, add with time 0
+                    file_times.append((file_path, 0))
+            except Exception:
+                file_times.append((file_path, 0))
+
+        # Sort by modification time (newest first)
+        file_times.sort(key=lambda x: x[1], reverse=True)
+
+        return [file_path for file_path, _ in file_times]

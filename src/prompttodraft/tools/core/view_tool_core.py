@@ -1,124 +1,77 @@
 """
-ViewToolCore - Framework-agnostic file reading tool.
+read_file tool - Framework-agnostic file reading tool.
 
-Extracted from smolcc/tools/view_tool.py with business logic separated from execution.
+Implements the Gemini CLI ReadFile tool specification.
 """
-import os
+from pathlib import Path
 import mimetypes
+import base64
 
 from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.tools.outputs.models import (
-    CodeOutputModel,
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,
 )
 
-# File extension to language mapping (from view_tool.py:23-100)
-LANGUAGE_MAP = {
-    # Python files
-    '.py': 'python',
-    '.pyx': 'python',
-    '.pyw': 'python',
-    # JavaScript/TypeScript files
-    '.js': 'javascript',
-    '.jsx': 'jsx',
-    '.ts': 'typescript',
-    '.tsx': 'tsx',
-    # Web files
-    '.html': 'html',
-    '.htm': 'html',
-    '.css': 'css',
-    '.scss': 'scss',
-    '.sass': 'sass',
-    '.less': 'less',
-    # Data files
-    '.json': 'json',
-    '.yaml': 'yaml',
-    '.yml': 'yaml',
-    '.toml': 'toml',
-    '.xml': 'xml',
-    # Shell scripts
-    '.sh': 'bash',
-    '.bash': 'bash',
-    '.zsh': 'bash',
-    '.fish': 'fish',
-    # C-family languages
-    '.c': 'c',
-    '.cpp': 'cpp',
-    '.cc': 'cpp',
-    '.h': 'c',
-    '.hpp': 'cpp',
-    '.cs': 'csharp',
-    '.java': 'java',
-    # Ruby
-    '.rb': 'ruby',
-    '.erb': 'erb',
-    # Go
-    '.go': 'go',
-    # Rust
-    '.rs': 'rust',
-    # Swift
-    '.swift': 'swift',
-    # Markdown
-    '.md': 'markdown',
-    '.markdown': 'markdown',
-    # Structured Config
-    '.ini': 'ini',
-    '.cfg': 'ini',
-    '.conf': 'ini',
-    # Other languages
-    '.php': 'php',
-    '.pl': 'perl',
-    '.kotlin': 'kotlin',
-    '.kt': 'kotlin',
-    '.lua': 'lua',
-    '.sql': 'sql',
-    '.r': 'r',
-    '.dart': 'dart',
-    '.scala': 'scala',
-    '.elm': 'elm',
-    '.clj': 'clojure',
-    '.ex': 'elixir',
-    '.exs': 'elixir',
-    '.hs': 'haskell',
-    '.fs': 'fsharp',
-    '.fsx': 'fsharp',
-    '.lisp': 'lisp',
-    '.matlab': 'matlab',
-    '.m': 'matlab',
-    '.asm': 'asm6502',
-    '.bat': 'batch',
-    '.ps1': 'powershell',
-    '.dockerfile': 'dockerfile',
-}
+
+# Supported image formats for base64 encoding
+IMAGE_FORMATS = {'.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp'}
+PDF_FORMAT = '.pdf'
 
 
-class ViewToolCore:
+class ReadFileToolCore:
     """
-    Framework-agnostic file reading tool.
+    read_file tool for reading file contents.
 
-    Extracted from smolcc/tools/view_tool.py:103-301
+    Implements the Gemini CLI ReadFile specification.
     """
 
-    # Metadata (from view_tool.py:108-115)
     metadata = ToolMetadata(
-        name="View",
-        description="Retrieves a file's contents from the local filesystem. The **file_path** parameter must be an absolute path (relative paths are not allowed). By default, the tool returns up to 2,000 lines starting at the top of the file. You may optionally specify a line offset and a maximum number of lines—handy for extremely long files—but when feasible, omit these options to load the entire file. Any line longer than 2,000 characters will be truncated. If the target is an image, the tool will render it for you. For Jupyter notebooks (`.ipynb`), use **ReadNotebook** instead.",
+        name="read_file",
+        description="""read_file reads and returns the content of a specified file. This tool handles
+text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, it
+can read specific line ranges. Other binary file types are generally skipped.
+
+- **Tool name:** `read_file`
+- **Display name:** ReadFile
+- **Parameters:**
+  - `path` (string, required): The absolute path to the file to read.
+  - `offset` (number, optional): For text files, the 0-based line number to
+    start reading from. Requires `limit` to be set.
+  - `limit` (number, optional): For text files, the maximum number of lines to
+    read. If omitted, reads a default maximum (e.g., 2000 lines) or the entire
+    file if feasible.
+- **Behavior:**
+  - For text files: Returns the content. If `offset` and `limit` are used,
+    returns only that slice of lines. Indicates if content was truncated due to
+    line limits or line length limits.
+  - For image and PDF files: Returns the file content as a base64-encoded data
+    structure suitable for model consumption.
+  - For other binary files: Attempts to identify and skip them, returning a
+    message indicating it's a generic binary file.
+- **Output:** (`llmContent`):
+  - For text files: The file content, potentially prefixed with a truncation
+    message.
+  - For image/PDF files: An object containing `inlineData` with `mimeType` and
+    base64 `data`.
+  - For other binary files: A message like
+    `Cannot display content of binary file: /path/to/data.bin`.
+- **Confirmation:** No.""",
         inputs={
-            "file_path": {
+            "path": {
                 "type": "string",
-                "description": "The absolute path to the file to read"
+                "description": "The absolute path to the file to read."
             },
             "offset": {
                 "type": "number",
-                "description": "The line number to start reading from. Only provide if the file is too large to read at once",
+                "description": "For text files, the 0-based line number to start reading from. Requires limit to be set.",
                 "nullable": True
             },
             "limit": {
                 "type": "number",
-                "description": "The number of lines to read. Only provide if the file is too large to read at once.",
+                "description": "For text files, the maximum number of lines to read. If omitted, reads a default maximum (2000 lines).",
                 "nullable": True
             }
         },
@@ -127,7 +80,7 @@ class ViewToolCore:
 
     def __init__(self, backend: ExecutionBackend):
         """
-        Initialize ViewToolCore with an execution backend.
+        Initialize ReadFileToolCore with an execution backend.
 
         Args:
             backend: The execution backend to use (local, docker, e2b)
@@ -136,118 +89,211 @@ class ViewToolCore:
 
     def execute(
         self,
-        file_path: str,
+        path: str,
         offset: int | None = None,
         limit: int | None = None
     ) -> ToolOutputModel:
         """
-        Read a file with validation and formatting (from view_tool.py:117-222).
+        Read a file with validation and formatting.
 
         Args:
-            file_path: The absolute path to the file to read
+            path: The absolute path to the file to read
             offset: The line number to start reading from (0-indexed)
             limit: The maximum number of lines to read
 
         Returns:
-            A ToolOutputModel (CodeOutput or TextOutput or ErrorOutput)
+            A ToolOutputModel (TextOutput or ErrorOutput)
         """
-        # Make sure path is absolute
-        if not os.path.isabs(file_path):
-            file_path = os.path.abspath(file_path)
+        # Ensure path is absolute
+        if not Path(path).is_absolute():
+            path = str(Path(self.backend.get_working_directory()) / path)
 
         # Check if file exists
-        if not self.backend.file_exists(path=file_path):
-            return ErrorOutputModel(error=f"File '{file_path}' does not exist", error_type="FileNotFoundError")
-        if not self.backend.is_file(path=file_path):
-            return ErrorOutputModel(error=f"Path '{file_path}' is not a file", error_type="ValueError")
-
-        # Check if this is an image file
-        mime_type, _ = mimetypes.guess_type(file_path)
-        if mime_type and mime_type.startswith('image/'):
-            return TextOutputModel(
-                content=f"This is an image file ({mime_type}). Images are supported in certain environments but not in a text-only interface."
+        file_type = self.backend.file_exists(path=path)
+        if file_type is None:
+            return ErrorOutputModel(
+                error=f"File '{path}' does not exist",
+                error_type="FileNotFoundError"
+            )
+        if file_type != FileType.FILE:
+            return ErrorOutputModel(
+                error=f"Path '{path}' is not a file",
+                error_type="ValueError"
             )
 
-        # Handle Jupyter notebook files
-        if file_path.lower().endswith('.ipynb'):
-            return TextOutputModel(
-                content="This is a Jupyter notebook file. Please use the ReadNotebook tool instead to view it properly."
+        # Get file extension and mime type
+        file_path_obj = Path(path)
+        extension = file_path_obj.suffix.lower()
+        mime_type, _ = mimetypes.guess_type(path)
+
+        # Handle image files - return base64 encoded
+        if extension in IMAGE_FORMATS:
+            return self._handle_image_file(path=path, mime_type=mime_type)
+
+        # Handle PDF files - return base64 encoded
+        if extension == PDF_FORMAT:
+            return self._handle_pdf_file(path=path)
+
+        # Read file content as text
+        try:
+            content = self.backend.read_file(file_path=path)
+        except Exception as e:
+            return ErrorOutputModel(
+                error=f"Error reading file: {str(e)}",
+                error_type="IOError"
             )
 
-        # Set defaults for offset and limit
+        # Check if it's a binary file (contains null bytes)
+        if '\0' in content:
+            return TextOutputModel(
+                content=f"Cannot display content of binary file: {path}"
+            )
+
+        # Apply offset and limit for text files
+        lines = content.split('\n')
+        total_lines = len(lines)
+
+        # Set defaults
         if offset is None:
             offset = 0
         if limit is None:
             limit = 2000
 
-        # Read file via backend
+        # Validate offset
+        if offset < 0:
+            return ErrorOutputModel(
+                error="Offset must be non-negative",
+                error_type="ValueError"
+            )
+        if offset >= total_lines:
+            return ErrorOutputModel(
+                error=f"Offset {offset} exceeds file length ({total_lines} lines)",
+                error_type="ValueError"
+            )
+
+        # Slice lines
+        end_line = min(offset + limit, total_lines)
+        selected_lines = lines[offset:end_line]
+
+        # Truncate long lines (2000 char limit)
+        truncated_lines = []
+        line_truncated = False
+        for line in selected_lines:
+            if len(line) > 2000:
+                truncated_lines.append(line[:2000] + "...")
+                line_truncated = True
+            else:
+                truncated_lines.append(line)
+
+        result_content = '\n'.join(truncated_lines)
+
+        # Add truncation message if needed
+        truncation_msg = []
+        if end_line < total_lines or offset > 0:
+            truncation_msg.append(
+                f"[File content truncated: showing lines {offset + 1}-{end_line} of {total_lines} total lines]"
+            )
+        if line_truncated:
+            truncation_msg.append(
+                "[Some lines were truncated at 2000 characters]"
+            )
+
+        if truncation_msg:
+            result_content = '\n'.join(truncation_msg) + '\n\n' + result_content
+
+        return TextOutputModel(content=result_content)
+
+    def _handle_image_file(self, path: str, mime_type: str | None) -> ToolOutputModel:
+        """
+        Handle image file by returning base64 encoded data.
+
+        Args:
+            path: Path to the image file
+            mime_type: MIME type of the image
+
+        Returns:
+            TextOutputModel with base64 encoded image data
+        """
         try:
-            result = self.backend.read_file(file_path=file_path, offset=offset, limit=limit)
-        except ValueError as e:
-            return TextOutputModel(content=str(e))
+            # Read file as binary using execute_command
+            result = self.backend.execute_command(
+                command=f"base64 '{path}'",
+                timeout=30000
+            )
+            if result.exit_code != 0:
+                return ErrorOutputModel(
+                    error=f"Error reading image file: {result.output}",
+                    error_type="IOError"
+                )
+
+            # Clean up base64 output (remove newlines)
+            base64_data = result.output.replace('\n', '').replace('\r', '')
+
+            # Determine mime type
+            if mime_type is None:
+                extension = Path(path).suffix.lower()
+                mime_type_map = {
+                    '.png': 'image/png',
+                    '.jpg': 'image/jpeg',
+                    '.jpeg': 'image/jpeg',
+                    '.gif': 'image/gif',
+                    '.webp': 'image/webp',
+                    '.svg': 'image/svg+xml',
+                    '.bmp': 'image/bmp'
+                }
+                mime_type = mime_type_map.get(extension, 'image/jpeg')
+
+            # Return in Gemini inlineData format
+            inline_data = {
+                "inlineData": {
+                    "mimeType": mime_type,
+                    "data": base64_data
+                }
+            }
+            return TextOutputModel(content=str(inline_data))
+
         except Exception as e:
-            return ErrorOutputModel(error=f"Error reading file: {str(e)}", error_type="IOError")
+            return ErrorOutputModel(
+                error=f"Error processing image file: {str(e)}",
+                error_type="IOError"
+            )
 
-        # Return result as CodeOutput if the file is code, otherwise as TextOutput
-        if self._is_code_file(file_path=file_path):
-            language = self._get_language_for_file(file_path=file_path)
-            return CodeOutputModel(content=result, language=language, line_numbers=False)
-        else:
-            return TextOutputModel(content=result)
-
-    def _is_code_file(self, file_path: str) -> bool:
+    def _handle_pdf_file(self, path: str) -> ToolOutputModel:
         """
-        Determine if a file is a code file (from view_tool.py:241-273).
+        Handle PDF file by returning base64 encoded data.
 
         Args:
-            file_path: Path to the file
+            path: Path to the PDF file
 
         Returns:
-            True if the file appears to be code, False otherwise
+            TextOutputModel with base64 encoded PDF data
         """
-        # Check extension first
-        ext = os.path.splitext(file_path)[1].lower()
-        if ext in LANGUAGE_MAP:
-            return True
-
-        # Check some common code patterns if extension doesn't match
         try:
-            # Read first 10 lines from backend
-            first_content = self.backend.read_file(file_path=file_path, offset=0, limit=10)
+            # Read file as binary using execute_command
+            result = self.backend.execute_command(
+                command=f"base64 '{path}'",
+                timeout=60000
+            )
+            if result.exit_code != 0:
+                return ErrorOutputModel(
+                    error=f"Error reading PDF file: {result.output}",
+                    error_type="IOError"
+                )
 
-            # Look for patterns that suggest code
-            code_indicators = [
-                "import ", "from ", "def ", "class ", "function ",
-                "var ", "let ", "const ", "#include", "package ",
-                "using ", "public class", "pragma", "{", "<html", "<?php"
-            ]
+            # Clean up base64 output (remove newlines)
+            base64_data = result.output.replace('\n', '').replace('\r', '')
 
-            if any(indicator in first_content for indicator in code_indicators):
-                return True
-        except:
-            pass  # If we can't read the file, assume it's not code
+            # Return in Gemini inlineData format
+            inline_data = {
+                "inlineData": {
+                    "mimeType": "application/pdf",
+                    "data": base64_data
+                }
+            }
+            return TextOutputModel(content=str(inline_data))
 
-        return False
-
-    def _get_language_for_file(self, file_path: str) -> str:
-        """
-        Get the language for syntax highlighting (from view_tool.py:275-296).
-
-        Args:
-            file_path: Path to the file
-
-        Returns:
-            Language identifier for syntax highlighting
-        """
-        ext = os.path.splitext(file_path)[1].lower()
-
-        # Check for special cases first
-        if file_path.lower().endswith('dockerfile'):
-            return 'dockerfile'
-
-        # Use the extension mapping
-        if ext in LANGUAGE_MAP:
-            return LANGUAGE_MAP[ext]
-
-        # Default to plain text
-        return 'text'
+        except Exception as e:
+            return ErrorOutputModel(
+                error=f"Error processing PDF file: {str(e)}",
+                error_type="IOError"
+            )

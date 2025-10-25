@@ -1,73 +1,91 @@
 """
-BashToolCore - Framework-agnostic bash command execution tool.
+run_shell_command tool - Framework-agnostic shell command execution tool.
 
-Extracted from smolcc/tools/bash_tool.py with business logic separated from execution.
+Implements the Gemini CLI Shell tool specification.
 """
-import os
+from pathlib import Path
 import re
-import shlex
 
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import (
-    CodeOutputModel,
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,
 )
 
-# Constants (from bash_tool.py:20-28)
-DEFAULT_TIMEOUT = 1800000  # 30 minutes in milliseconds
-MAX_TIMEOUT = 600000  # 10 minutes in milliseconds
-BANNED_COMMANDS = [
-    "alias", "curl", "curlie", "wget", "axel", "aria2c", "nc", "telnet",
-    "lynx", "w3m", "links", "httpie", "xh", "http-prompt", "chrome",
-    "firefox", "safari"
-]
 
-
-class BashToolCore:
+class RunShellCommandToolCore:
     """
-    Framework-agnostic bash tool for executing shell commands.
+    run_shell_command tool for executing shell commands.
 
-    Extracted from smolcc/tools/bash_tool.py:31-433
+    Implements the Gemini CLI Shell specification.
     """
 
-    # Metadata (from bash_tool.py:36-42)
     metadata = ToolMetadata(
-        name="Bash",
-        description="""Runs a supplied bash command inside a persistent shell session, with an optional timeout, while applying the required safety practices.
+        name="run_shell_command",
+        description="""Use `run_shell_command` to interact with the underlying system, run scripts, or
+perform command-line operations. `run_shell_command` executes a given shell
+command, including interactive commands that require user input if enabled.
 
-Before you launch the command, complete these steps:
+On Windows, commands are executed with `powershell.exe -NoProfile -Command`
+unless you explicitly point `ComSpec` at another shell. On other platforms,
+they are executed with `bash -c`.
 
-1. Parent Directory Confirmation:
- - If the command will create new folders or files, first employ the LS tool to ensure the parent directory already exists and is the intended location.
- - Example: prior to executing "mkdir foo/bar", call LS to verify that "foo" exists and is truly the correct parent directory.
+### Arguments
 
-2. Safety Screening:
- - To reduce the risk of prompt-injection attacks, some commands are restricted or banned. If you attempt to run a blocked command, you will receive an error message explaining the limitation—pass that explanation along to the User.
- - Confirm that the command is not one of these prohibited commands: alias, curl, curlie, wget, axel, aria2c, nc, telnet, lynx, w3m, links, httpie, xh, http-prompt, chrome, firefox, safari.
+`run_shell_command` takes the following arguments:
 
-3. Perform the Command:
- - Once proper quoting is verified, execute the command.
- - Capture the command's output.
+- `command` (string, required): The exact shell command to execute.
+- `description` (string, optional): A brief description of the command's
+  purpose, which will be shown to the user.
+- `directory` (string, optional): The directory (relative to the project root)
+  in which to execute the command. If not provided, the command runs in the
+  project root.
 
-Operational notes:
- - Supplying the command argument is mandatory.
- - A timeout in milliseconds may be provided (up to 600000 ms / 10 minutes). If omitted, the default timeout is 30 minutes.
- - If the output exceeds 30000 characters, it will be truncated before being returned.
- - VERY IMPORTANT: You MUST avoid search utilities like find and grep; instead, rely on GrepTool, GlobTool, or dispatch_agent. Likewise, avoid using cat, head, tail, and ls for reading—use View and LS.
- - When sending several commands, combine them with ';' or '&&' rather than newlines (newlines are acceptable only inside quoted strings).
- - IMPORTANT: All commands run within the same shell session. Environment variables, virtual environments, the current directory, and other state persist between commands. For instance, any environment variable you set will remain in subsequent commands.
- - Try to keep the working directory unchanged by using absolute paths and avoiding cd, unless the User explicitly instructs otherwise.""",
+## How to use `run_shell_command`
+
+When using `run_shell_command`, the command is executed as a subprocess.
+`run_shell_command` can start background processes using `&`. The tool returns
+detailed information about the execution, including:
+
+- `Command`: The command that was executed.
+- `Directory`: The directory where the command was run.
+- `Stdout`: Output from the standard output stream.
+- `Stderr`: Output from the standard error stream.
+- `Error`: Any error message reported by the subprocess.
+- `Exit Code`: The exit code of the command.
+- `Signal`: The signal number if the command was terminated by a signal.
+- `Background PIDs`: A list of PIDs for any background processes started.
+
+## Important notes
+
+- **Security:** Be cautious when executing commands, especially those
+  constructed from user input, to prevent security vulnerabilities.
+- **Error handling:** Check the `Stderr`, `Error`, and `Exit Code` fields to
+  determine if a command executed successfully.
+- **Background processes:** When a command is run in the background with `&`,
+  the tool will return immediately and the process will continue to run in the
+  background. The `Background PIDs` field will contain the process ID of the
+  background process.
+
+## Environment Variables
+
+When `run_shell_command` executes a command, it sets the `GEMINI_CLI=1`
+environment variable in the subprocess's environment.""",
         inputs={
             "command": {
                 "type": "string",
-                "description": "The command to execute"
+                "description": "The exact shell command to execute."
             },
-            "timeout": {
-                "type": "number",
-                "description": "Optional timeout in milliseconds (max 600000)",
+            "description": {
+                "type": "string",
+                "description": "A brief description of the command's purpose.",
+                "nullable": True
+            },
+            "directory": {
+                "type": "string",
+                "description": "The directory (relative to the project root) in which to execute the command.",
                 "nullable": True
             }
         },
@@ -76,7 +94,7 @@ Operational notes:
 
     def __init__(self, backend: ExecutionBackend):
         """
-        Initialize BashToolCore with an execution backend.
+        Initialize RunShellCommandToolCore with an execution backend.
 
         Args:
             backend: The execution backend to use (local, docker, e2b)
@@ -86,156 +104,81 @@ Operational notes:
     def execute(
         self,
         command: str,
-        timeout: int | None = None
+        description: str | None = None,
+        directory: str | None = None
     ) -> ToolOutputModel:
         """
-        Execute a bash command with validation and formatting.
+        Execute a shell command.
 
         Args:
-            command: The bash command to execute
-            timeout: Optional timeout in milliseconds (max 600000)
+            command: The shell command to execute
+            description: Optional description of the command
+            directory: Optional directory to execute in (relative to project root)
 
         Returns:
-            A ToolOutputModel (CodeOutput or TextOutput or ErrorOutput)
+            A ToolOutputModel (TextOutput or ErrorOutput)
         """
-        # Security check for banned commands (from bash_tool.py:83-84)
-        if self._is_banned_command(command=command):
+        # Determine execution directory
+        if directory is None:
+            exec_dir = self.backend.get_working_directory()
+        else:
+            # Make directory relative to working directory
+            if Path(directory).is_absolute():
+                exec_dir = directory
+            else:
+                exec_dir = str(Path(self.backend.get_working_directory()) / directory)
+
+        # Build command with environment variable and directory change
+        # Set GEMINI_CLI=1 environment variable
+        full_command = f"cd '{exec_dir}' && GEMINI_CLI=1 {command}"
+
+        # Execute command
+        try:
+            result = self.backend.execute_command(
+                command=full_command,
+                timeout=120000  # 2 minutes default timeout
+            )
+        except Exception as e:
             return ErrorOutputModel(
-                error=f"Command contains one or more banned commands: {', '.join(BANNED_COMMANDS)}. Please use alternative tools for these operations.",
-                error_type="SecurityError"
+                error=f"Error executing command: {str(e)}",
+                error_type="CommandError"
             )
 
-        # Execute command via backend
-        output, is_error = self.backend.execute_command(command=command, timeout=timeout)
+        # Detect background processes (commands ending with &)
+        background_pids = []
+        if command.strip().endswith('&'):
+            # Try to extract PID from output if available
+            pid_pattern = r'\[[\d]+\]\s+(\d+)'
+            matches = re.findall(pid_pattern, result.output)
+            background_pids = [int(pid) for pid in matches]
 
-        # Determine if the output is code based on the command (from bash_tool.py:98-104)
-        if self._is_code_command(command=command):
-            language = self._guess_language_from_command(command=command)
-            return CodeOutputModel(content=output, language=language, line_numbers=True)
-        elif is_error:
-            return ErrorOutputModel(error=output, error_type="CommandError")
+        # Format output
+        output_lines = []
+
+        if description:
+            output_lines.append(f"Description: {description}")
+
+        output_lines.append(f"Command: {command}")
+        output_lines.append(f"Directory: {exec_dir}")
+
+        if result.exit_code == 0:
+            output_lines.append("Exit Code: 0 (Success)")
         else:
-            return TextOutputModel(content=output)
+            output_lines.append(f"Exit Code: {result.exit_code} (Error)")
 
-    def _is_banned_command(self, command: str) -> bool:
-        """
-        Check if a command contains any banned commands (from bash_tool.py:231-259).
+        if result.output:
+            output_lines.append(f"\nOutput:\n{result.output}")
 
-        Args:
-            command: The command to check
+        if background_pids:
+            output_lines.append(f"\nBackground PIDs: {', '.join(map(str, background_pids))}")
 
-        Returns:
-            True if the command contains a banned command, False otherwise
-        """
-        # Split the command into tokens
-        try:
-            tokens = shlex.split(command)
+        output_text = "\n".join(output_lines)
 
-            # Check each token against the banned commands list
-            for token in tokens:
-                if token in BANNED_COMMANDS:
-                    return True
+        # Return error if exit code is non-zero
+        if result.exit_code != 0:
+            return ErrorOutputModel(
+                error=output_text,
+                error_type="CommandError"
+            )
 
-                # Also check for commands with paths
-                cmd_name = os.path.basename(token)
-                if cmd_name in BANNED_COMMANDS:
-                    return True
-        except Exception:
-            # If we can't parse the command, be conservative and allow it
-            # (the shell will fail if it's invalid syntax anyway)
-            pass
-
-        return False
-
-    def _is_code_command(self, command: str) -> bool:
-        """
-        Determine if a command likely produces code output (from bash_tool.py:261-303).
-
-        Args:
-            command: The command to check
-
-        Returns:
-            True if the command likely produces code output, False otherwise
-        """
-        # Commands that often produce code-like output
-        code_commands = [
-            # File listing commands (that show source code)
-            "cat", "head", "tail", "less", "more", "type",
-            # Programming language commands
-            "python", "python3", "node", "npm", "npx", "ruby", "perl", "php",
-            "go", "rust", "cargo", "java", "javac", "scala", "clang", "gcc",
-            # Build/Config commands
-            "cmake", "make", "bazel", "gradle", "maven", "ant", "pip",
-            # Source control
-            "git diff", "git show", "svn diff",
-            # File operations on code
-            "diff", "patch"
-        ]
-
-        try:
-            # Check if the command starts with any of the code commands
-            for code_cmd in code_commands:
-                if command.startswith(code_cmd + " ") or command == code_cmd:
-                    return True
-
-            # Check for shell script syntax that might indicate code
-            if re.search(r'\bfor\b.*\bin\b.*\bdo\b', command) or \
-               re.search(r'\bwhile\b.*\bdo\b', command) or \
-               re.search(r'\bif\b.*\bthen\b', command) or \
-               re.search(r'\bcase\b.*\bin\b', command):
-                return True
-
-        except Exception:
-            # If we can't parse the command, assume it's not code
-            pass
-
-        return False
-
-    def _guess_language_from_command(self, command: str) -> str:
-        """
-        Guess the programming language based on the command (from bash_tool.py:305-352).
-
-        Args:
-            command: The command to analyze
-
-        Returns:
-            Language name for syntax highlighting
-        """
-        # Map commands to languages
-        command_language_map = {
-            "python": "python",
-            "python3": "python",
-            "node": "javascript",
-            "npm": "javascript",
-            "npx": "javascript",
-            "ruby": "ruby",
-            "perl": "perl",
-            "php": "php",
-            "go": "go",
-            "rust": "rust",
-            "cargo": "rust",
-            "java": "java",
-            "javac": "java",
-            "scala": "scala",
-            "clang": "c",
-            "gcc": "c"
-        }
-
-        # Check command start for language hints
-        for cmd, lang in command_language_map.items():
-            if command.startswith(cmd + " ") or command == cmd:
-                return lang
-
-        # Check if it's a git diff or git show command
-        if command.startswith("git diff") or command.startswith("git show"):
-            return "diff"
-
-        # Check for shell script syntax
-        if re.search(r'\bfor\b.*\bin\b.*\bdo\b', command) or \
-           re.search(r'\bwhile\b.*\bdo\b', command) or \
-           re.search(r'\bif\b.*\bthen\b', command) or \
-           re.search(r'\bcase\b.*\bin\b', command):
-            return "bash"
-
-        # Default to bash for most commands
-        return "bash"
+        return TextOutputModel(content=output_text)
