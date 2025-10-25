@@ -1,540 +1,219 @@
-# Tools Architecture
+# AI Coding Agent Tools
 
-This directory contains a **3-layer architecture** for tool execution that separates concerns and enables maximum flexibility and reusability.
+A flexible toolkit for building AI coding agents that can operate in multiple execution environments (local, Docker, E2B) and integrate with multiple AI frameworks (smolagents, OpenAI, Pydantic-AI, Autogen).
 
-## Architecture Overview
+## Overview
+
+This toolkit provides **Gemini CLI-inspired coding tools** with a **3-layer architecture** that separates execution environments from business logic and framework integration:
 
 ```
-┌─────────────────────────────────────────────────┐
-│         Framework Adapter Layer                 │
-│  (Smolagents, OpenAI, PydanticAI, Autogen)     │
-│  - Reads metadata from Core Layer              │
-│  - Transforms to framework-specific format     │
-└───────────────────┬─────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────┐
-│         Core Tool Layer                         │
-│  ★ METADATA STORED HERE ★                      │
-│  (BashToolCore, EditToolCore, etc.)            │
-│  - name, description, inputs, outputs          │
-│  - Business logic (validation, formatting)     │
-└───────────────────┬─────────────────────────────┘
-                    │
-┌───────────────────▼─────────────────────────────┐
-│         Execution Backend Layer                 │
-│  (LocalBackend, DockerBackend, E2BBackend)     │
-│  - Primitive operations only                   │
-└─────────────────────────────────────────────────┘
+┌─────────────────────────────────────────┐
+│    Framework Adapters (Layer 3)        │
+│  smolagents, OpenAI, Pydantic-AI, etc. │
+│  - Reads metadata from core tools      │
+│  - Converts to framework-specific API  │
+└───────────────┬─────────────────────────┘
+                │
+┌───────────────▼─────────────────────────┐
+│    Core Tools (Layer 2)                 │
+│  Gemini CLI-based tools                 │
+│  - list_directory, read_file, etc.     │
+│  - Business logic & validation         │
+│  - Returns ToolOutputModel instances   │
+└───────────────┬─────────────────────────┘
+                │
+┌───────────────▼─────────────────────────┐
+│    Execution Backends (Layer 1)         │
+│  Local, Docker, E2B                     │
+│  - Primitive operations only           │
+│  - execute_command, read_file, etc.    │
+└─────────────────────────────────────────┘
 ```
 
-## Design Principles
+## Gemini CLI Tools
 
-### 1. Separation of Concerns
+The toolkit implements these tools from Gemini CLI:
 
-**Three distinct layers** with clear responsibilities:
+1. **`list_directory`** - List directory contents with filtering
+2. **`read_file`** - Read text, images, and PDFs
+3. **`write_file`** - Write content to files
+4. **`glob`** - Find files matching patterns
+5. **`search_file_content`** - Search with regex (grep)
+6. **`replace`** - Precise text replacement with context
+7. **`run_shell_command`** - Execute shell commands
+8. **`read_many_files`** - Read multiple files at once
+9. **`save_memory`** - Persistent memory across sessions
 
-- **Execution Backends**: Handle primitive operations (execute command, read file, write file, etc.)
-- **Core Tools**: Contain business logic (validation, formatting, metadata) - framework-agnostic
-- **Framework Adapters**: Convert core tools to framework-specific formats (smolagents, OpenAI, etc.)
+## Key Design Principles
 
-### 2. Output Separation
+### 1. Execution Environment Independence
 
-**Data separated from presentation**:
+Tools work across **any execution environment** without code changes:
+- **Local**: Direct filesystem and subprocess execution
+- **Docker**: Isolated container environment
+- **E2B**: Remote sandbox with persistent state
 
-- **Output Models** (Pydantic): Pure data structures with no display logic
-- **Renderers**: Handle how outputs are displayed (console, file, API)
+### 2. Framework Agnostic Core
 
-Benefits:
-- Same data can be rendered differently for console, web UI, or API
-- Easy to serialize for FastAPI backends
-- Type-safe with full Pydantic validation
+Core tools have **zero framework dependencies**. Adapters translate tool metadata to framework-specific formats:
+- **smolagents**: `Tool` class with `forward()` method
+- **OpenAI**: Function calling schema
+- **Pydantic-AI**: Tool definitions
+- **Autogen**: Agent tools
 
-### 3. Two Orthogonal Dimensions
+### 3. Output Separation
 
-The architecture supports **independent variation** along two axes:
-
-1. **Execution Environment**: Local, Docker, E2B (or any future environment)
-2. **Framework**: smolagents, OpenAI, Pydantic-AI, Autogen (or any future framework)
-
-You can combine any execution environment with any framework.
+Tools return **Pydantic output models** that handle their own display:
+- **Console mode**: Rich terminal output with syntax highlighting
+- **API mode**: JSON serialization for web APIs
+- **Hybrid mode**: Both console output and JSON return
 
 ## Directory Structure
 
 ```
-src/prompttodraft/tools/
-├── outputs/                    # Output layer
-│   ├── models.py              # Pydantic models (data only)
-│   └── renderers.py           # Console, File, API renderers
-├── backends/                  # Execution layer
-│   ├── execution_backend.py   # Abstract interface
-│   └── local_backend.py       # Local implementation
-├── core/                      # Business logic layer
+tools/
+├── backends/          # Execution environments
+│   ├── execution_backend.py    # Abstract interface
+│   ├── local_backend.py        # Local implementation
+│   ├── docker_backend.py       # Docker container
+│   └── e2b_backend.py          # E2B sandbox
+├── core/              # Framework-agnostic tools
 │   ├── metadata.py            # Tool metadata definition
-│   ├── bash_tool_core.py      # Bash tool (framework-agnostic)
-│   ├── edit_tool_core.py      # Edit tool
-│   ├── view_tool_core.py      # View tool
-│   ├── replace_tool_core.py   # Replace tool
-│   ├── glob_tool_core.py      # Glob tool
-│   ├── grep_tool_core.py      # Grep tool
-│   ├── ls_tool_core.py        # LS tool
-│   └── user_input_tool_core.py # User input tool
-├── adapters/                  # Framework integration layer
-│   └── smolagents_adapter.py  # Smolagents framework adapter
-├── coding_tools.py            # CodingTool abstract + implementations
-├── factory.py                 # ToolFactory for easy creation
-├── agent.py                   # ToolAgent with Rich output formatting
-├── system_prompt.py           # Dynamic system prompt generation
-└── system_message.txt         # System prompt template
+│   ├── list_directory_tool.py # list_directory
+│   ├── read_file_tool.py      # read_file
+│   ├── write_file_tool.py     # write_file
+│   ├── glob_tool.py           # glob
+│   ├── search_file_content_tool.py  # search_file_content
+│   ├── replace_tool.py        # replace
+│   ├── run_shell_command_tool.py    # run_shell_command
+│   ├── read_many_files_tool.py      # read_many_files
+│   └── save_memory_tool.py    # save_memory
+├── outputs/           # Output models
+│   ├── models.py              # Pydantic models
+│   └── README.md
+└── adapters/          # Framework integrations
+    └── smolagents_adapter.py  # smolagents integration
 ```
 
-## Layer Details
+## Architecture Benefits
 
-### Output Layer (`outputs/`)
+### Mix and Match
 
-#### Models (`outputs/models.py`)
-
-Pydantic models for tool outputs - pure data structures:
-
-- `TextOutputModel`: Simple text content
-- `CodeOutputModel`: Code with language and line numbers
-- `FileListOutputModel`: List of files/directories
-- `TableOutputModel`: Tabular data
-- `ErrorOutputModel`: Error information
-
-All models:
-- Inherit from `BaseOutputModel`
-- Can be serialized to JSON
-- Have optional metadata fields
-- Implement `__str__()` for string representation
-
-#### Renderers (`outputs/renderers.py`)
-
-Different renderers for different contexts:
-
-- **ConsoleRenderer**: Rich console output with styling (uses Rich library)
-- **FileRenderer**: Save outputs to files (markdown, CSV, etc.)
-- **APIRenderer**: Convert to JSON for FastAPI responses
-
-Example:
-```python
-from prompttodraft.tools.outputs.renderers import ConsoleRenderer, APIRenderer
-
-renderer = ConsoleRenderer()
-renderer.render_text(text_output)  # Pretty console display
-
-api_renderer = APIRenderer()
-json_str = api_renderer.render_text(text_output)  # JSON string
-```
-
-### Execution Backend Layer (`backends/`)
-
-#### Abstract Interface (`backends/execution_backend.py`)
-
-Defines the contract for all backends with primitive operations:
+Combine **any execution environment** with **any framework**:
 
 ```python
-class ExecutionBackend(ABC):
-    @abstractmethod
-    def execute_command(self, command: str, timeout: int | None) -> tuple[str, bool]:
-        """Execute a bash command."""
-        pass
-
-    @abstractmethod
-    def read_file(self, file_path: str, offset: int, limit: int | None) -> str:
-        """Read a file from the filesystem."""
-        pass
-
-    # ... other primitive operations
-```
-
-#### Local Backend (`backends/local_backend.py`)
-
-Implements all primitives using standard Python:
-
-- Uses `subprocess` for command execution
-- Uses `open()` for file operations
-- Uses `os.walk()` for directory traversal
-- Uses `glob` for pattern matching
-- Uses `re` for regex searching
-
-All the low-level implementation details are isolated here.
-
-### Core Tool Layer (`core/`)
-
-#### Metadata (`core/metadata.py`)
-
-Framework-agnostic metadata definition:
-
-```python
-@dataclass
-class ToolMetadata:
-    name: str
-    description: str
-    inputs: dict[str, dict[str, str | bool | None]]
-    output_type: str
-```
-
-Metadata can be transformed to different framework formats:
-- `to_smolagents_format()`: For smolagents
-- `to_openai_format()`: For OpenAI function calling
-
-#### Core Tools
-
-Each core tool (e.g., `BashToolCore`):
-
-1. **Stores metadata** as a class attribute
-2. **Contains business logic**: validation, formatting, error handling
-3. **Delegates primitive operations** to the backend
-4. **Returns output models** (not strings)
-
-Example structure:
-```python
-class BashToolCore:
-    # Metadata stored here
-    metadata = ToolMetadata(
-        name="Bash",
-        description="...",
-        inputs={...},
-        output_type="string"
-    )
-
-    def __init__(self, backend: ExecutionBackend):
-        self.backend = backend
-
-    def execute(self, command: str, timeout: int | None) -> ToolOutputModel:
-        # 1. Validation
-        if self._is_banned_command(command):
-            return ErrorOutputModel(error="Banned command")
-
-        # 2. Delegate to backend
-        output, is_error = self.backend.execute_command(command, timeout)
-
-        # 3. Format output
-        if self._is_code_command(command):
-            return CodeOutputModel(output, language=self._guess_language(command))
-        return TextOutputModel(output)
-
-    # Helper methods (validation, formatting)
-    def _is_banned_command(self, command: str) -> bool: ...
-    def _is_code_command(self, command: str) -> bool: ...
-```
-
-### Framework Adapter Layer (`adapters/`)
-
-#### Smolagents Adapter (`adapters/smolagents_adapter.py`)
-
-Wraps core tools for smolagents framework:
-
-```python
-class SmolagentsBashTool(Tool):
-    def __init__(self, core: BashToolCore):
-        super().__init__()
-        self.core = core
-        # Copy metadata
-        self.name = core.metadata.name
-        self.description = core.metadata.description
-        self.inputs = core.metadata.inputs
-        self.output_type = core.metadata.output_type
-
-    def forward(self, command: str, timeout: int | None = None):
-        # Execute and convert to string
-        return str(self.core.execute(command=command, timeout=timeout))
-```
-
-### Integration Layer
-
-#### CodingTool (`coding_tools.py`)
-
-High-level interface that bundles all 8 tools:
-
-```python
-class CodingToolLocal(CodingTool):
-    def __init__(self):
-        backend = LocalBackend()
-        self._bash = BashToolCore(backend)
-        self._edit = EditToolCore(backend)
-        # ... all 8 tools
-
-    def bash_tool(self, command: str, timeout: int | None = None):
-        return self._bash.execute(command=command, timeout=timeout)
-```
-
-#### ToolFactory (`factory.py`)
-
-Convenient factory for creating framework-specific tools:
-
-```python
-from prompttodraft.tools.factory import ToolFactory
-
-# Create smolagents tools for local execution
-tools = ToolFactory.create_smolagents_tools(environment="local")
-```
-
-## Usage Examples
-
-### Basic Usage with CodingToolLocal
-
-```python
-from prompttodraft.tools.coding_tools import CodingToolLocal
-
-# Create coding tool
-coding_tool = CodingToolLocal()
-
-# Execute bash command
-result = coding_tool.bash_tool(command="echo 'Hello World'")
-print(result.content)  # Access the content
-
-# Read a file
-result = coding_tool.view_tool(file_path="/path/to/file.py")
-if isinstance(result, CodeOutputModel):
-    print(f"Language: {result.language}")
-    print(result.content)
-
-# Edit a file
-result = coding_tool.edit_tool(
-    file_path="/path/to/file.py",
-    old_string="old code\n",
-    new_string="new code\n"
-)
-```
-
-### Using with Smolagents
-
-```python
-from prompttodraft.tools.factory import ToolFactory
-
-# Create smolagents tools
+# Local execution with smolagents
 tools = ToolFactory.create_smolagents_tools(environment="local")
 
-# Use with smolagents agent
-from smolagents import CodeAgent
+# Docker execution with OpenAI
+tools = ToolFactory.create_openai_tools(environment="docker")
 
-agent = CodeAgent(tools=tools, model=...)
-agent.run("List all Python files in the current directory")
+# E2B execution with Pydantic-AI
+tools = ToolFactory.create_pydantic_tools(environment="e2b")
 ```
 
-### Custom Rendering
-
-```python
-from prompttodraft.tools.coding_tools import CodingToolLocal
-from prompttodraft.tools.outputs.renderers import ConsoleRenderer, APIRenderer
-
-coding_tool = CodingToolLocal()
-result = coding_tool.bash_tool(command="ls -la")
-
-# Render to console
-console_renderer = ConsoleRenderer()
-console_renderer.render(result)
-
-# Convert to JSON for API
-api_renderer = APIRenderer()
-json_data = api_renderer.render(result)
-```
-
-## Benefits of This Architecture
-
-### 1. Minimal Code Duplication
+### Write Once, Use Anywhere
 
 - Business logic written **once** in core tools
 - Execution logic written **once** in backends
-- Framework integration **thin adapters only**
+- Framework integration is **thin adapters only**
 
-### 2. Easy to Extend
+### Easy to Extend
 
-#### Adding a new execution environment:
-
+**Add a new environment**:
 1. Implement `ExecutionBackend` interface
-2. Create `CodingToolDocker` or `CodingToolE2B`
-3. Done! All 8 tools work automatically
+2. All tools work automatically
 
-#### Adding a new framework:
+**Add a new framework**:
+1. Create adapter that reads tool metadata
+2. Transform to framework-specific format
 
-1. Create adapter (e.g., `OpenAIBashTool`)
-2. Read metadata from core tool
-3. Transform to framework format
-4. Done!
+**Add a new tool**:
+1. Create core tool with metadata
+2. Add framework adapters
+3. Works in all environments
 
-#### Adding a new tool:
+## Quick Start
 
-1. Create core tool (e.g., `FileSearchToolCore`)
-2. Create smolagents adapter
-3. Add to `CodingTool` interface
-4. Update implementations
-
-### 3. Easy to Test
+### Using Core Tools Directly
 
 ```python
-# Mock the backend for unit testing
-class MockBackend(ExecutionBackend):
-    def execute_command(self, command, timeout):
-        return "mocked output", False
+from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.core.read_file_tool import ReadFileTool
 
-# Test core tool independently
-bash_tool = BashToolCore(backend=MockBackend())
-result = bash_tool.execute(command="echo test")
-assert result.content == "mocked output"
+# Create backend
+backend = LocalBackend(project_id="my-project")
+backend.start()
+
+# Create and use tool
+tool = ReadFileTool(backend=backend)
+result = tool.execute(absolute_path="/path/to/file.py")
+
+# Handle output (console mode by default)
+output = result.handle()
 ```
 
-### 4. Type-Safe
-
-- Full typing throughout
-- Pydantic models for outputs
-- Abstract protocols for interfaces
-
-### 5. Framework-Agnostic Core
-
-- Core tools have **zero** framework dependencies
-- Can be used with any framework
-- Business logic is portable
-
-## Future Extensions
-
-### Add Docker Backend
+### Using with smolagents
 
 ```python
-class DockerBackend(ExecutionBackend):
-    def __init__(self, container_id: str):
-        self.container = docker.from_env().containers.get(container_id)
+from prompttodraft.tools.factory import ToolFactory
+from smolagents import CodeAgent
 
-    def execute_command(self, command, timeout):
-        result = self.container.exec_run(command, timeout=timeout)
-        return result.output.decode(), result.exit_code != 0
+# Create tools for local environment
+tools = ToolFactory.create_smolagents_tools(environment="local")
 
-    # ... implement other methods
+# Use with agent
+agent = CodeAgent(tools=tools, model=...)
+agent.run("List all Python files")
 ```
 
-### Add OpenAI Adapter
+## Output Models
+
+All tools return `ToolOutputModel` instances that adapt to the environment:
 
 ```python
-class OpenAIBashTool:
-    def __init__(self, core: BashToolCore):
-        self.core = core
-        self.function_definition = core.metadata.to_openai_format()
+import os
+os.environ["DISPLAY_MODE"] = "console"  # Rich terminal output (default)
+os.environ["DISPLAY_MODE"] = "api"      # JSON dict for APIs
+os.environ["DISPLAY_MODE"] = "hybrid"   # Both console + JSON
 
-    def execute(self, **kwargs):
-        return self.core.execute(**kwargs)
+# Tool execution
+result = tool.execute(...)
+output = result.handle()  # Automatically adapts based on DISPLAY_MODE
 ```
 
-### Add Web Renderer
+## State Management
 
-```python
-class WebRenderer(BaseRenderer):
-    def render_code(self, output: CodeOutputModel) -> str:
-        return f'<pre><code class="language-{output.language}">{output.content}</code></pre>'
-```
+Backends handle persistent state with cloud storage:
+- `start()`: Load files from bucket, create environment
+- `shutdown()`: Sync files to bucket, destroy environment
+- `sync_to_bucket()`: Save current state (timestamped snapshots)
+- `load_from_bucket()`: Restore latest state
 
 ## Testing
 
-Run E2E tests:
-
-```bash
-pytest tests/test_tools_e2e.py -v
-```
-
-The tests verify:
-- ✅ Output models work correctly
-- ✅ LocalBackend executes primitive operations
-- ✅ Core tools combine backend + business logic
-- ✅ Smolagents adapters work correctly
-- ✅ ToolFactory creates tools properly
-- ✅ CodingToolLocal integrates everything
-- ✅ Error handling works as expected
-- ✅ Output serialization works
-
-## Migration from `/smolcc`
-
-The `/smolcc` directory contains the old monolithic implementation. This new architecture:
-
-1. **Extracts** primitive operations → `backends/local_backend.py`
-2. **Extracts** business logic → `core/*_tool_core.py`
-3. **Separates** output data → `outputs/models.py`
-4. **Separates** output rendering → `outputs/renderers.py`
-5. **Adds** framework adapters → `adapters/smolagents_adapter.py`
-
-All functionality is preserved, but now with:
-- Better separation of concerns
-- Easier to test
-- Easier to extend
-- Framework-agnostic core
-- Reusable across execution environments
-
-## Agent Integration
-
-### ToolAgent (`agent.py`)
-
-The `ToolAgent` class provides a complete agent implementation using smolagents with the 3-layer architecture:
+All layers are independently testable:
 
 ```python
-from prompttodraft.tools.agent import create_agent
+# Mock backend for unit testing
+class MockBackend(ExecutionBackend):
+    def execute_command(self, command, timeout):
+        return CommandResult(output="mocked", exit_code=0)
 
-# Create an agent with all tools
-agent = create_agent(cwd="/path/to/project", log_file="agent.log")
-
-# Run a query
-result = agent.run("What files are in the current directory?")
+# Test core tool
+tool = RunShellCommandTool(backend=MockBackend())
+result = tool.execute(command="echo test")
 ```
 
-#### Features
+## Design Patterns
 
-- **Rich Terminal Output**: Uses Rich library for beautiful terminal formatting
-- **Tool Call Display**: Shows tool calls with parameters
-- **Smart Output Formatting**: Automatically formats outputs based on type (code, files, tables, text)
-- **Thinking Spinner**: Shows visual feedback during LLM processing
-- **Execution Timing**: Displays execution time for slow operations
-- **Error Handling**: Prominently displays errors
+- **Strategy Pattern**: Swappable backends (Local, Docker, E2B)
+- **Adapter Pattern**: Framework adapters (smolagents, OpenAI, etc.)
+- **Factory Pattern**: `ToolFactory` for convenient creation
+- **Separation of Concerns**: Data (models) vs. Presentation (display)
 
-#### System Prompt Generation (`system_prompt.py`)
+## See Also
 
-The agent uses dynamic system prompts that include:
-
-- Current working directory
-- Directory structure (with smart filtering)
-- Git repository status (if applicable)
-- Platform information
-- Current date
-
-```python
-from prompttodraft.tools.system_prompt import get_system_prompt
-
-# Generate a system prompt for a specific directory
-prompt = get_system_prompt(cwd="/path/to/project")
-```
-
-#### Custom Logger
-
-The `RichConsoleLogger` provides:
-
-- Suppression of default smolagents output
-- Rich console integration
-- Optional file logging
-- Formatted error display
-
-#### Display System
-
-The agent automatically formats different output types:
-
-- **TextOutputModel**: Simple text with line count for multiline
-- **CodeOutputModel**: Syntax-highlighted code with line numbers
-- **FileListOutputModel**: Tables with file names, types, and sizes
-- **ErrorOutputModel**: Prominently styled error messages
-- **TableOutputModel**: Formatted tables with headers
-
-## Design Patterns Used
-
-1. **Strategy Pattern**: Different backends (Local, Docker, E2B)
-2. **Adapter Pattern**: Framework adapters (Smolagents, OpenAI, etc.)
-3. **Factory Pattern**: ToolFactory for convenient creation
-4. **Template Method**: Core tools define algorithm, backends fill in steps
-5. **Separation of Concerns**: Data (models) vs. Presentation (renderers)
-
-## Conclusion
-
-This architecture provides:
-
-- **Maximum flexibility**: Mix and match environments + frameworks
-- **Minimal duplication**: Write once, use anywhere
-- **Clean separation**: Each layer has one responsibility
-- **Easy testing**: Mock any layer independently
-- **Future-proof**: Easy to add new environments, frameworks, or tools
-
-The key insight: **Separate what varies from what stays the same**. Execution varies (local/docker/e2b), frameworks vary (smolagents/openai), but business logic stays constant.
+- [`backends/README.md`](backends/README.md) - Execution backend details
+- [`core/README.md`](core/README.md) - Core tools and Gemini CLI reference
+- [`outputs/README.md`](outputs/README.md) - Output models and display modes
