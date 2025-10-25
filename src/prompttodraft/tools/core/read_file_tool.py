@@ -34,9 +34,9 @@ class ReadFileTool:
         name="read_file",
         description="Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit.",
         inputs={
-            "absolute_path": {
+            "path": {
                 "type": "string",
-                "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Relative paths are not supported. You must provide an absolute path.",
+                "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.",
                 "nullable": False,
             },
             "offset": {
@@ -112,7 +112,7 @@ class ReadFileTool:
 
     def execute(
         self,
-        absolute_path: str,
+        path: str,
         offset: int | None = None,
         limit: int | None = None,
     ) -> ToolOutputModel:
@@ -120,7 +120,7 @@ class ReadFileTool:
         Execute the read_file tool.
 
         Args:
-            absolute_path: The absolute path to the file to read
+            path: The absolute path to the file to read
             offset: For text files, the 0-based line number to start reading from
             limit: For text files, the maximum number of lines to read
 
@@ -128,27 +128,27 @@ class ReadFileTool:
             TextOutputModel with file content or ErrorOutputModel on failure
         """
         # Check if file exists
-        file_type = self.backend.file_exists(path=absolute_path)
+        file_type = self.backend.file_exists(path=path)
         if file_type is None:
             return ErrorOutputModel(
-                error=f"File does not exist: {absolute_path}",
+                error=f"File does not exist: {path}",
                 error_type="FileNotFoundError",
             )
 
         if file_type != FileType.FILE:
             return ErrorOutputModel(
-                error=f"Path is not a file: {absolute_path}",
+                error=f"Path is not a file: {path}",
                 error_type="NotAFileError",
             )
 
         # Check if this is a media file (image or PDF)
-        if self._is_media_file(file_path=absolute_path):
+        if self._is_media_file(file_path=path):
             # Get mime type
-            mime_type = self._get_mime_type(file_path=absolute_path)
+            mime_type = self._get_mime_type(file_path=path)
 
             # Use execute_command to read binary file and encode to base64
             result = self.backend.execute_command(
-                command=f'base64 "{absolute_path}"',
+                command=f'base64 "{path}"',
                 timeout=30000,
             )
 
@@ -162,7 +162,7 @@ class ReadFileTool:
 
             # Get file size
             size_result = self.backend.execute_command(
-                command=f'wc -c < "{absolute_path}"',
+                command=f'wc -c < "{path}"',
                 timeout=5000,
             )
             size_bytes = None
@@ -173,19 +173,19 @@ class ReadFileTool:
                     pass
 
             return MediaOutputModel(
-                filename=Path(absolute_path).name,
+                filename=Path(path).name,
                 mime_type=mime_type,
                 base64_data=base64_data,
                 size_bytes=size_bytes,
             )
 
         # Read text file
-        content = self.backend.read_file(file_path=absolute_path)
+        content = self.backend.read_file(file_path=path)
 
         # Check if it's a binary file
         if self._is_binary_file(content=content):
             return TextOutputModel(
-                content=f"Cannot display content of binary file: {absolute_path}",
+                content=f"Cannot display content of binary file: {path}",
             )
 
         # Handle line offset and limit for text files

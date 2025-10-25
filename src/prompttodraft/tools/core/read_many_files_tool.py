@@ -115,6 +115,42 @@ class ReadManyFilesTool:
         """
         return "\x00" in content[:8192]
 
+    def _is_git_repository(self) -> bool:
+        """
+        Check if the working directory is a git repository.
+
+        Returns:
+            True if in a git repository, False otherwise
+        """
+        try:
+            result = self.backend.execute_command(
+                command="git rev-parse --is-inside-work-tree",
+                timeout=2000  # 2 seconds
+            )
+            return result.exit_code == 0 and result.output.strip() == "true"
+        except Exception:
+            return False
+
+    def _should_ignore_by_git(self, file_path: str) -> bool:
+        """
+        Check if a file should be ignored according to .gitignore.
+
+        Args:
+            file_path: Absolute path to the file to check
+
+        Returns:
+            True if the file should be ignored, False otherwise
+        """
+        try:
+            # git check-ignore returns exit code 0 if the path is ignored
+            result = self.backend.execute_command(
+                command=f"git check-ignore -q '{file_path}'",
+                timeout=2000  # 2 seconds
+            )
+            return result.exit_code == 0
+        except Exception:
+            return False
+
     def _should_exclude(self, file_path: str, exclude_patterns: list[str]) -> bool:
         """
         Check if file should be excluded based on patterns.
@@ -190,6 +226,12 @@ class ReadManyFilesTool:
         filtered_files = [
             f for f in unique_files if not self._should_exclude(file_path=f, exclude_patterns=exclude_patterns)
         ]
+
+        # Apply gitignore filtering if requested
+        if respect_git_ignore and self._is_git_repository():
+            filtered_files = [
+                f for f in filtered_files if not self._should_ignore_by_git(file_path=f)
+            ]
 
         if not filtered_files:
             return TextOutputModel(content="No files matched the specified patterns.")
