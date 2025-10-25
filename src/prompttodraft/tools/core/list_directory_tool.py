@@ -57,6 +57,43 @@ class ListDirectoryTool:
         """
         self.backend = backend
 
+    def _is_git_repository(self) -> bool:
+        """
+        Check if the working directory is a git repository.
+
+        Returns:
+            True if in a git repository, False otherwise
+        """
+        try:
+            result = self.backend.execute_command(
+                command="git rev-parse --is-inside-work-tree",
+                timeout=2000  # 2 seconds
+            )
+            return result.exit_code == 0 and result.output.strip() == "true"
+        except Exception:
+            return False
+
+    def _should_ignore_by_git(self, entry_path: str) -> bool:
+        """
+        Check if a file should be ignored according to .gitignore.
+
+        Args:
+            entry_path: Absolute path to the entry to check
+
+        Returns:
+            True if the entry should be ignored, False otherwise
+        """
+        try:
+            # git check-ignore returns exit code 0 if the path is ignored
+            # Use -q flag for quiet mode (no output, just exit code)
+            result = self.backend.execute_command(
+                command=f"git check-ignore -q '{entry_path}'",
+                timeout=2000  # 2 seconds
+            )
+            return result.exit_code == 0
+        except Exception:
+            return False
+
     def execute(
         self,
         path: str,
@@ -88,8 +125,19 @@ class ListDirectoryTool:
                 error_type="NotADirectoryError",
             )
 
+        # Check if we should respect gitignore
+        use_gitignore = respect_git_ignore and self._is_git_repository()
+
         # List directory contents
         entries = self.backend.list_directory(path=path, recursive=False)
+
+        # Apply gitignore filtering if enabled
+        if use_gitignore:
+            filtered_entries = []
+            for entry in entries:
+                if not self._should_ignore_by_git(entry.path):
+                    filtered_entries.append(entry)
+            entries = filtered_entries
 
         # Apply ignore patterns if provided
         if ignore:
