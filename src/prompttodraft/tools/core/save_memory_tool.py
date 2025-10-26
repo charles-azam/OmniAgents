@@ -56,7 +56,14 @@ class SaveMemoryTool:
         Returns:
             Absolute path to the memory file
         """
-        # Get home directory
+        # For Docker and E2B backends, use working directory to avoid permission issues
+        from prompttodraft.tools.backends.docker_backend import DockerBackend
+        from prompttodraft.tools.backends.e2b_backend import E2BBackend
+
+        if isinstance(self.backend, (DockerBackend, E2BBackend)):
+            return str(Path(self.backend.get_working_directory()) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
+
+        # For local backend, try to use home directory
         home_result = self.backend.execute_command(
             command="echo $HOME",
             timeout=5000,

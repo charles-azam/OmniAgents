@@ -99,6 +99,45 @@ class DockerBackend(ExecutionBackend):
     def get_status(self) -> BackendStatus:
         return self._status
 
+    def sync_to_bucket(self) -> None:
+        """
+        Sync all relevant files from working directory to bucket with timestamp.
+
+        Overridden for Docker backend to use host paths instead of container paths.
+        """
+        from datetime import datetime, timezone
+        from prompttodraft import storage_utils
+        from prompttodraft.common import DATA_PATH
+
+        # Use host project path for listing files (not container path)
+        working_dir = self._get_host_working_directory()
+
+        # Create timestamp snapshot
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+        project_data_path = DATA_PATH / self.project_id / timestamp
+
+        # List all files recursively using host path
+        files = self.list_directory(path=working_dir, recursive=True)
+
+        for file_info in files:
+            if file_info.type != FileType.FILE:
+                continue
+
+            # Get relative path from working directory
+            file_path = Path(file_info.path)
+            relative_path = file_path.relative_to(working_dir)
+
+            # Check if file should be synced
+            if not self._should_sync_file(str(relative_path)):
+                continue
+
+            # Read file content
+            content = self.read_file(file_path=file_path)
+
+            # Write to bucket with timestamp
+            bucket_path = project_data_path / relative_path
+            storage_utils.write_to_storage(file_path=bucket_path, content=content)
+
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         if self._container is None:
             raise RuntimeError("Container not initialized - call start() first")
@@ -116,7 +155,33 @@ class DockerBackend(ExecutionBackend):
         return CommandResult(output=output.rstrip("\n") if output else "", exit_code=exit_code)
 
     def get_working_directory(self) -> str:
-        return str(self._project_path)
+        """Get the working directory path for commands (container path)."""
+        return CONTAINER_WORKSPACE
+
+    def _get_host_working_directory(self) -> Path:
+        """Get the host filesystem path where files are actually stored."""
+        return self._project_path
+
+    def convert_to_path(self, path: str | Path) -> Path:
+        """
+        Convert container path to host path for file operations.
+
+        Container paths (e.g., /workspace/file.py) are mapped to host paths
+        (e.g., /Users/.../data/project_id/file.py) where the volume is mounted.
+        """
+        path_obj = Path(path)
+
+        # If path is absolute and starts with container workspace, convert to host path
+        if path_obj.is_absolute() and path_obj.is_relative_to(CONTAINER_WORKSPACE):
+            # Remove /workspace prefix and append to host project path
+            relative_path = path_obj.relative_to(CONTAINER_WORKSPACE)
+            return self._project_path / relative_path
+        elif path_obj.is_absolute():
+            # Absolute path outside workspace - just use it
+            return path_obj
+        else:
+            # Relative path - make it relative to host project path
+            return self._project_path / path_obj
 
     def read_file(self, file_path: str | Path) -> str:
         return self.convert_to_path(file_path).read_text()
