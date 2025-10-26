@@ -89,10 +89,6 @@ class GlobTool:
         if not file_paths:
             return []
 
-        # Use git check-ignore to filter files
-        # Create a temporary file with all paths
-        paths_input = "\n".join(file_paths)
-
         # git check-ignore returns 0 for ignored files, 1 for non-ignored
         # We'll check each file individually for reliability
         non_ignored_files = []
@@ -111,7 +107,6 @@ class GlobTool:
     def _apply_case_sensitivity(
         self,
         file_paths: list[str],
-        pattern: str,
         case_sensitive: bool,
     ) -> list[str]:
         """
@@ -119,7 +114,6 @@ class GlobTool:
 
         Args:
             file_paths: List of matched file paths
-            pattern: The original glob pattern
             case_sensitive: Whether to enforce case sensitivity
 
         Returns:
@@ -130,14 +124,7 @@ class GlobTool:
             # No additional filtering needed
             return file_paths
 
-        # For case-insensitive matching, we need to check if the pattern
-        # matches case-insensitively. Python's glob behavior varies by OS,
-        # so we'll do case-insensitive filtering manually
-
-        # Convert pattern to lowercase for comparison
-        pattern_lower = pattern.lower()
-
-        # This is a simplified approach - in reality, glob patterns are complex
+        # For case-insensitive matching, Python's glob behavior varies by OS
         # For now, we'll just return all files since glob already matched them
         return file_paths
 
@@ -170,7 +157,6 @@ class GlobTool:
         if case_sensitive:
             matched_paths = self._apply_case_sensitivity(
                 file_paths=matched_paths,
-                pattern=pattern,
                 case_sensitive=case_sensitive,
             )
 
@@ -192,7 +178,11 @@ class GlobTool:
 
             mtime = 0
             if result.exit_code == 0 and result.output:
-                mtime = int(result.output.strip())
+                try:
+                    mtime = int(result.output.strip())
+                except ValueError:
+                    # stat command might not support format options on this system
+                    mtime = 0
 
             file_infos.append(
                 FileInfo(

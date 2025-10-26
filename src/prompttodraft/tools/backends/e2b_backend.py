@@ -222,10 +222,28 @@ class E2BBackend(ExecutionBackend):
 
         # Use find command for glob since E2B doesn't have native glob
         search_path = self._normalize_path(path=path) if path else SANDBOX_WORKING_DIR
-        result = self._sandbox.commands.run(
-            cmd=f"find {search_path} -name '{pattern}' -type f",
-            cwd=SANDBOX_WORKING_DIR
-        )
+
+        # Convert glob pattern to find command
+        # Handle ** recursive glob patterns
+        if pattern.startswith("**/"):
+            # **/*.py -> find all .py files recursively
+            file_pattern = pattern[3:]  # Remove **/
+            result = self._sandbox.commands.run(
+                cmd=f"find {search_path} -type f -name '{file_pattern}'",
+                cwd=SANDBOX_WORKING_DIR
+            )
+        elif "**/" in pattern:
+            # Complex pattern with ** in middle - not common, treat as literal
+            result = self._sandbox.commands.run(
+                cmd=f"find {search_path} -type f -name '{pattern}'",
+                cwd=SANDBOX_WORKING_DIR
+            )
+        else:
+            # Simple pattern like *.py -> only search in the directory itself
+            result = self._sandbox.commands.run(
+                cmd=f"find {search_path} -maxdepth 1 -type f -name '{pattern}'",
+                cwd=SANDBOX_WORKING_DIR
+            )
 
         if result.exit_code != 0:
             return []
