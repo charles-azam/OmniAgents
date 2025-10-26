@@ -415,12 +415,19 @@ class ToolAgent(ToolCallingAgent):
         raise ValueError(f"Tool not found: {tool_name}")
 
 
-def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="groq"), log_file: str | None = "tool_agent.log") -> ToolAgent:
+def create_agent(
+    cwd: str | None = None,
+    backend: "ExecutionBackend | None" = None,
+    model: ApiModel | None = None,
+    log_file: str | None = "tool_agent.log",
+) -> ToolAgent:
     """
     Create a tool agent with all available tools using the new 3-layer architecture.
 
     Args:
         cwd: Current working directory (defaults to os.getcwd())
+        backend: ExecutionBackend instance (defaults to LocalBackend if None)
+        model: LLM model to use (defaults to Groq gpt-oss-120b if None)
         log_file: Path to log file or None to disable logging
 
     Returns:
@@ -428,6 +435,8 @@ def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(
     """
     from dotenv import load_dotenv
 
+    from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+    from prompttodraft.tools.backends.local_backend import LocalBackend
     from prompttodraft.tools.factory import ToolFactory
     from prompttodraft.tools.system_prompt import get_system_prompt
 
@@ -438,11 +447,22 @@ def create_agent(cwd: str | None = None, model: ApiModel = InferenceClientModel(
     if cwd is None:
         cwd = os.getcwd()
 
-    # Get the dynamic system prompt
-    system_prompt = get_system_prompt(cwd=cwd)
+    # Create backend if not provided
+    if backend is None:
+        backend = LocalBackend(project_id="local")
+        # Start the backend
+        backend.start()
+
+    # Create default model if not provided
+    if model is None:
+        model = InferenceClientModel(model_id="groq/gpt-oss-120b")
+
+    # Get the dynamic system prompt with model ID
+    model_id = getattr(model, "model_id", "groq/gpt-oss-120b")
+    system_prompt = get_system_prompt(cwd=cwd, model_id=model_id)
 
     # Create tool instances using the ToolFactory
-    tool_instances = ToolFactory.create_smolagents_tools(environment="local")
+    tool_instances = ToolFactory.create_smolagents_tools(backend=backend)
 
     # Initialize the agent with all tools and system prompt
     agent = ToolAgent(tools=tool_instances, model=model, log_file=log_file, system_prompt=system_prompt)
