@@ -14,6 +14,7 @@ Tests all 9 Gemini CLI-inspired tools with different backends (local, docker, e2
 """
 import os
 from pathlib import Path
+import pytest
 
 from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
@@ -357,6 +358,7 @@ def test_tools_docker_backend():
     run_tools_e2e_test(backend=backend)
 
 
+@pytest.mark.e2b
 def test_tools_e2b_backend():
     """Test all tools with E2BBackend."""
     backend = E2BBackend(project_id="test_tools_e2b")
