@@ -386,7 +386,7 @@ def test_docker_backend_container_reuse():
 
 
 if __name__ == "__main__":
-    # test_local_backend_e2e()
-    # test_docker_backend_e2e()
-    # test_docker_backend_container_reuse()
+    test_local_backend_e2e()
+    test_docker_backend_e2e()
+    test_docker_backend_container_reuse()
     test_e2b_backend_e2e()
