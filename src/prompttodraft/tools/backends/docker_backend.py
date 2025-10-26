@@ -89,11 +89,14 @@ class DockerBackend(ExecutionBackend):
 
     def shutdown(self) -> None:
         # Sync current state to bucket before shutdown
+        if self._container is None:
+            # Already shut down, nothing to do
+            return
+
         self.sync_to_bucket()
-        if self._container:
-            self._container.stop()
-            self._container.remove()
-            self._container = None
+        self._container.stop()
+        self._container.remove()
+        self._container = None
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:
