@@ -4,6 +4,7 @@ Docker execution backend.
 This module implements the ExecutionBackend for Docker container execution.
 """
 import os
+import platform
 import shutil
 from pathlib import Path
 
@@ -74,23 +75,29 @@ class DockerBackend(ExecutionBackend):
             self._client.images.pull(DOCKER_IMAGE)
 
         # Create and start container with volume mount
-        # Run as current user to avoid permission issues with mounted volumes
-        uid = os.getuid()
-        gid = os.getgid()
-        self._container = self._client.containers.run(
-            image=DOCKER_IMAGE,
-            name=self._container_name,
-            command="sleep infinity",  # Keep container running
-            volumes={str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
-            working_dir=CONTAINER_WORKSPACE,
-            user=f"{uid}:{gid}",
-            environment={
+        # On Linux: Run as current user to avoid permission issues with mounted volumes
+        # On macOS: Docker Desktop handles permissions automatically, don't set user
+        container_kwargs = {
+            "image": DOCKER_IMAGE,
+            "name": self._container_name,
+            "command": "sleep infinity",
+            "volumes": {str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
+            "working_dir": CONTAINER_WORKSPACE,
+            "environment": {
                 "HOME": CONTAINER_WORKSPACE,
                 "UV_CACHE_DIR": f"{CONTAINER_WORKSPACE}/.uv_cache",
             },
-            detach=True,
-            remove=False,
-        )
+            "detach": True,
+            "remove": False,
+        }
+
+        # Only set user on Linux to avoid permission issues
+        if platform.system() == "Linux":
+            uid = os.getuid()
+            gid = os.getgid()
+            container_kwargs["user"] = f"{uid}:{gid}"
+
+        self._container = self._client.containers.run(**container_kwargs)
 
         self._status = BackendStatus.RUNNING
         # Load existing files from bucket if any
