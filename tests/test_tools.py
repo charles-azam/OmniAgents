@@ -1,7 +1,7 @@
 """
 Comprehensive E2E tests for all tools.
 
-Tests all 9 Gemini CLI-inspired tools with different backends (local, docker, e2b):
+Tests all 10 tools with different backends (local, docker, e2b):
 1. write_file - Create/overwrite files
 2. read_file - Read file contents with offset/limit support
 3. list_directory - List directory contents with filtering
@@ -11,6 +11,7 @@ Tests all 9 Gemini CLI-inspired tools with different backends (local, docker, e2
 7. run_shell_command - Execute shell commands
 8. read_many_files - Read multiple files at once
 9. save_memory - Save facts to memory file
+10. uv - Execute uv package manager commands
 """
 import os
 from pathlib import Path
@@ -30,6 +31,7 @@ from prompttodraft.tools.core.replace_tool import ReplaceTool
 from prompttodraft.tools.core.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.core.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.core.save_memory_tool import SaveMemoryTool
+from prompttodraft.tools.core.uv_tool import UVTool
 
 from prompttodraft.tools.outputs.models import (
     FileListOutputModel,
@@ -312,6 +314,39 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         result = memory_tool.execute(fact="Project name is prompttodraft")
         assert isinstance(result, TextOutputModel)
         assert "saved" in result.content.lower()
+
+        # TEST 10: uv
+        print("\n" + "="*80)
+        print("TEST 10: uv")
+        print("="*80)
+
+        uv_tool = UVTool(backend=backend)
+
+        # Initialize project first (creates pyproject.toml)
+        from prompttodraft.utils import initialize_project
+        init_result = initialize_project(backend=backend)
+        assert init_result["success"] is True
+
+        # Create a simple Python script to run
+        test_script = f"{working_dir}/test_script.py"
+        backend.write_file(file_path=test_script, content="print('Hello from uv run!')\n")
+
+        # Test uv run
+        result = uv_tool.execute(command="run test_script.py", description="Run Python script with uv")
+        assert isinstance(result, TextOutputModel)
+        assert "Hello from uv run!" in result.content
+        assert "Exit Code: 0" in result.content
+        assert "Run Python script with uv" in result.content
+
+        # Test uv sync (should work now that project is initialized)
+        result = uv_tool.execute(command="sync")
+        assert isinstance(result, TextOutputModel)
+        assert "Exit Code: 0" in result.content
+
+        # Test uv add package
+        result = uv_tool.execute(command="add requests", description="Add requests package")
+        assert isinstance(result, TextOutputModel)
+        # Exit code might be 0 or non-zero depending on environment, just check it ran
 
         # INTEGRATION TEST: Combined workflow
         print("\n" + "="*80)

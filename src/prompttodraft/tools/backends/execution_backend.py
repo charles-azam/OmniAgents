@@ -242,6 +242,45 @@ class ExecutionBackend(ABC):
         """
         pass
 
+    def execute_uv(
+        self,
+        uv_command: str,
+        timeout: int | None = None
+    ) -> CommandResult:
+        """
+        Execute a uv command, ensuring uv is installed first.
+
+        Args:
+            uv_command: The uv command to execute (e.g., "run script.py", "add requests", "sync")
+            timeout: Optional timeout in milliseconds
+
+        Returns:
+            CommandResult with output (stdout+stderr merged) and exit_code
+        """
+        # Check if uv is installed
+        uv_check = self.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && command -v uv',
+            timeout=10000,
+        )
+
+        if uv_check.exit_code != 0:
+            # Install uv
+            install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+            install_result = self.execute_command(
+                command=install_command,
+                timeout=120000,
+            )
+
+            if install_result.exit_code != 0:
+                return CommandResult(
+                    output=f"Failed to install uv: {install_result.output}",
+                    exit_code=install_result.exit_code,
+                )
+
+        # Execute the uv command with PATH set
+        full_command = f'export PATH="$HOME/.local/bin:$PATH" && uv {uv_command}'
+        return self.execute_command(command=full_command, timeout=timeout)
+
     # === Working Directory ===
 
     @abstractmethod
