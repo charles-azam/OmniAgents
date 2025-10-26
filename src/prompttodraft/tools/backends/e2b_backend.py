@@ -60,12 +60,15 @@ class E2BBackend(ExecutionBackend):
 
     def shutdown(self) -> None:
         # Sync files to bucket and kill sandbox
+        if self._sandbox is None:
+            # Already shut down, nothing to do
+            return
+
+        # Sync before killing sandbox
         self.sync_to_bucket()
 
-        if self._sandbox:
-            self._sandbox.kill()
-            self._sandbox = None
-
+        self._sandbox.kill()
+        self._sandbox = None
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:
