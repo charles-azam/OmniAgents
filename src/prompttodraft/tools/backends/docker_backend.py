@@ -3,6 +3,7 @@ Docker execution backend.
 
 This module implements the ExecutionBackend for Docker container execution.
 """
+import os
 import shutil
 from pathlib import Path
 
@@ -73,12 +74,16 @@ class DockerBackend(ExecutionBackend):
             self._client.images.pull(DOCKER_IMAGE)
 
         # Create and start container with volume mount
+        # Run as current user to avoid permission issues with mounted volumes
+        uid = os.getuid()
+        gid = os.getgid()
         self._container = self._client.containers.run(
             image=DOCKER_IMAGE,
             name=self._container_name,
             command="sleep infinity",  # Keep container running
             volumes={str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
             working_dir=CONTAINER_WORKSPACE,
+            user=f"{uid}:{gid}",
             detach=True,
             remove=False,
         )
