@@ -439,6 +439,7 @@ def create_agent(
     from prompttodraft.tools.backends.local_backend import LocalBackend
     from prompttodraft.tools.factory import ToolFactory
     from prompttodraft.tools.system_prompt import get_system_prompt
+    from prompttodraft.utils import initialize_project
 
     # Initialize environment variables
     load_dotenv()
@@ -452,6 +453,9 @@ def create_agent(
         backend = LocalBackend(project_id="local")
         # Start the backend
         backend.start()
+
+    # Initialize the project (runs uv init on first run, uv sync always)
+    initialize_project(backend=backend)
 
     # Create default model if not provided
     if model is None:

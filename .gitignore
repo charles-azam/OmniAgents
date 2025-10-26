@@ -12,3 +12,6 @@ wheels/
 *.step
 
 .env
+
+# Backend working directories (contains nested projects for testing)
+data/
