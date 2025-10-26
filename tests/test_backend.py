@@ -316,6 +316,7 @@ def test_docker_backend_e2e():
     run_backend_e2e_test(backend=backend)
 
 
+@pytest.mark.e2b
 def test_e2b_backend_e2e():
     """Test E2BBackend implementation using generic backend test."""
     backend = E2BBackend(project_id="test_e2b_backend_e2e")

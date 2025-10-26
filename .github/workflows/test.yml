@@ -51,7 +51,15 @@ jobs:
       run: |
         docker pull ghcr.io/astral-sh/uv:debian
 
+    - name: Run tests (without e2b)
+      if: github.ref != 'refs/heads/main'
+      env:
+        BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
+      run: |
+          uv run pytest tests -vvvv -m "not e2b"
+
     - name: Set up E2B API key
+      if: github.ref == 'refs/heads/main'
       env:
         E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
       run: |
@@ -61,7 +69,8 @@ jobs:
           echo "Warning: E2B_API_KEY not set. E2B tests may fail."
         fi
 
-    - name: Run tests
+    - name: Run all tests (including e2b)
+      if: github.ref == 'refs/heads/main'
       env:
         BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
         E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
