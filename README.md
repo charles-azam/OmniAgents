@@ -1,0 +1,121 @@
+# PromptToDraft
+
+[![Test All Backends](https://github.com/charles-azam/prompttodraft/actions/workflows/test.yml/badge.svg)](https://github.com/charles-azam/prompttodraft/actions/workflows/test.yml)
+
+A multi-backend execution framework supporting local, Docker, and E2B sandbox environments.
+
+## Features
+
+- **Multi-Backend Support**: Run code in local, Docker containers, or E2B sandboxes
+- **Unified API**: Same interface across all backends
+- **File Operations**: Read, write, copy, move, and manage files
+- **Command Execution**: Execute shell commands with timeout support
+- **State Persistence**: Automatic sync to/from cloud storage
+- **Comprehensive Testing**: E2E tests for all backends
+
+## Backend Implementations
+
+### 1. Local Backend
+- Executes directly on the local filesystem
+- Best for development and testing
+- No additional setup required
+
+### 2. Docker Backend
+- Isolated execution in Docker containers
+- File operations via volume mounts
+- Automatic container lifecycle management
+- Container reuse for efficiency
+
+### 3. E2B Backend
+- Secure sandboxed execution via E2B
+- True isolation with ephemeral environments
+- Cloud-native architecture
+
+## Installation
+
+```bash
+# Install uv (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Install dependencies
+uv sync
+```
+
+## Usage
+
+```python
+from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.docker_backend import DockerBackend
+from prompttodraft.tools.backends.e2b_backend import E2BBackend
+
+# Choose your backend
+backend = LocalBackend(project_id="my-project")
+# backend = DockerBackend(project_id="my-project")
+# backend = E2BBackend(project_id="my-project")
+
+# Start the backend
+backend.start()
+
+# Write a file
+backend.write_file(file_path="hello.py", content="print('Hello, World!')")
+
+# Execute a command
+result = backend.execute_command(command="python hello.py")
+print(result.output)  # "Hello, World!"
+
+# Shutdown (syncs files to cloud storage)
+backend.shutdown()
+```
+
+## Running Tests
+
+```bash
+# Run all tests
+uv run python -m pytest tests/test_backend.py tests/test_tools.py -v
+
+# Run specific backend tests
+uv run python -m pytest tests/test_backend.py::test_local_backend_e2e -v
+uv run python -m pytest tests/test_backend.py::test_docker_backend_e2e -v
+uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
+```
+
+## Configuration
+
+### Google Cloud Storage
+
+Set up credentials for state persistence:
+
+```bash
+export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/gcp-credentials.json"
+```
+
+### E2B API Key
+
+For E2B backend:
+
+```bash
+export E2B_API_KEY="e2b_your_api_key_here"
+```
+
+## CI/CD
+
+The project uses GitHub Actions for continuous testing. See [Setup Secrets Guide](.github/SETUP_SECRETS.md) for configuring the CI/CD pipeline.
+
+## Architecture
+
+All backends implement the `ExecutionBackend` abstract interface:
+
+- **File Operations**: `read_file`, `write_file`, `delete_file`, `copy_file`, `move_file`
+- **Directory Operations**: `create_directory`, `delete_directory`, `list_directory`
+- **Search**: `glob_files`, `file_exists`
+- **Execution**: `execute_command`
+- **State Management**: `sync_to_bucket`, `load_from_bucket`
+- **Lifecycle**: `start`, `shutdown`, `get_status`
+
+## Contributing
+
+Contributions are welcome! Please ensure all tests pass before submitting a PR.
+
+## License
+
+See LICENSE file for details.

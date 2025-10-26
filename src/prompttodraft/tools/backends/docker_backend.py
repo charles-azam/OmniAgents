@@ -3,6 +3,7 @@ Docker execution backend.
 
 This module implements the ExecutionBackend for Docker container execution.
 """
+import os
 import shutil
 from pathlib import Path
 
@@ -16,7 +17,7 @@ from prompttodraft.tools.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 DOCKER_IMAGE = "ghcr.io/astral-sh/uv:debian"
@@ -38,7 +39,7 @@ class DockerBackend(ExecutionBackend):
 
     @property
     def _project_path(self) -> Path:
-        return DATA_PATH / self._project_id
+        return DOCKER_BACKEND_PATH / self._project_id
 
     @property
     def _container_name(self) -> str:
@@ -72,16 +73,24 @@ class DockerBackend(ExecutionBackend):
         except docker.errors.ImageNotFound:
             self._client.images.pull(DOCKER_IMAGE)
 
+        # On Linux, run container as host user to avoid permission issues
+        # On macOS/Windows, Docker Desktop handles user mapping automatically
+        container_kwargs = {
+            "image": DOCKER_IMAGE,
+            "name": self._container_name,
+            "command": "sleep infinity",  # Keep container running
+            "volumes": {str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
+            "working_dir": CONTAINER_WORKSPACE,
+            "detach": True,
+            "remove": False,
+        }
+
+        # Only set user on Linux to match host user (avoids root-owned files)
+        if os.name == "posix" and hasattr(os, "getuid"):
+            container_kwargs["user"] = f"{os.getuid()}:{os.getgid()}"
+
         # Create and start container with volume mount
-        self._container = self._client.containers.run(
-            image=DOCKER_IMAGE,
-            name=self._container_name,
-            command="sleep infinity",  # Keep container running
-            volumes={str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
-            working_dir=CONTAINER_WORKSPACE,
-            detach=True,
-            remove=False,
-        )
+        self._container = self._client.containers.run(**container_kwargs)
 
         self._status = BackendStatus.RUNNING
         # Load existing files from bucket if any

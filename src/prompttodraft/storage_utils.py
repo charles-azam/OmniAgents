@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 from google.cloud import storage
 from loguru import logger
 
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import GCP_DATA_PATH
 
 load_dotenv()
 
@@ -86,17 +86,17 @@ def write_to_storage(file_path: Path, content: str) -> None:
     Write content to a file in bucket storage.
 
     Args:
-        file_path: Path object that must be relative to DATA_PATH
+        file_path: Path object that must be relative to GCP_DATA_PATH
         content: Content to write to the file
 
     Raises:
-        ValueError: If the path is not relative to DATA_PATH
+        ValueError: If the path is not relative to GCP_DATA_PATH
     """
-    if not file_path.is_relative_to(DATA_PATH):
-        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    if not file_path.is_relative_to(GCP_DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to GCP_DATA_PATH {GCP_DATA_PATH}")
 
-    relative_path = file_path.relative_to(DATA_PATH)
-    _write_to_bucket(content=content, blob_name=str(relative_path))
+    relative_path = file_path.relative_to(GCP_DATA_PATH)
+    _write_to_bucket(content=content, blob_name=relative_path.as_posix())
 
 
 def _read_from_bucket(blob_name: str) -> str:
@@ -111,19 +111,19 @@ def read_from_storage(file_path: Path) -> str:
     Read a file from bucket storage.
 
     Args:
-        file_path: Path object that must be relative to DATA_PATH
+        file_path: Path object that must be relative to GCP_DATA_PATH
 
     Returns:
         Content of the file as string
 
     Raises:
-        ValueError: If the path is not relative to DATA_PATH
+        ValueError: If the path is not relative to GCP_DATA_PATH
     """
-    if not file_path.is_relative_to(DATA_PATH):
-        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    if not file_path.is_relative_to(GCP_DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to GCP_DATA_PATH {GCP_DATA_PATH}")
 
-    relative_path = file_path.relative_to(DATA_PATH)
-    return _read_from_bucket(blob_name=str(relative_path))
+    relative_path = file_path.relative_to(GCP_DATA_PATH)
+    return _read_from_bucket(blob_name=relative_path.as_posix())
 
 
 def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool:
@@ -131,24 +131,24 @@ def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool
     Check if a file exists in bucket storage.
 
     Args:
-        file_path: Path object that must be relative to DATA_PATH
+        file_path: Path object that must be relative to GCP_DATA_PATH
         force_rewrite: If True, always return False to force rewrite
 
     Returns:
         True if file exists, False otherwise
 
     Raises:
-        ValueError: If the path is not relative to DATA_PATH
+        ValueError: If the path is not relative to GCP_DATA_PATH
     """
     if force_rewrite:
         return False
 
-    if not file_path.is_relative_to(DATA_PATH):
-        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    if not file_path.is_relative_to(GCP_DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to GCP_DATA_PATH {GCP_DATA_PATH}")
 
     bucket = get_bucket()
-    relative_path = file_path.relative_to(DATA_PATH)
-    blob = bucket.blob(blob_name=str(relative_path))
+    relative_path = file_path.relative_to(GCP_DATA_PATH)
+    blob = bucket.blob(blob_name=relative_path.as_posix())
     return blob.exists()
 
 
@@ -157,20 +157,20 @@ def delete_from_storage(file_path: Path) -> bool:
     Delete a file from bucket storage.
 
     Args:
-        file_path: Path object that must be relative to DATA_PATH
+        file_path: Path object that must be relative to GCP_DATA_PATH
 
     Returns:
         True if file was deleted successfully, False if file didn't exist
 
     Raises:
-        ValueError: If the path is not relative to DATA_PATH
+        ValueError: If the path is not relative to GCP_DATA_PATH
     """
-    if not file_path.is_relative_to(DATA_PATH):
-        raise ValueError(f"Path {file_path} is not relative to DATA_PATH {DATA_PATH}")
+    if not file_path.is_relative_to(GCP_DATA_PATH):
+        raise ValueError(f"Path {file_path} is not relative to GCP_DATA_PATH {GCP_DATA_PATH}")
 
     bucket = get_bucket()
-    relative_path = file_path.relative_to(DATA_PATH)
-    blob = bucket.blob(blob_name=str(relative_path))
+    relative_path = file_path.relative_to(GCP_DATA_PATH)
+    blob = bucket.blob(blob_name=relative_path.as_posix())
 
     if blob.exists():
         blob.delete()

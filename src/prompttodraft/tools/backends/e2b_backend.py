@@ -17,7 +17,7 @@ from prompttodraft.tools.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 SANDBOX_TIMEOUT = 3600  # 1 hour for sandbox lifetime
@@ -38,7 +38,8 @@ class E2BBackend(ExecutionBackend):
 
     @property
     def _project_path(self) -> Path:
-        return DATA_PATH / self._project_id
+        # E2B files only exist in remote sandbox, this path is only for GCP staging
+        return GCP_DATA_PATH / self._project_id
 
     def start(self) -> None:
         # Create project directory if it doesn't exist

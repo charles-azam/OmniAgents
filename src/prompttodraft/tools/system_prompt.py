@@ -210,12 +210,32 @@ Recent commits:
     return git_status_text
 
 
-def get_system_prompt(cwd: str | None = None) -> str:
+def load_memory(cwd: str) -> str:
+    """
+    Load memory from .gemini/GEMINI.md if it exists.
+
+    Args:
+        cwd: Current working directory
+
+    Returns:
+        Memory content or empty string if file doesn't exist
+    """
+    memory_file = os.path.join(cwd, ".gemini", "GEMINI.md")
+    if os.path.exists(memory_file):
+        with open(memory_file, "r") as f:
+            content = f.read().strip()
+            if content:
+                return content
+    return ""
+
+
+def get_system_prompt(cwd: str | None = None, model_id: str = "groq/gpt-oss-120b") -> str:
     """
     Generate the system prompt with dynamic values filled in.
 
     Args:
         cwd: Current working directory (defaults to os.getcwd())
+        model_id: Model identifier to include in the prompt
 
     Returns:
         Formatted system prompt string
@@ -243,7 +263,7 @@ def get_system_prompt(cwd: str | None = None) -> str:
     system_message = system_message.replace("{is_git_repo}", "Yes" if is_repo else "No")
     system_message = system_message.replace("{platform}", platform.system().lower())
     system_message = system_message.replace("{date}", today)
-    system_message = system_message.replace("{model}", "claude-3-7-sonnet-20250219")
+    system_message = system_message.replace("{model}", model_id)
 
     # Replace the directory structure placeholder
     system_message = system_message.replace("{directory_structure}", dir_structure)
@@ -252,5 +272,10 @@ def get_system_prompt(cwd: str | None = None) -> str:
     if is_repo:
         git_status = get_git_status(cwd)
         system_message = system_message + f'\n<context name="gitStatus">{git_status}</context>\n'
+
+    # Load and append memory from .gemini/GEMINI.md if it exists
+    memory_content = load_memory(cwd)
+    if memory_content:
+        system_message = system_message + f'\n\n<context name="memory">User Memory (from .gemini/GEMINI.md):\n\n{memory_content}</context>\n'
 
     return system_message

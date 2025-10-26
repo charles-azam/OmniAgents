@@ -16,7 +16,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
     from prompttodraft import storage_utils
-    from prompttodraft.common import DATA_PATH
+    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
     import shutil
 
     # === FRESH START CLEANUP ===
@@ -28,12 +28,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     for blob in bucket.list_blobs(prefix=prefix):
         blob.delete()
 
-    # 2. Clean local working directory
-    working_dir_path = DATA_PATH / backend.project_id
-    if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
-
-    # 3. Clean Docker container if exists (for DockerBackend)
+    # 2. Clean Docker container if exists (for DockerBackend)
     if isinstance(backend, DockerBackend):
         import docker
         try:
@@ -45,12 +40,22 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         except:
             pass  # Container doesn't exist or already cleaned
 
+    # 3. Clean local working directory (backend-specific paths)
+    if isinstance(backend, LocalBackend):
+        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
+    elif isinstance(backend, DockerBackend):
+        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
+    else:  # E2BBackend
+        working_dir_path = GCP_DATA_PATH / backend.project_id
+    if working_dir_path.exists():
+        shutil.rmtree(working_dir_path)
+
     try:
         # Pre-populate bucket with test files to verify load_from_bucket works
         # Use timestamp format: project_id/timestamp/file.py
         from datetime import datetime, timezone
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = DATA_PATH / backend.project_id / timestamp
+        project_data_path = GCP_DATA_PATH / backend.project_id / timestamp
 
         storage_utils.write_to_storage(
             file_path=project_data_path / "preloaded.py",
@@ -215,6 +220,39 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
+        # Test execute_uv
+        # First, initialize project with uv
+        uv_init_result = backend.execute_uv(uv_command="init", timeout=120000)
+        assert uv_init_result.exit_code == 0
+
+        # Verify pyproject.toml was created
+        pyproject_path = f"{working_dir}/pyproject.toml"
+        assert backend.file_exists(path=pyproject_path) == FileType.FILE
+
+        # Read initial pyproject.toml content
+        initial_pyproject = backend.read_file(file_path=pyproject_path)
+        assert "[project]" in initial_pyproject or "name" in initial_pyproject
+
+        # Test uv add - add a package and verify pyproject.toml is modified
+        uv_add_result = backend.execute_uv(uv_command="add requests", timeout=120000)
+        assert uv_add_result.exit_code == 0
+
+        # Read modified pyproject.toml and verify requests was added
+        modified_pyproject = backend.read_file(file_path=pyproject_path)
+        assert modified_pyproject != initial_pyproject, "pyproject.toml should be modified after uv add"
+        assert "requests" in modified_pyproject, "requests should appear in dependencies"
+
+        # Test uv run python - create and run a Python script
+        uv_test_script = f"{working_dir}/uv_test.py"
+        backend.write_file(file_path=uv_test_script, content="print('UV run test successful')")
+
+        uv_run_result = backend.execute_uv(uv_command="run uv_test.py", timeout=60000)
+        assert uv_run_result.exit_code == 0
+        assert "UV run test successful" in uv_run_result.output
+
+        # Clean up uv test files
+        backend.delete_file(path=uv_test_script)
+
         # Test sync/load with shutdown/start cycle
         # Modify test.txt before shutdown
         backend.write_file(file_path=test_file, content="Modified content for sync test")
@@ -295,13 +333,20 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         except:
             pass  # May fail if directory doesn't exist
 
-        # Cleanup bucket files
+        # Cleanup bucket files and GCP staging
         from prompttodraft import storage_utils
-        from prompttodraft.common import DATA_PATH
+        from prompttodraft.common import GCP_DATA_PATH
+        import shutil
+
         bucket = storage_utils.get_bucket()
         prefix = f"{backend.project_id}/"
         for blob in bucket.list_blobs(prefix=prefix):
             blob.delete()
+
+        # Clean GCP staging directory
+        gcp_staging_path = GCP_DATA_PATH / backend.project_id
+        if gcp_staging_path.exists():
+            shutil.rmtree(gcp_staging_path)
 
 
 def test_local_backend_e2e():

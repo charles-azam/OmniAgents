@@ -40,6 +40,12 @@ markers = [
     "e2b: marks tests that require E2B backend (deselect with '-m \"not e2b\"')",
 ]
 
+[tool.uv.workspace]
+members = [
+    "data/test_init_local",
+    "data/test_init_local/test_subproject",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
