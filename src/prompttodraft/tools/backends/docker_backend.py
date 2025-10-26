@@ -102,45 +102,6 @@ class DockerBackend(ExecutionBackend):
     def get_status(self) -> BackendStatus:
         return self._status
 
-    def sync_to_bucket(self) -> None:
-        """
-        Sync all relevant files from working directory to bucket with timestamp.
-
-        Overridden for Docker backend to use host paths instead of container paths.
-        """
-        from datetime import datetime, timezone
-        from prompttodraft import storage_utils
-        from prompttodraft.common import DATA_PATH
-
-        # Use host project path for listing files (not container path)
-        working_dir = self._get_host_working_directory()
-
-        # Create timestamp snapshot
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = DATA_PATH / self.project_id / timestamp
-
-        # List all files recursively using host path
-        files = self.list_directory(path=working_dir, recursive=True)
-
-        for file_info in files:
-            if file_info.type != FileType.FILE:
-                continue
-
-            # Get relative path from working directory
-            file_path = Path(file_info.path)
-            relative_path = file_path.relative_to(working_dir)
-
-            # Check if file should be synced
-            if not self._should_sync_file(str(relative_path)):
-                continue
-
-            # Read file content
-            content = self.read_file(file_path=file_path)
-
-            # Write to bucket with timestamp
-            bucket_path = project_data_path / relative_path
-            storage_utils.write_to_storage(file_path=bucket_path, content=content)
-
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
         if self._container is None:
             raise RuntimeError("Container not initialized - call start() first")
@@ -186,6 +147,20 @@ class DockerBackend(ExecutionBackend):
             # Relative path - make it relative to host project path
             return self._project_path / path_obj
 
+    def _convert_to_container_path(self, host_path: Path) -> str:
+        """
+        Convert host path to container path.
+
+        This is the reverse operation of convert_to_path().
+        Host paths (e.g., /Users/.../data/project_id/file.py) are mapped back to
+        container paths (e.g., /workspace/file.py).
+        """
+        if host_path.is_relative_to(self._project_path):
+            relative_path = host_path.relative_to(self._project_path)
+            return str(Path(CONTAINER_WORKSPACE) / relative_path)
+        # If not under project path, return as-is
+        return str(host_path)
+
     def read_file(self, file_path: str | Path) -> str:
         return self.convert_to_path(file_path).read_text()
 
@@ -224,10 +199,13 @@ class DockerBackend(ExecutionBackend):
                 else FileType.DIRECTORY if item.is_dir()
                 else FileType.OTHER
             )
-            files.append(FileInfo(name=item.name, path=str(item), type=file_type))
+            # Convert host path back to container path for consistency with get_working_directory()
+            container_path = self._convert_to_container_path(host_path=item)
+            files.append(FileInfo(name=item.name, path=container_path, type=file_type))
 
             if recursive and file_type == FileType.DIRECTORY:
-                files.extend(self.list_directory(path=item, recursive=True))
+                # Use container path for recursive call to maintain consistency
+                files.extend(self.list_directory(path=container_path, recursive=True))
 
         return files
 
@@ -245,4 +223,5 @@ class DockerBackend(ExecutionBackend):
 
     def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
         search_path = self.convert_to_path(path) if path else self._project_path
-        return [str(p) for p in sorted(search_path.glob(pattern)) if p.is_file()]
+        # Convert host paths back to container paths for consistency
+        return [self._convert_to_container_path(host_path=p) for p in sorted(search_path.glob(pattern)) if p.is_file()]
