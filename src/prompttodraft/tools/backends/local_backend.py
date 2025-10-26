@@ -14,7 +14,7 @@ from prompttodraft.tools.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import LOCAL_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 
@@ -32,7 +32,8 @@ class LocalBackend(ExecutionBackend):
 
     @property
     def _project_path(self) -> Path:
-        return DATA_PATH / self._project_id
+        # Use temp directory to avoid nested project issues with parent repo
+        return LOCAL_BACKEND_PATH / self._project_id
 
     def start(self) -> None:
         self._project_path.mkdir(parents=True, exist_ok=True)

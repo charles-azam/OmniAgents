@@ -10,7 +10,7 @@ from enum import Enum
 from pathlib import Path
 from datetime import datetime, timezone
 
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft import storage_utils
 
 
@@ -147,7 +147,7 @@ class ExecutionBackend(ABC):
 
         # Create timestamp snapshot
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = DATA_PATH / self.project_id / timestamp
+        project_data_path = GCP_DATA_PATH / self.project_id / timestamp
 
         # List all files recursively
         files = self.list_directory(path=working_dir, recursive=True)
@@ -167,7 +167,7 @@ class ExecutionBackend(ABC):
             # Read file content
             content = self.read_file(file_path=file_path)
 
-            # Write to bucket with timestamp (storage_utils expects path relative to DATA_PATH)
+            # Write to bucket with timestamp (storage_utils expects path relative to GCP_DATA_PATH)
             bucket_path = project_data_path / relative_path
             storage_utils.write_to_storage(file_path=bucket_path, content=content)
 
@@ -202,7 +202,7 @@ class ExecutionBackend(ABC):
 
         # Load files from latest snapshot
         snapshot_prefix = f"{self.project_id}/{latest_timestamp}/"
-        project_data_path = DATA_PATH / self.project_id / latest_timestamp
+        project_data_path = GCP_DATA_PATH / self.project_id / latest_timestamp
 
         for blob in bucket.list_blobs(prefix=snapshot_prefix):
             # Get relative path from snapshot directory
@@ -241,6 +241,45 @@ class ExecutionBackend(ABC):
             CommandResult with output (stdout+stderr merged) and exit_code
         """
         pass
+
+    def execute_uv(
+        self,
+        uv_command: str,
+        timeout: int | None = None
+    ) -> CommandResult:
+        """
+        Execute a uv command, ensuring uv is installed first.
+
+        Args:
+            uv_command: The uv command to execute (e.g., "run script.py", "add requests", "sync")
+            timeout: Optional timeout in milliseconds
+
+        Returns:
+            CommandResult with output (stdout+stderr merged) and exit_code
+        """
+        # Check if uv is installed
+        uv_check = self.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && command -v uv',
+            timeout=10000,
+        )
+
+        if uv_check.exit_code != 0:
+            # Install uv
+            install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+            install_result = self.execute_command(
+                command=install_command,
+                timeout=120000,
+            )
+
+            if install_result.exit_code != 0:
+                return CommandResult(
+                    output=f"Failed to install uv: {install_result.output}",
+                    exit_code=install_result.exit_code,
+                )
+
+        # Execute the uv command with PATH set
+        full_command = f'export PATH="$HOME/.local/bin:$PATH" && uv {uv_command}'
+        return self.execute_command(command=full_command, timeout=timeout)
 
     # === Working Directory ===
 

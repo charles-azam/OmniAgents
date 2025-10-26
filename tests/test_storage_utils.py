@@ -1,8 +1,8 @@
-from prompttodraft.common import DATA_PATH
+from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft.storage_utils import write_to_storage, read_from_storage
 from pathlib import Path
 
 def test_storage_utils():
-    file_path = DATA_PATH / "test.txt"
-    write_to_storage(file_path, "test")
-    assert read_from_storage(file_path) == "test"
+    file_path = GCP_DATA_PATH / "test.txt"
+    write_to_storage(file_path=file_path, content="test")
+    assert read_from_storage(file_path=file_path) == "test"
