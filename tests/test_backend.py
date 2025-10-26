@@ -31,7 +31,15 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     # 2. Clean local working directory
     working_dir_path = DATA_PATH / backend.project_id
     if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
+        # Handle permission errors by making files writable before removal
+        import stat
+        def handle_remove_readonly(func, path, exc):
+            """Error handler for readonly files during cleanup."""
+            import os
+            os.chmod(path=path, mode=stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+            func(path)
+
+        shutil.rmtree(path=working_dir_path, onexc=handle_remove_readonly)
 
     # 3. Clean Docker container if exists (for DockerBackend)
     if isinstance(backend, DockerBackend):

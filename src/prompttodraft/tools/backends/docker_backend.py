@@ -84,6 +84,10 @@ class DockerBackend(ExecutionBackend):
             volumes={str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
             working_dir=CONTAINER_WORKSPACE,
             user=f"{uid}:{gid}",
+            environment={
+                "HOME": CONTAINER_WORKSPACE,
+                "UV_CACHE_DIR": f"{CONTAINER_WORKSPACE}/.uv_cache",
+            },
             detach=True,
             remove=False,
         )

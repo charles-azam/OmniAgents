@@ -45,6 +45,7 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
     from prompttodraft import storage_utils
     from prompttodraft.common import DATA_PATH
     import shutil
+    import stat
 
     # Clean bucket storage
     bucket = storage_utils.get_bucket()
@@ -55,7 +56,14 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
     # Clean local data directory
     working_dir_path = DATA_PATH / backend.project_id
     if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
+        # Handle permission errors by making files writable before removal
+        def handle_remove_readonly(func, path, exc):
+            """Error handler for readonly files during cleanup."""
+            import os
+            os.chmod(path=path, mode=stat.S_IWRITE | stat.S_IREAD | stat.S_IEXEC)
+            func(path)
+
+        shutil.rmtree(path=working_dir_path, onexc=handle_remove_readonly)
 
     # Clean Docker container if applicable
     if isinstance(backend, DockerBackend):
