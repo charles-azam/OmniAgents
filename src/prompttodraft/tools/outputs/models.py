@@ -9,7 +9,7 @@ from abc import abstractmethod
 from enum import Enum
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from rich.console import Console
 
 
@@ -28,9 +28,10 @@ class ToolOutputModel(BaseModel):
         description="Optional metadata about the output (timestamps, tool name, etc.)"
     )
 
-    class Config:
-        frozen = False  # Allow modification if needed
-        extra = "allow"  # Allow additional fields
+    model_config = ConfigDict(
+        frozen=False,  # Allow modification if needed
+        extra="allow",  # Allow additional fields
+    )
 
     def handle(self) -> dict[str, Any] | str:
         """
@@ -196,8 +197,7 @@ class FileInfo(BaseModel):
         description="Formatted modification date"
     )
 
-    class Config:
-        extra = "allow"  # Allow additional fields like matches, first_match, etc.
+    model_config = ConfigDict(extra="allow")  # Allow additional fields like matches, first_match, etc.
 
 
 class FileListOutputModel(ToolOutputModel):

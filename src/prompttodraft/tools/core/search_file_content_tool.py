@@ -85,11 +85,10 @@ class SearchFileContentTool:
 
         if git_check.exit_code == 0:
             # Use git grep
-            grep_cmd_parts.append(f'cd "{search_path}" && git grep -n')
+            grep_cmd_parts.append(f'cd "{search_path}" && git grep -n "{pattern}"')
             if include:
-                # Add file pattern
-                grep_cmd_parts.append(f'--glob="{include}"')
-            grep_cmd_parts.append(f'"{pattern}"')
+                # Add file pattern as pathspec (git grep uses pathspec, not --glob)
+                grep_cmd_parts.append(f'-- "{include}"')
         else:
             # Use regular grep
             grep_cmd_parts.append(f'grep -rn "{pattern}" "{search_path}"')
