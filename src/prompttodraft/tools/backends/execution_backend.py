@@ -114,10 +114,14 @@ class ExecutionBackend(ABC):
         """
         path = Path(file_path)
 
-        # Ignore patterns
+        # Skip any file under a directory that starts with "."
+        for part in path.parts:
+            if part.startswith("."):
+                return False
+
+        # Ignore specific patterns
         ignore_patterns = [
-            ".venv", "__pycache__", ".git", ".pytest_cache",
-            ".e2b_sandbox_id", "node_modules", ".DS_Store"
+            "__pycache__", "node_modules"
         ]
 
         for part in path.parts:

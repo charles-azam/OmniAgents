@@ -83,6 +83,12 @@ class DockerBackend(ExecutionBackend):
             "working_dir": CONTAINER_WORKSPACE,
             "detach": True,
             "remove": False,
+            "environment": {
+                "HOME": CONTAINER_WORKSPACE,
+                "UV_CACHE_DIR": f"{CONTAINER_WORKSPACE}/.cache/uv",
+                "UV_TOOL_DIR": f"{CONTAINER_WORKSPACE}/.local/bin",
+                "UV_PYTHON_INSTALL_DIR": f"{CONTAINER_WORKSPACE}/.local/share/uv/python",
+            },
         }
 
         # Only set user on Linux to match host user (avoids root-owned files)
