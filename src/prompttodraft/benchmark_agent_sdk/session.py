@@ -1,10 +1,10 @@
 """Shopping session that encapsulates cart state and operations."""
 
-from prompttodraft.benchmark.types import CheckoutSummary
-from prompttodraft.benchmark.types import ShoppingCart
-from prompttodraft.benchmark.catalog import get_categories
-from prompttodraft.benchmark.catalog import get_item_by_name
-from prompttodraft.benchmark.catalog import get_items_by_category
+from prompttodraft.benchmark_agent_sdk.types import CheckoutSummary
+from prompttodraft.benchmark_agent_sdk.types import ShoppingCart
+from prompttodraft.benchmark_agent_sdk.catalog import get_categories
+from prompttodraft.benchmark_agent_sdk.catalog import get_item_by_name
+from prompttodraft.benchmark_agent_sdk.catalog import get_items_by_category
 
 
 class ShoppingSession:

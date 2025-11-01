@@ -10,9 +10,9 @@ from smolagents import InferenceClientModel
 from smolagents import OpenAIModel
 from smolagents import tool
 
-from prompttodraft.benchmark.config import MODEL_CONFIGS_NO_XAI, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
-from prompttodraft.benchmark.metrics import MetricsTracker
-from prompttodraft.benchmark.session import ShoppingSession
+from prompttodraft.benchmark_agent_sdk.config import MODEL_CONFIGS_NO_XAI, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
+from prompttodraft.benchmark_agent_sdk.metrics import MetricsTracker
+from prompttodraft.benchmark_agent_sdk.session import ShoppingSession
 
 from phoenix.otel import register
 from openinference.instrumentation.smolagents import SmolagentsInstrumentor

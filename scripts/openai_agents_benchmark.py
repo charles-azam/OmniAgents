@@ -13,9 +13,9 @@ from agents import Runner
 from agents import function_tool
 from agents.extensions.models.litellm_model import LitellmModel
 
-from prompttodraft.benchmark.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
-from prompttodraft.benchmark.metrics import MetricsTracker
-from prompttodraft.benchmark.session import ShoppingSession
+from prompttodraft.benchmark_agent_sdk.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
+from prompttodraft.benchmark_agent_sdk.metrics import MetricsTracker
+from prompttodraft.benchmark_agent_sdk.session import ShoppingSession
 
 
 def create_agent_tools(session: ShoppingSession, metrics_tracker: MetricsTracker) -> list:

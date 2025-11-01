@@ -1,6 +1,6 @@
 """Item catalog for shopping cart benchmark."""
 
-from prompttodraft.benchmark.types import Item
+from prompttodraft.benchmark_agent_sdk.types import Item
 
 # Define the catalog with ~30 items across 5 categories
 # Prices range from $5 to $40 to allow for interesting optimization problems
