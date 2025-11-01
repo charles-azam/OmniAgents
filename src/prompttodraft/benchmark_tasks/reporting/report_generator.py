@@ -4,7 +4,7 @@ Report generation for benchmark results.
 This module provides functions to generate HTML and Markdown reports from benchmark results.
 """
 from datetime import datetime
-from prompttodraft.benchmarks.metrics import BenchmarkResult, AggregateResults
+from prompttodraft.benchmark_tasks.metrics import BenchmarkResult, AggregateResults
 
 
 def generate_markdown_report(aggregate: AggregateResults) -> str:
