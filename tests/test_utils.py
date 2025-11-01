@@ -9,6 +9,7 @@ from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus
+from prompttodraft.tools.backends.state_manager import StorageType
 from prompttodraft.utils import initialize_project
 
 
@@ -120,20 +121,20 @@ def run_initialize_project_test(backend: ExecutionBackend):
 
 def test_initialize_project_local_backend():
     """Test initialize_project with LocalBackend."""
-    backend = LocalBackend(project_id="test_init_local")
+    backend = LocalBackend(project_id="test_init_local", storage=StorageType.GCS)
     run_initialize_project_test(backend=backend)
 
 
 def test_initialize_project_docker_backend():
     """Test initialize_project with DockerBackend."""
-    backend = DockerBackend(project_id="test_init_docker")
+    backend = DockerBackend(project_id="test_init_docker", storage=StorageType.GCS)
     run_initialize_project_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_initialize_project_e2b_backend():
     """Test initialize_project with E2BBackend."""
-    backend = E2BBackend(project_id="test_init_e2b")
+    backend = E2BBackend(project_id="test_init_e2b", storage=StorageType.GCS)
     run_initialize_project_test(backend=backend)
 
 

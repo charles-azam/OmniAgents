@@ -8,6 +8,7 @@ import os
 from prompttodraft.tools.agent import create_agent
 from prompttodraft.tools.factory import ToolFactory
 from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 
 
 def test_agent_creation():
@@ -46,7 +47,7 @@ def test_agent_with_custom_backend():
     print("\nTesting agent with custom backend...")
 
     # Create a LocalBackend
-    backend = LocalBackend(project_id="test_agent")
+    backend = LocalBackend(project_id="test_agent", storage=StorageType.NONE)
     backend.start()
 
     # Create agent with custom backend
@@ -93,7 +94,7 @@ def test_tool_factory():
     print("\nTesting ToolFactory...")
 
     # Create backend
-    backend = LocalBackend(project_id="test_factory")
+    backend = LocalBackend(project_id="test_factory", storage=StorageType.NONE)
     backend.start()
 
     # Create tools

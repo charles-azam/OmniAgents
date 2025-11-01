@@ -12,6 +12,7 @@ from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 
 from prompttodraft.tools.core.write_file_tool import WriteFileTool
 from prompttodraft.tools.core.read_file_tool import ReadFileTool
@@ -78,6 +79,7 @@ class ToolFactory:
     def create_backend(
         environment: Literal["local", "docker", "e2b"] = "local",
         project_id: str | None = None,
+        storage: StorageType = StorageType.GIT,
     ) -> ExecutionBackend:
         """
         Create an ExecutionBackend instance for the given environment.
@@ -85,6 +87,10 @@ class ToolFactory:
         Args:
             environment: The execution environment ("local", "docker", or "e2b")
             project_id: Optional project ID (required for docker and e2b backends)
+            storage: Storage backend for state persistence:
+                - StorageType.GIT: Use GitHub branches (default)
+                - StorageType.GCS: Use Google Cloud Storage buckets
+                - StorageType.NONE: No state persistence
 
         Returns:
             ExecutionBackend instance
@@ -94,14 +100,14 @@ class ToolFactory:
         """
         match environment:
             case "local":
-                return LocalBackend(project_id=project_id or "local")
+                return LocalBackend(project_id=project_id or "local", storage=storage)
             case "docker":
                 if project_id is None:
                     raise ValueError("project_id is required for docker backend")
-                return DockerBackend(project_id=project_id)
+                return DockerBackend(project_id=project_id, storage=storage)
             case "e2b":
                 if project_id is None:
                     raise ValueError("project_id is required for e2b backend")
-                return E2BBackend(project_id=project_id)
+                return E2BBackend(project_id=project_id, storage=storage)
             case _:
                 raise ValueError(f"Unknown environment: {environment}")

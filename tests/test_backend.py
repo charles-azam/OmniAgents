@@ -2,6 +2,7 @@ from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from prompttodraft.tools.backends.state_manager import StorageType
 from pathlib import Path
 import pytest
 
@@ -355,20 +356,20 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
 def test_local_backend_e2e():
     """Test LocalBackend implementation using generic backend test."""
-    backend = LocalBackend(project_id="test_backend_e2e")
+    backend = LocalBackend(project_id="test_backend_e2e", storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 def test_docker_backend_e2e():
     """Test DockerBackend implementation using generic backend test."""
-    backend = DockerBackend(project_id="test_docker_backend_e2e")
+    backend = DockerBackend(project_id="test_docker_backend_e2e", storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_e2b_backend_e2e():
     """Test E2BBackend implementation using generic backend test."""
-    backend = E2BBackend(project_id="test_e2b_backend_e2e")
+    backend = E2BBackend(project_id="test_e2b_backend_e2e", storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
@@ -380,7 +381,7 @@ def test_docker_backend_container_reuse():
 
     try:
         # Create first backend and start
-        backend1 = DockerBackend(project_id=project_id)
+        backend1 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
         backend1.start()
         assert backend1.get_status() == BackendStatus.RUNNING
 
@@ -401,7 +402,7 @@ def test_docker_backend_container_reuse():
         assert backend1.get_status() == BackendStatus.STOPPED
 
         # Create second backend instance with same project_id
-        backend2 = DockerBackend(project_id=project_id)
+        backend2 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
         assert backend2.get_status() == BackendStatus.UNINITIALIZED
 
         # Start should connect to existing container

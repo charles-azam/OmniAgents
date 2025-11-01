@@ -17,6 +17,7 @@ from prompttodraft.tools.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
+from prompttodraft.tools.backends.state_manager import StorageType
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -27,11 +28,12 @@ CONTAINER_WORKSPACE = "/workspace"
 class DockerBackend(ExecutionBackend):
     """Docker execution backend."""
 
-    def __init__(self, project_id: str):
+    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT):
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._container: Container | None = None
         self._client = docker.from_env()
+        self._state_manager = self._create_state_manager(storage=storage)
 
     @property
     def project_id(self) -> str:
@@ -62,8 +64,8 @@ class DockerBackend(ExecutionBackend):
             if self._container.status != "running":
                 self._container.start()
             self._status = BackendStatus.RUNNING
-            # Load latest state from bucket
-            self.load_from_bucket()
+            # Load latest state from state manager
+            self._state_manager.load_latest(backend=self)
             return
 
         # No container exists, create new one
@@ -99,16 +101,16 @@ class DockerBackend(ExecutionBackend):
         self._container = self._client.containers.run(**container_kwargs)
 
         self._status = BackendStatus.RUNNING
-        # Load existing files from bucket if any
-        self.load_from_bucket()
+        # Load existing files from state manager if any
+        self._state_manager.load_latest(backend=self)
 
     def shutdown(self) -> None:
-        # Sync current state to bucket before shutdown
+        # Sync current state via state manager before shutdown
         if self._container is None:
             # Already shut down, nothing to do
             return
 
-        self.sync_to_bucket()
+        self._state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
         self._container.stop()
         self._container.remove()
         self._container = None

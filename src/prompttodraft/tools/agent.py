@@ -420,6 +420,7 @@ def create_agent(
     backend: "ExecutionBackend | None" = None,
     model: ApiModel | None = None,
     log_file: str | None = "tool_agent.log",
+    storage: "StorageType" = None,  # Will import StorageType in function body
 ) -> ToolAgent:
     """
     Create a tool agent with all available tools using the new 3-layer architecture.
@@ -429,6 +430,10 @@ def create_agent(
         backend: ExecutionBackend instance (defaults to LocalBackend if None)
         model: LLM model to use (defaults to Groq gpt-oss-120b if None)
         log_file: Path to log file or None to disable logging
+        storage: Storage backend for state persistence:
+            - StorageType.GIT: Use GitHub branches (default)
+            - StorageType.GCS: Use Google Cloud Storage buckets
+            - StorageType.NONE: No state persistence
 
     Returns:
         A ToolAgent instance
@@ -437,6 +442,7 @@ def create_agent(
 
     from prompttodraft.tools.backends.execution_backend import ExecutionBackend
     from prompttodraft.tools.backends.local_backend import LocalBackend
+    from prompttodraft.tools.backends.state_manager import StorageType
     from prompttodraft.tools.factory import ToolFactory
     from prompttodraft.tools.system_prompt import get_system_prompt
     from prompttodraft.utils import initialize_project
@@ -450,7 +456,10 @@ def create_agent(
 
     # Create backend if not provided
     if backend is None:
-        backend = LocalBackend(project_id="local")
+        # Default to GIT storage if not specified
+        if storage is None:
+            storage = StorageType.GIT
+        backend = LocalBackend(project_id="local", storage=storage)
         # Start the backend
         backend.start()
 
