@@ -26,7 +26,11 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     bucket = storage_utils.get_bucket()
     prefix = f"{backend.project_id}/"
     for blob in bucket.list_blobs(prefix=prefix):
-        blob.delete()
+        try:
+            blob.delete()
+        except Exception:
+            # Ignore errors if blob already deleted (eventual consistency)
+            pass
 
     # 2. Clean Docker container if exists (for DockerBackend)
     if isinstance(backend, DockerBackend):
