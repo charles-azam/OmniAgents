@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""OpenAI Agents SDK benchmark for shopping cart optimizer."""
+"""OpenAI Agents SDK benchmark runner for shopping cart optimizer."""
 
 from __future__ import annotations
 
@@ -140,7 +139,7 @@ def get_api_key_for_provider(provider: str) -> str | None:
     return os.getenv(key_name)
 
 
-async def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
+async def run_single_benchmark(provider: str, model_id: str, display_name: str, output_dir: Path) -> dict:
     """
     Run a single benchmark with OpenAI Agents SDK.
 
@@ -148,6 +147,10 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
         provider: Provider name.
         model_id: Model identifier.
         display_name: Display name for results.
+        output_dir: Directory to save results.
+
+    Returns:
+        Dictionary containing benchmark results.
     """
     print("\n" + "=" * 60)
     print(f"Testing: {display_name}")
@@ -213,7 +216,6 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
     print("=" * 60)
 
     # Save results to JSON
-    output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
     # Create safe filename from model display name
@@ -224,9 +226,16 @@ async def run_single_benchmark(provider: str, model_id: str, display_name: str) 
 
     print(f"\nResults saved to: {output_file}")
 
+    return benchmark_result.model_dump()
 
-async def run_benchmark() -> None:
-    """Run the OpenAI Agents SDK shopping cart benchmark with multiple models."""
+
+async def main() -> list[dict]:
+    """
+    Run the OpenAI Agents SDK shopping cart benchmark with multiple models.
+
+    Returns:
+        List of benchmark results dictionaries.
+    """
     missing_keys = []
     for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
@@ -240,8 +249,12 @@ async def run_benchmark() -> None:
             print(f"  - {key}")
         print("\nSkipping models with missing keys...\n")
 
+    # Determine output directory
+    output_dir = Path.cwd() / "benchmark_results"
+
     # Run benchmarks for each model
     completed_count = 0
+    results = []
     for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
@@ -250,17 +263,17 @@ async def run_benchmark() -> None:
             print(f"\nSkipping {model_config['display_name']} (missing {key})")
             continue
 
-        await run_single_benchmark(
+        result = await run_single_benchmark(
             provider=provider,
             model_id=model_config["model_id"],
-            display_name=model_config["display_name"]
+            display_name=model_config["display_name"],
+            output_dir=output_dir
         )
+        results.append(result)
         completed_count += 1
 
     print("\n" + "=" * 60)
-    print(f"Completed {completed_count} benchmark(s)!")
+    print(f"Completed {completed_count} OpenAI Agents SDK benchmark(s)!")
     print("=" * 60)
 
-
-if __name__ == "__main__":
-    asyncio.run(run_benchmark())
+    return results

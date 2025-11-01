@@ -1,16 +1,13 @@
-#!/usr/bin/env python3
-"""LangChain benchmark for shopping cart optimizer."""
+"""LangChain benchmark runner for shopping cart optimizer."""
 
 import json
 import os
 from pathlib import Path
 
-from langchain.agents import AgentExecutor
-from langchain.agents import create_tool_calling_agent, create_openai_functions_agent
 from langchain_core.callbacks import BaseCallbackHandler
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from langgraph.prebuilt import create_react_agent
 
 from prompttodraft.benchmark_agent_sdk.metrics import MetricsTracker
 from prompttodraft.benchmark_agent_sdk.session import ShoppingSession
@@ -176,7 +173,7 @@ def create_model(provider: str, model_id: str):
         raise ValueError(f"Unsupported provider: {provider}")
 
 
-def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
+def run_single_benchmark(provider: str, model_id: str, display_name: str, output_dir: Path) -> dict:
     """
     Run a single benchmark with a specific model.
 
@@ -184,6 +181,10 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
         provider: Provider name.
         model_id: Model identifier.
         display_name: Display name for results.
+        output_dir: Directory to save results.
+
+    Returns:
+        Dictionary containing benchmark results.
     """
     print("\n" + "=" * 60)
     print(f"Testing: {display_name}")
@@ -199,27 +200,18 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
     # Create tools for this session
     tools = create_langchain_tools(session=session)
 
-    # Create the prompt
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            ("system", SYSTEM_PROMPT),
-            ("human", "{input}"),
-            ("placeholder", "{agent_scratchpad}"),
-        ]
-    )
-
     # Create callback handler for tracking tool calls
     callback_handler = ToolCallbackHandler(metrics_tracker=metrics_tracker)
 
-    # Create agent
-    agent = create_tool_calling_agent(llm=model, tools=tools, prompt=prompt)
-    agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True)
+    # Create agent using LangGraph
+    agent_executor = create_react_agent(model=model, tools=tools, state_modifier=SYSTEM_PROMPT)
 
     # Start metrics tracking
     metrics_tracker.start_timer()
 
+    # Run agent
     agent_executor.invoke(
-        input={"input": TASK_DESCRIPTION},
+        input={"messages": [("user", TASK_DESCRIPTION)]},
         config={"callbacks": [callback_handler]}
     )
 
@@ -246,7 +238,6 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
     print("=" * 60)
 
     # Save results to JSON
-    output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
     # Create safe filename from model display name
@@ -257,9 +248,16 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
 
     print(f"\nResults saved to: {output_file}")
 
+    return benchmark_result.model_dump()
 
-def run_benchmark() -> None:
-    """Run the LangChain shopping cart benchmark with multiple models."""
+
+def main() -> list[dict]:
+    """
+    Run the LangChain shopping cart benchmark with multiple models.
+
+    Returns:
+        List of benchmark results dictionaries.
+    """
     missing_keys = []
     for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
@@ -273,8 +271,12 @@ def run_benchmark() -> None:
             print(f"  - {key}")
         print("\nSkipping models with missing keys...\n")
 
+    # Determine output directory
+    output_dir = Path.cwd() / "benchmark_results"
+
     # Run benchmarks for each model
     completed_count = 0
+    results = []
     for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
@@ -283,17 +285,17 @@ def run_benchmark() -> None:
             print(f"\nSkipping {model_config['display_name']} (missing {key})")
             continue
 
-        run_single_benchmark(
+        result = run_single_benchmark(
             provider=provider,
             model_id=model_config["model_id"],
-            display_name=model_config["display_name"]
+            display_name=model_config["display_name"],
+            output_dir=output_dir
         )
+        results.append(result)
         completed_count += 1
 
     print("\n" + "=" * 60)
-    print(f"Completed {completed_count} benchmark(s)!")
+    print(f"Completed {completed_count} LangChain benchmark(s)!")
     print("=" * 60)
 
-
-if __name__ == "__main__":
-    run_benchmark()
+    return results
