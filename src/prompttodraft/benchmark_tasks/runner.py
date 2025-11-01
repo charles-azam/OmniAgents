@@ -10,10 +10,10 @@ import shutil
 from pathlib import Path
 from typing import Literal
 
-from smolagents import CodeAgent, HfApiModel
+from smolagents import CodeAgent, ApiModel
 
-from prompttodraft.benchmarks.base_task import BenchmarkTask
-from prompttodraft.benchmarks.metrics import BenchmarkResult
+from prompttodraft.benchmark_tasks.base_task import BenchmarkTask
+from prompttodraft.benchmark_tasks.metrics import BenchmarkResult
 from prompttodraft.tools.factory import ToolFactory
 
 
@@ -202,11 +202,12 @@ class BenchmarkRunner:
         Returns:
             Dict with metrics
         """
-        # Create tools
-        tools = ToolFactory.create_smolagents_tools(environment=environment)
+        # Create backend and tools
+        backend = ToolFactory.create_backend(environment=environment)
+        tools = ToolFactory.create_smolagents_tools(backend=backend)
 
         # Create model
-        model = HfApiModel(model_id=self.model_id)
+        model = ApiModel(model_id=self.model_id)
 
         # Create agent
         agent = CodeAgent(
