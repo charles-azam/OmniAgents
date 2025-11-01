@@ -1,5 +1,4 @@
-#!/usr/bin/env python3
-"""Pydantic AI benchmark for shopping cart optimizer."""
+"""Pydantic AI benchmark runner for shopping cart optimizer."""
 
 import json
 import os
@@ -225,7 +224,7 @@ def create_model(provider: str, model_id: str) -> OpenAIChatModel:
         raise ValueError(f"Unsupported provider: {provider}")
 
 
-def run_single_benchmark(provider: str, model_id: str, display_name: str) -> None:
+def run_single_benchmark(provider: str, model_id: str, display_name: str, output_dir: Path) -> dict:
     """
     Run a single benchmark with a specific model.
 
@@ -233,6 +232,10 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
         provider: Provider name.
         model_id: Model identifier.
         display_name: Display name for results.
+        output_dir: Directory to save results.
+
+    Returns:
+        Dictionary containing benchmark results.
     """
     print("\n" + "=" * 60)
     print(f"Testing: {display_name}")
@@ -274,7 +277,6 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
     print(benchmark_result.to_summary())
     print("=" * 60)
 
-    output_dir = Path(__file__).parent.parent / "benchmark_results"
     output_dir.mkdir(exist_ok=True)
 
     safe_filename = (
@@ -290,9 +292,16 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str) -> Non
 
     print(f"\nResults saved to: {output_file}")
 
+    return benchmark_result.model_dump()
 
-def run_benchmark() -> None:
-    """Run the Pydantic AI shopping cart benchmark with multiple models."""
+
+def main() -> list[dict]:
+    """
+    Run the Pydantic AI shopping cart benchmark with multiple models.
+
+    Returns:
+        List of benchmark results dictionaries.
+    """
     setup_logfire()
 
     missing_keys = []
@@ -308,7 +317,11 @@ def run_benchmark() -> None:
             print(f"  - {key}")
         print("\nSkipping models with missing keys...\n")
 
+    # Determine output directory
+    output_dir = Path.cwd() / "benchmark_results"
+
     completed_count = 0
+    results = []
     for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
@@ -323,17 +336,17 @@ def run_benchmark() -> None:
             )
             continue
 
-        run_single_benchmark(
+        result = run_single_benchmark(
             provider=provider,
             model_id=model_config["model_id"],
             display_name=model_config["display_name"],
+            output_dir=output_dir
         )
+        results.append(result)
         completed_count += 1
 
     print("\n" + "=" * 60)
-    print(f"Completed {completed_count} benchmark(s)!")
+    print(f"Completed {completed_count} Pydantic AI benchmark(s)!")
     print("=" * 60)
 
-
-if __name__ == "__main__":
-    run_benchmark()
+    return results
