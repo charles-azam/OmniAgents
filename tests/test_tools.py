@@ -50,7 +50,11 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
     bucket = storage_utils.get_bucket()
     prefix = f"{backend.project_id}/"
     for blob in bucket.list_blobs(prefix=prefix):
-        blob.delete()
+        try:
+            blob.delete()
+        except Exception:
+            # Ignore errors if blob already deleted (eventual consistency)
+            pass
 
     # Clean local data directory (backend-specific paths)
     if isinstance(backend, LocalBackend):

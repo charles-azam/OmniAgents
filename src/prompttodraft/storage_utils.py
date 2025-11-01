@@ -173,8 +173,12 @@ def delete_from_storage(file_path: Path) -> bool:
     blob = bucket.blob(blob_name=relative_path.as_posix())
 
     if blob.exists():
-        blob.delete()
-        return True
+        try:
+            blob.delete()
+            return True
+        except Exception:
+            # Ignore errors if blob already deleted (eventual consistency)
+            return False
     return False
 
 
