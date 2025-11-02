@@ -10,16 +10,21 @@ import os
 
 def get_project_id(base_name: str) -> str:
     """
-    Get project ID with CI prefix if running in CI.
+    Get project ID with CI prefix and branch name if running in CI.
 
     Args:
         base_name: Base project name
 
     Returns:
-        Project ID with 'ci-' prefix if CI=true, otherwise base_name
+        Project ID with 'ci-{branch_name}-' prefix if CI=true, otherwise base_name
     """
     is_ci = os.getenv("CI", "").lower() == "true"
-    return f"ci-{base_name}" if is_ci else base_name
+    if is_ci:
+        branch_name = os.getenv("CI_BRANCH_NAME", "unknown")
+        # Sanitize branch name for use in identifiers (remove special chars, limit length)
+        sanitized_branch = branch_name.replace("/", "-").replace("_", "-")[:20]
+        return f"ci-{sanitized_branch}-{base_name}"
+    return base_name
 
 
 def run_backend_e2e_test(backend: ExecutionBackend):
