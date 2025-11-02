@@ -43,6 +43,7 @@ The toolkit implements these tools from Gemini CLI:
 7. **`run_shell_command`** - Execute shell commands
 8. **`read_many_files`** - Read multiple files at once
 9. **`save_memory`** - Persistent memory across sessions
+10. **`uv`** - Execute uv package manager commands
 
 ## Key Design Principles
 
@@ -78,6 +79,7 @@ tools/
 │   ├── docker_backend.py       # Docker container
 │   └── e2b_backend.py          # E2B sandbox
 ├── core/              # Framework-agnostic tools
+│   ├── base_tool.py           # CoreTool abstract base class
 │   ├── metadata.py            # Tool metadata definition
 │   ├── list_directory_tool.py # list_directory
 │   ├── read_file_tool.py      # read_file
@@ -87,7 +89,8 @@ tools/
 │   ├── replace_tool.py        # replace
 │   ├── run_shell_command_tool.py    # run_shell_command
 │   ├── read_many_files_tool.py      # read_many_files
-│   └── save_memory_tool.py    # save_memory
+│   ├── save_memory_tool.py    # save_memory
+│   └── uv_tool.py             # uv
 ├── outputs/           # Output models
 │   ├── models.py              # Pydantic models
 │   └── README.md
@@ -99,17 +102,23 @@ tools/
 
 ### Mix and Match
 
-Combine **any execution environment** with **any framework**:
+Combine **any execution environment** with **any framework** and **any storage**:
 
 ```python
-# Local execution with smolagents
-tools = ToolFactory.create_smolagents_tools(environment="local")
+from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.docker_backend import DockerBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 
-# Docker execution with OpenAI
-tools = ToolFactory.create_openai_tools(environment="docker")
+# Local execution with smolagents + Git storage
+backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend.start()
+tools = create_smolagents_tools(backend=backend)
 
-# E2B execution with Pydantic-AI
-tools = ToolFactory.create_pydantic_tools(environment="e2b")
+# Docker execution with smolagents + GCS storage
+docker_backend = DockerBackend(project_id="my-project", storage=StorageType.GCS)
+docker_backend.start()
+tools = create_smolagents_tools(backend=docker_backend)
 ```
 
 ### Write Once, Use Anywhere
@@ -129,8 +138,8 @@ tools = ToolFactory.create_pydantic_tools(environment="e2b")
 2. Transform to framework-specific format
 
 **Add a new tool**:
-1. Create core tool with metadata
-2. Add framework adapters
+1. Create core tool inheriting from `CoreTool` with metadata
+2. Add to `create_smolagents_tools()` in adapter
 3. Works in all environments
 
 ## Quick Start
@@ -156,11 +165,15 @@ output = result.handle()
 ### Using with smolagents
 
 ```python
-from prompttodraft.tools.factory import ToolFactory
+from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 from smolagents import CodeAgent
 
-# Create tools for local environment
-tools = ToolFactory.create_smolagents_tools(environment="local")
+# Create backend and tools (with Git storage)
+backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend.start()
+tools = create_smolagents_tools(backend=backend)
 
 # Use with agent
 agent = CodeAgent(tools=tools, model=...)
@@ -184,9 +197,44 @@ output = result.handle()  # Automatically adapts based on DISPLAY_MODE
 
 ## State Management
 
-Backends handle persistent state with cloud storage:
-- `start()`: Load files from bucket, create environment
-- `shutdown()`: Sync files to bucket, destroy environment
+Backends handle persistent state with cloud storage using two storage options:
+
+### Storage Types
+
+**Git Storage** (default):
+- Uses GitHub branches for state persistence
+- Each project gets its own branch
+- Automatic commit and push on `sync_to_bucket()`
+- Fast and free for small/medium projects
+
+**GCS Storage**:
+- Uses Google Cloud Storage buckets
+- Timestamped snapshots for each save
+- Better for large files or non-git workflows
+- Requires GCS credentials
+
+### Usage
+
+```python
+from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.state_manager import StorageType
+
+# Using Git storage (default)
+backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend.start()  # Loads from git branch
+
+# Using GCS storage
+backend = LocalBackend(project_id="my-project", storage=StorageType.GCS)
+backend.start()  # Loads from GCS bucket
+
+# No persistence
+backend = LocalBackend(project_id="my-project", storage=StorageType.NONE)
+```
+
+### Lifecycle Methods
+
+- `start()`: Load files from storage, create environment
+- `shutdown()`: Sync files to storage, destroy environment
 - `sync_to_bucket()`: Save current state (timestamped snapshots)
 - `load_from_bucket()`: Restore latest state
 
@@ -209,7 +257,7 @@ result = tool.execute(command="echo test")
 
 - **Strategy Pattern**: Swappable backends (Local, Docker, E2B)
 - **Adapter Pattern**: Framework adapters (smolagents, OpenAI, etc.)
-- **Factory Pattern**: `ToolFactory` for convenient creation
+- **Abstract Base Class**: `CoreTool` ensures consistent tool interface
 - **Separation of Concerns**: Data (models) vs. Presentation (display)
 
 ## See Also

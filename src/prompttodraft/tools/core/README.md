@@ -4,7 +4,7 @@ Framework-agnostic coding tools **reverse-engineered from Gemini CLI**. Each too
 
 ## Gemini CLI Tools
 
-Nine tools based on Gemini CLI:
+Ten tools based on Gemini CLI:
 
 1. **`list_directory`** - List directory contents with filtering
 2. **`read_file`** - Read text, images, and PDFs
@@ -15,6 +15,7 @@ Nine tools based on Gemini CLI:
 7. **`run_shell_command`** - Execute shell commands
 8. **`read_many_files`** - Read multiple files at once
 9. **`save_memory`** - Persistent memory across sessions
+10. **`uv`** - Execute uv package manager commands
 
 See `gemini_cli_tool.md` for complete Gemini CLI specifications.
 
@@ -22,14 +23,15 @@ See `gemini_cli_tool.md` for complete Gemini CLI specifications.
 
 ## Tool Structure
 
-All tools follow this pattern:
+All tools inherit from `CoreTool` base class and follow this pattern:
 
 ```python
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import ToolOutputModel
 
-class ExampleTool:
+class ExampleTool(CoreTool):
     # Tool metadata for framework adapters
     metadata = ToolMetadata(
         name="example_tool",
@@ -45,7 +47,7 @@ class ExampleTool:
     )
 
     def __init__(self, backend: ExecutionBackend):
-        self.backend = backend
+        super().__init__(backend=backend)
 
     def execute(self, param1: str) -> ToolOutputModel:
         # 1. Validate inputs
@@ -54,6 +56,14 @@ class ExampleTool:
         # 4. Return output model
         pass
 ```
+
+### CoreTool Base Class
+
+All tools inherit from `CoreTool` (defined in `base_tool.py`), which:
+- Ensures consistent interface across all tools
+- Requires `metadata` class attribute
+- Requires `execute(**kwargs)` method implementation
+- Enables automatic adapter generation
 
 ## Output Models
 
@@ -89,7 +99,9 @@ These tools are reverse-engineered from Gemini CLI. See `gemini_cli_tool.md` for
 1. **Create tool file** in `core/`:
 
 ```python
-class NewTool:
+from prompttodraft.tools.core.base_tool import CoreTool
+
+class NewTool(CoreTool):
     metadata = ToolMetadata(
         name="new_tool",
         description="Tool description",
@@ -98,15 +110,21 @@ class NewTool:
     )
 
     def __init__(self, backend: ExecutionBackend):
-        self.backend = backend
+        super().__init__(backend=backend)
 
     def execute(self, **kwargs) -> ToolOutputModel:
         # Implementation
         pass
 ```
 
-2. **Create framework adapter** (e.g., in `adapters/smolagents_adapter.py`)
+2. **Add to adapter** in `adapters/smolagents_adapter.py`:
 
-3. **Add to factory** in `factory.py`
+```python
+# In create_smolagents_tools() function
+core_tools = [
+    # ... existing tools ...
+    NewTool(backend=backend),
+]
+```
 
-The tool will automatically work in all execution environments (local, Docker, E2B).
+The tool will automatically work in all execution environments (local, Docker, E2B) and with the smolagents framework.
