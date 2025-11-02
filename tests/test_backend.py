@@ -5,6 +5,22 @@ from prompttodraft.tools.backends.execution_backend import ExecutionBackend, Bac
 from prompttodraft.tools.backends.state_manager import StorageType
 from pathlib import Path
 import pytest
+import os
+
+
+def get_project_id(base_name: str) -> str:
+    """
+    Get project ID with CI prefix if running in CI.
+
+    Args:
+        base_name: Base project name
+
+    Returns:
+        Project ID with 'ci-' prefix if CI=true, otherwise base_name
+    """
+    is_ci = os.getenv("CI", "").lower() == "true"
+    return f"ci-{base_name}" if is_ci else base_name
+
 
 def run_backend_e2e_test(backend: ExecutionBackend):
     """
@@ -356,20 +372,23 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
 def test_local_backend_e2e():
     """Test LocalBackend implementation using generic backend test."""
-    backend = LocalBackend(project_id="test_backend_e2e", storage=StorageType.GCS)
+    project_id = get_project_id(base_name="test_backend_e2e")
+    backend = LocalBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 def test_docker_backend_e2e():
     """Test DockerBackend implementation using generic backend test."""
-    backend = DockerBackend(project_id="test_docker_backend_e2e", storage=StorageType.GCS)
+    project_id = get_project_id(base_name="test_docker_backend_e2e")
+    backend = DockerBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_e2b_backend_e2e():
     """Test E2BBackend implementation using generic backend test."""
-    backend = E2BBackend(project_id="test_e2b_backend_e2e", storage=StorageType.GCS)
+    project_id = get_project_id(base_name="test_e2b_backend_e2e")
+    backend = E2BBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
@@ -377,7 +396,7 @@ def test_docker_backend_container_reuse():
     """Test that DockerBackend properly reuses existing containers."""
     import docker
 
-    project_id = "test_docker_reuse"
+    project_id = get_project_id(base_name="test_docker_reuse")
 
     try:
         # Create first backend and start
@@ -612,28 +631,31 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
 
 def test_local_backend_git_storage():
     """Test LocalBackend with Git storage."""
-    backend = LocalBackend(project_id="test_backend_git_local", storage=StorageType.GIT)
+    project_id = get_project_id(base_name="test_backend_git_local")
+    backend = LocalBackend(project_id=project_id, storage=StorageType.GIT)
     run_backend_git_e2e_test(backend=backend)
 
 
 def test_docker_backend_git_storage():
     """Test DockerBackend with Git storage."""
-    backend = DockerBackend(project_id="test_backend_git_docker", storage=StorageType.GIT)
+    project_id = get_project_id(base_name="test_backend_git_docker")
+    backend = DockerBackend(project_id=project_id, storage=StorageType.GIT)
     run_backend_git_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_e2b_backend_git_storage():
     """Test E2BBackend with Git storage."""
-    backend = E2BBackend(project_id="test_backend_git_e2b", storage=StorageType.GIT)
+    project_id = get_project_id(base_name="test_backend_git_e2b")
+    backend = E2BBackend(project_id=project_id, storage=StorageType.GIT)
     run_backend_git_e2e_test(backend=backend)
 
 
 if __name__ == "__main__":
-    test_local_backend_e2e()
-    test_docker_backend_e2e()
-    test_docker_backend_container_reuse()
-    test_e2b_backend_e2e()
+    # test_local_backend_e2e()
+    # test_docker_backend_e2e()
+    # test_docker_backend_container_reuse()
+    # test_e2b_backend_e2e()
     test_local_backend_git_storage()
     test_docker_backend_git_storage()
     test_e2b_backend_git_storage()
