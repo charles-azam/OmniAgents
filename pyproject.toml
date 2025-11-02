@@ -27,6 +27,7 @@ dependencies = [
     "google-cloud-storage>=3.3.0",
     "loguru>=0.7.3",
     "docker>=7.1.0",
+    "pygithub>=2.5.0",
 ]
 
 [project.scripts]

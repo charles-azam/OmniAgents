@@ -9,7 +9,6 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from enum import Enum
-import subprocess
 import os
 
 from prompttodraft.common import GCP_DATA_PATH
@@ -371,20 +370,19 @@ class GitStateManager(StateManager):
             # No token, cannot delete branch
             return
 
+        from github import Github, GithubException
+
         branch_name = self._get_branch_name(project_id=project_id)
 
-        # Delete branch using GitHub API
-        import urllib.request
-        url = f"https://api.github.com/repos/{self.repo_path}/git/refs/heads/{branch_name}"
-        req = urllib.request.Request(url=url, method="DELETE")
-        req.add_header("Authorization", f"Bearer {self.github_token}")
-        req.add_header("Accept", "application/vnd.github+json")
-        req.add_header("X-GitHub-Api-Version", "2022-11-28")
+        gh = Github(auth=self.github_token)
+        repo = gh.get_repo(full_name_or_id=self.repo_path)
 
+        # Try to get and delete the branch
         try:
-            urllib.request.urlopen(req)
-        except Exception:
-            # Branch doesn't exist or other error, ignore
+            ref = repo.get_git_ref(ref=f"heads/{branch_name}")
+            ref.delete()
+        except GithubException:
+            # Branch doesn't exist, nothing to delete
             pass
 
     def list_snapshots(self, project_id: str) -> list[dict]:
@@ -393,37 +391,30 @@ class GitStateManager(StateManager):
             # No token, cannot list commits
             return []
 
+        from github import Github, GithubException
+
         branch_name = self._get_branch_name(project_id=project_id)
 
-        # Get commit history using GitHub API
-        import urllib.request
-        import json
+        gh = Github(auth=self.github_token)
+        repo = gh.get_repo(full_name_or_id=self.repo_path)
 
-        url = f"https://api.github.com/repos/{self.repo_path}/commits?sha={branch_name}"
-        req = urllib.request.Request(url=url)
-        req.add_header("Authorization", f"Bearer {self.github_token}")
-        req.add_header("Accept", "application/vnd.github+json")
-        req.add_header("X-GitHub-Api-Version", "2022-11-28")
-
+        # Try to get the branch and its commits
         try:
-            with urllib.request.urlopen(req) as response:
-                commits = json.loads(response.read().decode())
+            branch = repo.get_branch(branch=branch_name)
+            commits = repo.get_commits(sha=branch.commit.sha)
 
             snapshots = []
             for commit in commits:
-                # Parse ISO 8601 date
-                date_str = commit["commit"]["author"]["date"]
-                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
                 snapshots.append({
-                    "id": commit["sha"],
-                    "author": commit["commit"]["author"]["name"],
-                    "timestamp": int(dt.timestamp()),
-                    "message": commit["commit"]["message"]
+                    "id": commit.sha,
+                    "author": commit.commit.author.name,
+                    "timestamp": int(commit.commit.author.date.timestamp()),
+                    "message": commit.commit.message
                 })
 
             return snapshots
-        except Exception:
-            # Branch doesn't exist or other error
+        except GithubException:
+            # Branch doesn't exist
             return []
 
 
