@@ -6,6 +6,7 @@ This tool lists the names of files and subdirectories within a specified directo
 from pathlib import Path
 from fnmatch import fnmatch
 
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.tools.outputs.models import (
@@ -16,7 +17,7 @@ from prompttodraft.tools.outputs.models import (
 )
 
 
-class ListDirectoryTool:
+class ListDirectoryTool(CoreTool):
     """
     Framework-agnostic directory listing tool.
 
@@ -47,15 +48,6 @@ class ListDirectoryTool:
         },
         output_type="string",
     )
-
-    def __init__(self, backend: ExecutionBackend):
-        """
-        Initialize ListDirectoryTool with an execution backend.
-
-        Args:
-            backend: The execution backend to use (local, docker, e2b)
-        """
-        self.backend = backend
 
     def _is_git_repository(self) -> bool:
         """

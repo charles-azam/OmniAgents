@@ -5,6 +5,7 @@ This tool finds files matching specific glob patterns.
 """
 from pathlib import Path
 
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import (
@@ -14,7 +15,7 @@ from prompttodraft.tools.outputs.models import (
 )
 
 
-class GlobTool:
+class GlobTool(CoreTool):
     """
     Framework-agnostic glob file finding tool.
 
@@ -49,15 +50,6 @@ class GlobTool:
         },
         output_type="string",
     )
-
-    def __init__(self, backend: ExecutionBackend):
-        """
-        Initialize GlobTool with an execution backend.
-
-        Args:
-            backend: The execution backend to use (local, docker, e2b)
-        """
-        self.backend = backend
 
     def _is_git_repository(self, search_path: str) -> bool:
         """

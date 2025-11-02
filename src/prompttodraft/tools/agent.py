@@ -440,10 +440,10 @@ def create_agent(
     """
     from dotenv import load_dotenv
 
+    from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
     from prompttodraft.tools.backends.execution_backend import ExecutionBackend
     from prompttodraft.tools.backends.local_backend import LocalBackend
     from prompttodraft.tools.backends.state_manager import StorageType
-    from prompttodraft.tools.factory import ToolFactory
     from prompttodraft.tools.system_prompt import get_system_prompt
     from prompttodraft.utils import initialize_project
 
@@ -474,8 +474,8 @@ def create_agent(
     model_id = getattr(model, "model_id", "groq/gpt-oss-120b")
     system_prompt = get_system_prompt(backend=backend, model_id=model_id)
 
-    # Create tool instances using the ToolFactory
-    tool_instances = ToolFactory.create_smolagents_tools(backend=backend)
+    # Create all tool instances using the refactored adapter
+    tool_instances = create_smolagents_tools(backend=backend)
 
     # Initialize the agent with all tools and system prompt
     agent = ToolAgent(tools=tool_instances, model=model, log_file=log_file, system_prompt=system_prompt)

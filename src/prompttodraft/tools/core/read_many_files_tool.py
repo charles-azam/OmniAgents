@@ -5,6 +5,7 @@ This tool reads content from multiple files specified by paths or glob patterns.
 """
 from pathlib import Path
 
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.tools.outputs.models import (
@@ -14,7 +15,7 @@ from prompttodraft.tools.outputs.models import (
 )
 
 
-class ReadManyFilesTool:
+class ReadManyFilesTool(CoreTool):
     """
     Framework-agnostic multi-file reading tool.
 
@@ -80,15 +81,6 @@ class ReadManyFilesTool:
         },
         output_type="string",
     )
-
-    def __init__(self, backend: ExecutionBackend):
-        """
-        Initialize ReadManyFilesTool with an execution backend.
-
-        Args:
-            backend: The execution backend to use (local, docker, e2b)
-        """
-        self.backend = backend
 
     def _is_media_file(self, file_path: str) -> bool:
         """

@@ -5,6 +5,7 @@ This tool searches for a regular expression pattern within file contents.
 """
 from pathlib import Path
 
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.outputs.models import (
@@ -14,7 +15,7 @@ from prompttodraft.tools.outputs.models import (
 )
 
 
-class SearchFileContentTool:
+class SearchFileContentTool(CoreTool):
     """
     Framework-agnostic file content search tool (grep functionality).
 
@@ -44,15 +45,6 @@ class SearchFileContentTool:
         },
         output_type="string",
     )
-
-    def __init__(self, backend: ExecutionBackend):
-        """
-        Initialize SearchFileContentTool with an execution backend.
-
-        Args:
-            backend: The execution backend to use (local, docker, e2b)
-        """
-        self.backend = backend
 
     def execute(
         self,

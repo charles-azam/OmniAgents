@@ -30,32 +30,3 @@ class ToolMetadata:
             "inputs": self.inputs,
             "output_type": self.output_type
         }
-
-    def to_openai_format(self) -> dict:
-        """
-        Convert metadata to OpenAI function calling format.
-
-        Returns:
-            Dictionary in OpenAI function schema format
-        """
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        name: {
-                            "type": info["type"],
-                            "description": info["description"]
-                        }
-                        for name, info in self.inputs.items()
-                    },
-                    "required": [
-                        name for name, info in self.inputs.items()
-                        if not info.get("nullable", False)
-                    ]
-                }
-            }
-        }

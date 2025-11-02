@@ -7,6 +7,7 @@ Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files.
 import base64
 from pathlib import Path
 
+from prompttodraft.tools.core.base_tool import CoreTool
 from prompttodraft.tools.core.metadata import ToolMetadata
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.tools.outputs.models import (
@@ -17,7 +18,7 @@ from prompttodraft.tools.outputs.models import (
 )
 
 
-class ReadFileTool:
+class ReadFileTool(CoreTool):
     """
     Framework-agnostic file reading tool.
 
@@ -52,15 +53,6 @@ class ReadFileTool:
         },
         output_type="string",
     )
-
-    def __init__(self, backend: ExecutionBackend):
-        """
-        Initialize ReadFileTool with an execution backend.
-
-        Args:
-            backend: The execution backend to use (local, docker, e2b)
-        """
-        self.backend = backend
 
     def _get_mime_type(self, file_path: str) -> str:
         """
