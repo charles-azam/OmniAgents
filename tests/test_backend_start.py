@@ -11,11 +11,11 @@ from pathlib import Path
 import pytest
 
 from prompttodraft.common import DOCKER_BACKEND_PATH, GCP_DATA_PATH, LOCAL_BACKEND_PATH
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.state_manager import GitStateManager, StorageType
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.state_manager import GitStateManager
 
 
 def get_project_id(base_name: str) -> str:
@@ -176,14 +176,14 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
 def test_local_backend_git_first_start():
     """Test LocalBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_local")
-    backend = LocalBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = LocalBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_first_start_test(backend=backend)
 
 
 def test_docker_backend_git_first_start():
     """Test DockerBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_docker")
-    backend = DockerBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = DockerBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_first_start_test(backend=backend)
 
 
@@ -191,7 +191,7 @@ def test_docker_backend_git_first_start():
 def test_e2b_backend_git_first_start():
     """Test E2BBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_e2b")
-    backend = E2BBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = E2BBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_first_start_test(backend=backend)
 
 if __name__ == "__main__":

@@ -1,8 +1,8 @@
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from prompttodraft.agent.backends.state_manager import GCSStateManager, GitStateManager
 from pathlib import Path
 import pytest
 import os
@@ -373,14 +373,14 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 def test_local_backend_e2e():
     """Test LocalBackend implementation using generic backend test."""
     project_id = get_project_id(base_name="test_backend_e2e")
-    backend = LocalBackend(project_id=project_id, storage=StorageType.GCS)
+    backend = LocalBackend(project_id=project_id, state_manager=GCSStateManager())
     run_backend_e2e_test(backend=backend)
 
 
 def test_docker_backend_e2e():
     """Test DockerBackend implementation using generic backend test."""
     project_id = get_project_id(base_name="test_docker_backend_e2e")
-    backend = DockerBackend(project_id=project_id, storage=StorageType.GCS)
+    backend = DockerBackend(project_id=project_id, state_manager=GCSStateManager())
     run_backend_e2e_test(backend=backend)
 
 
@@ -388,7 +388,7 @@ def test_docker_backend_e2e():
 def test_e2b_backend_e2e():
     """Test E2BBackend implementation using generic backend test."""
     project_id = get_project_id(base_name="test_e2b_backend_e2e")
-    backend = E2BBackend(project_id=project_id, storage=StorageType.GCS)
+    backend = E2BBackend(project_id=project_id, state_manager=GCSStateManager())
     run_backend_e2e_test(backend=backend)
 
 
@@ -400,7 +400,7 @@ def test_docker_backend_container_reuse():
 
     try:
         # Create first backend and start
-        backend1 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
+        backend1 = DockerBackend(project_id=project_id, state_manager=GCSStateManager())
         backend1.start()
         assert backend1.get_status() == BackendStatus.RUNNING
 
@@ -421,7 +421,7 @@ def test_docker_backend_container_reuse():
         assert backend1.get_status() == BackendStatus.STOPPED
 
         # Create second backend instance with same project_id
-        backend2 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
+        backend2 = DockerBackend(project_id=project_id, state_manager=GCSStateManager())
         assert backend2.get_status() == BackendStatus.UNINITIALIZED
 
         # Start should connect to existing container
@@ -470,7 +470,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
 
     # === FRESH START CLEANUP ===
     # Clean Git branch if exists
-    from prompttodraft.tools.backends.state_manager import GitStateManager
+    from prompttodraft.agent.backends.state_manager import GitStateManager
     git_manager = GitStateManager()
     git_manager.cleanup(project_id=backend.project_id)
 
@@ -631,14 +631,14 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
 def test_local_backend_git_storage():
     """Test LocalBackend with Git storage."""
     project_id = get_project_id(base_name="test_backend_git_local")
-    backend = LocalBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = LocalBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_e2e_test(backend=backend)
 
 
 def test_docker_backend_git_storage():
     """Test DockerBackend with Git storage."""
     project_id = get_project_id(base_name="test_backend_git_docker")
-    backend = DockerBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = DockerBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_e2e_test(backend=backend)
 
 
@@ -646,7 +646,7 @@ def test_docker_backend_git_storage():
 def test_e2b_backend_git_storage():
     """Test E2BBackend with Git storage."""
     project_id = get_project_id(base_name="test_backend_git_e2b")
-    backend = E2BBackend(project_id=project_id, storage=StorageType.GIT)
+    backend = E2BBackend(project_id=project_id, state_manager=GitStateManager())
     run_backend_git_e2e_test(backend=backend)
 
 

@@ -5,7 +5,7 @@ This module provides utility functions for project initialization and other comm
 """
 from pathlib import Path
 
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend
 
 
 def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:

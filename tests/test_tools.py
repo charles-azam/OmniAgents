@@ -12,29 +12,42 @@ Tests all 10 tools with different backends (local, docker, e2b):
 8. read_many_files - Read multiple files at once
 9. save_memory - Save facts to memory file
 10. uv - Execute uv package manager commands
+
+Also includes storage persistence tests:
+- Git storage (GitHub branches)
+- GCS storage (Google Cloud Storage buckets)
+- No storage (ephemeral)
+
+Run storage tests with: pytest -m storage
+Run E2B tests with: pytest -m e2b
+Run basic tests (no markers): pytest tests/test_tools.py
 """
 import os
 from pathlib import Path
 import pytest
 
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus
+from prompttodraft.agent.backends.state_manager import (
+    NoOpStateManager,
+    GitStateManager,
+    GCSStateManager,
+)
 
-from prompttodraft.tools.core.list_directory_tool import ListDirectoryTool
-from prompttodraft.tools.core.read_file_tool import ReadFileTool
-from prompttodraft.tools.core.write_file_tool import WriteFileTool
-from prompttodraft.tools.core.glob_tool import GlobTool
-from prompttodraft.tools.core.search_file_content_tool import SearchFileContentTool
-from prompttodraft.tools.core.replace_tool import ReplaceTool
-from prompttodraft.tools.core.run_shell_command_tool import RunShellCommandTool
-from prompttodraft.tools.core.read_many_files_tool import ReadManyFilesTool
-from prompttodraft.tools.core.save_memory_tool import SaveMemoryTool
-from prompttodraft.tools.core.uv_tool import UVTool
+from prompttodraft.agent.core.list_directory_tool import ListDirectoryTool
+from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.core.write_file_tool import WriteFileTool
+from prompttodraft.agent.core.glob_tool import GlobTool
+from prompttodraft.agent.core.search_file_content_tool import SearchFileContentTool
+from prompttodraft.agent.core.replace_tool import ReplaceTool
+from prompttodraft.agent.core.run_shell_command_tool import RunShellCommandTool
+from prompttodraft.agent.core.read_many_files_tool import ReadManyFilesTool
+from prompttodraft.agent.core.save_memory_tool import SaveMemoryTool
+from prompttodraft.agent.core.uv_tool import UVTool
 
-from prompttodraft.tools.outputs.models import (
+from prompttodraft.agent.outputs.models import (
     FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,
@@ -43,19 +56,12 @@ from prompttodraft.tools.outputs.models import (
 
 def cleanup_backend(backend: ExecutionBackend) -> None:
     """Clean up backend storage and containers before/after tests."""
-    from prompttodraft import storage_utils
     from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
     import shutil
 
-    # Clean bucket storage
-    bucket = storage_utils.get_bucket()
-    prefix = f"{backend.project_id}/"
-    for blob in bucket.list_blobs(prefix=prefix):
-        try:
-            blob.delete()
-        except Exception:
-            # Ignore errors if blob already deleted (eventual consistency)
-            pass
+    # Clean persistent storage (Git/GCS/None) via state manager
+    # The state manager's cleanup() handles storage-specific cleanup
+    backend.state_manager.cleanup(project_id=backend.project_id)
 
     # Clean local data directory (backend-specific paths)
     if isinstance(backend, LocalBackend):
@@ -82,7 +88,7 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
 
 def run_tools_e2e_test(backend: ExecutionBackend):
     """
-    E2E test for all 9 tools with any backend implementation.
+    E2E test for all 10 tools with any backend implementation.
 
     Args:
         backend: An initialized ExecutionBackend instance (local, docker, or e2b)
@@ -393,21 +399,101 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
 def test_tools_local_backend():
     """Test all tools with LocalBackend."""
-    backend = LocalBackend(project_id="test_tools_local", storage=StorageType.NONE)
+    backend = LocalBackend(project_id="test_tools_local", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 def test_tools_docker_backend():
     """Test all tools with DockerBackend."""
-    backend = DockerBackend(project_id="test_tools_docker", storage=StorageType.NONE)
+    backend = DockerBackend(project_id="test_tools_docker", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_tools_e2b_backend():
     """Test all tools with E2BBackend."""
-    backend = E2BBackend(project_id="test_tools_e2b", storage=StorageType.NONE)
+    backend = E2BBackend(project_id="test_tools_e2b", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_tools_local_backend_with_git_storage():
+    """Test all tools with LocalBackend and Git storage."""
+    backend = LocalBackend(project_id="test_tools_local_git", state_manager=GitStateManager())
+    run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_tools_local_backend_with_gcs_storage():
+    """Test all tools with LocalBackend and GCS storage."""
+    backend = LocalBackend(project_id="test_tools_local_gcs", state_manager=GCSStateManager())
+    run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_git_storage_persistence():
+    """Test that Git storage properly persists and restores state."""
+    backend = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
+    cleanup_backend(backend=backend)
+
+    try:
+        # Start backend and create some files
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        write_tool = WriteFileTool(backend=backend)
+        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+
+        # Save to Git storage
+        backend.shutdown()
+
+        # Create a new backend with same project_id and state manager
+        backend2 = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
+        backend2.start()
+
+        # Verify file was restored
+        read_tool = ReadFileTool(backend=backend2)
+        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        assert isinstance(result, TextOutputModel)
+        assert "Persistent file" in result.content
+
+        backend2.shutdown()
+
+    finally:
+        cleanup_backend(backend=backend)
+
+
+@pytest.mark.storage
+def test_gcs_storage_persistence():
+    """Test that GCS storage properly persists and restores state."""
+    backend = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
+    cleanup_backend(backend=backend)
+
+    try:
+        # Start backend and create some files
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        write_tool = WriteFileTool(backend=backend)
+        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+
+        # Save to GCS storage
+        backend.shutdown()
+
+        # Create a new backend with same project_id and state manager
+        backend2 = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
+        backend2.start()
+
+        # Verify file was restored
+        read_tool = ReadFileTool(backend=backend2)
+        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        assert isinstance(result, TextOutputModel)
+        assert "Persistent file" in result.content
+
+        backend2.shutdown()
+
+    finally:
+        cleanup_backend(backend=backend)
 
 
 if __name__ == "__main__":

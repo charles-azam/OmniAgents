@@ -9,7 +9,7 @@ import shutil
 from pathlib import Path
 
 from prompttodraft.common import PROMPT_TO_DRAFT_REPO_PATH
-from prompttodraft.tools.agent import create_agent
+from prompttodraft.agent.agent import create_agent
 
 
 def reset_playground() -> Path:
