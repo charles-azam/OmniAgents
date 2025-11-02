@@ -222,14 +222,16 @@ class GitStateManager(StateManager):
     def __init__(
         self,
         repo_url: str | None = None,
-        branch_prefix: str = "state/"
+        branch_prefix: str = "state/",
+        github_token: str | None = None
     ):
         """
         Args:
-            repo_url: GitHub repo URL (defaults to env GITHUB_STATE_REPO or 'charlesazam/prompttodraft-states')
+            repo_url: GitHub repo URL (defaults to env PROMPTTODRAFT_GITHUB_STATE_REPO or 'charlesazam/prompttodraft-states')
             branch_prefix: Prefix for state branches (default: "state/")
+            github_token: GitHub personal access token (defaults to env GITHUB_TOKEN)
         """
-        self.repo_url = repo_url or os.getenv("GITHUB_STATE_REPO", "charlesazam/prompttodraft-states")
+        self.repo_url = repo_url or os.getenv("PROMPTTODRAFT_GITHUB_STATE_REPO", "charlesazam/prompttodraft-states")
 
         # Normalize repo URL to full format
         if not self.repo_url.startswith("http"):
@@ -239,12 +241,24 @@ class GitStateManager(StateManager):
             self.repo_url += ".git"
 
         self.branch_prefix = branch_prefix
+        self.github_token = github_token or os.getenv("PROMPTTODRAFT_GITHUB_API_KEY")
+
+        # Extract owner/repo from URL for API calls
+        # https://github.com/owner/repo.git -> owner/repo
+        self.repo_path = self.repo_url.replace("https://github.com/", "").replace(".git", "")
 
     def _get_branch_name(self, project_id: str) -> str:
         """Convert project_id to branch name."""
         # Sanitize project_id for Git branch naming
         safe_id = project_id.replace(" ", "-").replace("_", "-")
         return f"{self.branch_prefix}{safe_id}"
+
+    def _get_authenticated_url(self) -> str:
+        """Get repo URL with token authentication."""
+        if self.github_token:
+            # Insert token into URL: https://oauth2:TOKEN@github.com/owner/repo.git
+            return self.repo_url.replace("https://", f"https://oauth2:{self.github_token}@")
+        return self.repo_url
 
     def _ensure_gitignore(self, backend: "ExecutionBackend") -> None:
         """Ensure .gitignore exists in working directory."""
@@ -264,8 +278,10 @@ class GitStateManager(StateManager):
 
     def _initialize_git(self, backend: "ExecutionBackend", branch_name: str) -> None:
         """Initialize git in working directory and set up remote."""
+        auth_url = self._get_authenticated_url()
+
         backend.execute_command(command="git init")
-        backend.execute_command(command=f"git remote add origin {self.repo_url}")
+        backend.execute_command(command=f"git remote add origin {auth_url}")
         backend.execute_command(command='git config user.name "PromptToDraft"')
         backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
 
@@ -315,6 +331,7 @@ class GitStateManager(StateManager):
     def load_latest(self, backend: "ExecutionBackend") -> bool:
         """Load latest snapshot from Git branch."""
         branch_name = self._get_branch_name(project_id=backend.project_id)
+        auth_url = self._get_authenticated_url()
 
         # Check if git is already initialized
         if self._is_git_initialized(backend=backend):
@@ -334,7 +351,7 @@ class GitStateManager(StateManager):
             if init_result.exit_code != 0:
                 return False
 
-            backend.execute_command(command=f"git remote add origin {self.repo_url}")
+            backend.execute_command(command=f"git remote add origin {auth_url}")
             backend.execute_command(command='git config user.name "PromptToDraft"')
             backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
 
@@ -350,56 +367,64 @@ class GitStateManager(StateManager):
 
     def cleanup(self, project_id: str) -> None:
         """Delete the branch for this project."""
+        if not self.github_token:
+            # No token, cannot delete branch
+            return
+
         branch_name = self._get_branch_name(project_id=project_id)
 
-        # Extract owner/repo from URL
-        # https://github.com/owner/repo.git -> owner/repo
-        repo_path = self.repo_url.replace("https://github.com/", "").replace(".git", "")
+        # Delete branch using GitHub API
+        import urllib.request
+        url = f"https://api.github.com/repos/{self.repo_path}/git/refs/heads/{branch_name}"
+        req = urllib.request.Request(url=url, method="DELETE")
+        req.add_header("Authorization", f"Bearer {self.github_token}")
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("X-GitHub-Api-Version", "2022-11-28")
 
-        # Use gh CLI to delete remote branch (run on host)
-        subprocess.run(
-            ["gh", "api", f"repos/{repo_path}/git/refs/heads/{branch_name}", "-X", "DELETE"],
-            check=False,
-            capture_output=True
-        )
+        try:
+            urllib.request.urlopen(req)
+        except Exception:
+            # Branch doesn't exist or other error, ignore
+            pass
 
     def list_snapshots(self, project_id: str) -> list[dict]:
         """List all commits on the project branch."""
-        branch_name = self._get_branch_name(project_id=project_id)
-
-        # Extract owner/repo from URL
-        repo_path = self.repo_url.replace("https://github.com/", "").replace(".git", "")
-
-        # Use gh CLI to get commit history (run on host)
-        result = subprocess.run(
-            [
-                "gh", "api",
-                f"repos/{repo_path}/commits?sha={branch_name}",
-                "--jq", ".[] | \"\\(.sha)|\\(.commit.author.name)|\\(.commit.author.date)|\\(.commit.message)\""
-            ],
-            capture_output=True,
-            text=True,
-            check=False
-        )
-
-        if result.returncode != 0:
+        if not self.github_token:
+            # No token, cannot list commits
             return []
 
-        snapshots = []
-        for line in result.stdout.strip().split("\n"):
-            if not line:
-                continue
-            sha, author, date, msg = line.split("|", 3)
-            # Parse ISO 8601 date
-            dt = datetime.fromisoformat(date.replace("Z", "+00:00"))
-            snapshots.append({
-                "id": sha,
-                "author": author,
-                "timestamp": int(dt.timestamp()),
-                "message": msg
-            })
+        branch_name = self._get_branch_name(project_id=project_id)
 
-        return snapshots
+        # Get commit history using GitHub API
+        import urllib.request
+        import json
+
+        url = f"https://api.github.com/repos/{self.repo_path}/commits?sha={branch_name}"
+        req = urllib.request.Request(url=url)
+        req.add_header("Authorization", f"Bearer {self.github_token}")
+        req.add_header("Accept", "application/vnd.github+json")
+        req.add_header("X-GitHub-Api-Version", "2022-11-28")
+
+        try:
+            with urllib.request.urlopen(req) as response:
+                commits = json.loads(response.read().decode())
+
+            snapshots = []
+            for commit in commits:
+                # Parse ISO 8601 date
+                date_str = commit["commit"]["author"]["date"]
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                snapshots.append({
+                    "id": commit["sha"],
+                    "author": commit["commit"]["author"]["name"],
+                    "timestamp": int(dt.timestamp()),
+                    "message": commit["commit"]["message"]
+                })
+
+            return snapshots
+        except Exception:
+            # Branch doesn't exist or other error
+            return []
 
 
 class NoOpStateManager(StateManager):

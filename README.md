@@ -111,24 +111,27 @@ uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
 
 ### GitHub State Storage (Default)
 
-Install and authenticate the GitHub CLI:
+Set up a GitHub personal access token with `repo` scope:
+
+1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click "Generate new token" and select `repo` scope
+3. Copy the token and set it as an environment variable:
 
 ```bash
-# Install gh CLI (macOS)
-brew install gh
-
-# Or download from: https://cli.github.com/
-
-# Authenticate
-gh auth login
+export PROMPTTODRAFT_GITHUB_API_KEY="ghp_your_token_here"
 ```
 
 Configure the state repository (optional):
 
 ```bash
 # Default: charlesazam/prompttodraft-states
-export GITHUB_STATE_REPO="your-org/your-repo"
+export PROMPTTODRAFT_GITHUB_STATE_REPO="your-org/your-repo"
 ```
+
+The token is used for:
+- Pushing/pulling state to GitHub branches
+- Listing commit history
+- Deleting state branches during cleanup
 
 ### Google Cloud Storage
 
