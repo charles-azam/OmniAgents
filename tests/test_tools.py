@@ -12,6 +12,15 @@ Tests all 10 tools with different backends (local, docker, e2b):
 8. read_many_files - Read multiple files at once
 9. save_memory - Save facts to memory file
 10. uv - Execute uv package manager commands
+
+Also includes storage persistence tests:
+- Git storage (GitHub branches)
+- GCS storage (Google Cloud Storage buckets)
+- No storage (ephemeral)
+
+Run storage tests with: pytest -m storage
+Run E2B tests with: pytest -m e2b
+Run basic tests (no markers): pytest tests/test_tools.py
 """
 import os
 from pathlib import Path
@@ -43,18 +52,16 @@ from prompttodraft.agent.outputs.models import (
 
 def cleanup_backend(backend: ExecutionBackend) -> None:
     """Clean up backend storage and containers before/after tests."""
-    from prompttodraft import storage_utils
     from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
     import shutil
 
-    # Clean bucket storage
-    bucket = storage_utils.get_bucket()
-    prefix = f"{backend.project_id}/"
-    for blob in bucket.list_blobs(prefix=prefix):
+    # Clean persistent storage (Git/GCS/None) via state manager
+    # The state manager's cleanup() handles storage-specific cleanup
+    if hasattr(backend, '_state_manager') and backend._state_manager:
         try:
-            blob.delete()
+            backend._state_manager.cleanup(project_id=backend.project_id)
         except Exception:
-            # Ignore errors if blob already deleted (eventual consistency)
+            # Ignore cleanup errors (branch/bucket might not exist yet)
             pass
 
     # Clean local data directory (backend-specific paths)
@@ -82,7 +89,7 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
 
 def run_tools_e2e_test(backend: ExecutionBackend):
     """
-    E2E test for all 9 tools with any backend implementation.
+    E2E test for all 10 tools with any backend implementation.
 
     Args:
         backend: An initialized ExecutionBackend instance (local, docker, or e2b)
@@ -408,6 +415,86 @@ def test_tools_e2b_backend():
     """Test all tools with E2BBackend."""
     backend = E2BBackend(project_id="test_tools_e2b", storage=StorageType.NONE)
     run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_tools_local_backend_with_git_storage():
+    """Test all tools with LocalBackend and Git storage."""
+    backend = LocalBackend(project_id="test_tools_local_git", storage=StorageType.GIT)
+    run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_tools_local_backend_with_gcs_storage():
+    """Test all tools with LocalBackend and GCS storage."""
+    backend = LocalBackend(project_id="test_tools_local_gcs", storage=StorageType.GCS)
+    run_tools_e2e_test(backend=backend)
+
+
+@pytest.mark.storage
+def test_git_storage_persistence():
+    """Test that Git storage properly persists and restores state."""
+    backend = LocalBackend(project_id="test_git_persistence", storage=StorageType.GIT)
+    cleanup_backend(backend=backend)
+
+    try:
+        # Start backend and create some files
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        write_tool = WriteFileTool(backend=backend)
+        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+
+        # Save to Git storage
+        backend.shutdown()
+
+        # Create a new backend with same project_id
+        backend2 = LocalBackend(project_id="test_git_persistence", storage=StorageType.GIT)
+        backend2.start()
+
+        # Verify file was restored
+        read_tool = ReadFileTool(backend=backend2)
+        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        assert isinstance(result, TextOutputModel)
+        assert "Persistent file" in result.content
+
+        backend2.shutdown()
+
+    finally:
+        cleanup_backend(backend=backend)
+
+
+@pytest.mark.storage
+def test_gcs_storage_persistence():
+    """Test that GCS storage properly persists and restores state."""
+    backend = LocalBackend(project_id="test_gcs_persistence", storage=StorageType.GCS)
+    cleanup_backend(backend=backend)
+
+    try:
+        # Start backend and create some files
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        write_tool = WriteFileTool(backend=backend)
+        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+
+        # Save to GCS storage
+        backend.shutdown()
+
+        # Create a new backend with same project_id
+        backend2 = LocalBackend(project_id="test_gcs_persistence", storage=StorageType.GCS)
+        backend2.start()
+
+        # Verify file was restored
+        read_tool = ReadFileTool(backend=backend2)
+        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        assert isinstance(result, TextOutputModel)
+        assert "Persistent file" in result.content
+
+        backend2.shutdown()
+
+    finally:
+        cleanup_backend(backend=backend)
 
 
 if __name__ == "__main__":
