@@ -17,6 +17,8 @@ from rich.table import Table
 from rich.text import Text
 from smolagents import AgentLogger, LogLevel, Tool, ToolCallingAgent, ApiModel, InferenceClientModel
 
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend
+from prompttodraft.agent.backends.state_manager import StateManager
 from prompttodraft.agent.outputs.models import (
     CodeOutputModel,
     ErrorOutputModel,
@@ -417,10 +419,10 @@ class ToolAgent(ToolCallingAgent):
 
 def create_agent(
     cwd: str | None = None,
-    backend: "ExecutionBackend | None" = None,
+    backend: ExecutionBackend | None = None,
     model: ApiModel | None = None,
     log_file: str | None = "tool_agent.log",
-    state_manager: "StateManager | None" = None,
+    state_manager: StateManager | None = None,
 ) -> ToolAgent:
     """
     Create a tool agent with all available tools using the new 3-layer architecture.
@@ -441,9 +443,8 @@ def create_agent(
     from dotenv import load_dotenv
 
     from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
-    from prompttodraft.agent.backends.execution_backend import ExecutionBackend
     from prompttodraft.agent.backends.local_backend import LocalBackend
-    from prompttodraft.agent.backends.state_manager import GitStateManager, StateManager
+    from prompttodraft.agent.backends.state_manager import GitStateManager
     from prompttodraft.agent.system_prompt import get_system_prompt
     from prompttodraft.utils import initialize_project
 

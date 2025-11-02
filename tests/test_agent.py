@@ -8,7 +8,7 @@ import os
 from prompttodraft.agent.agent import create_agent
 from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
 from prompttodraft.agent.backends.local_backend import LocalBackend
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import NoOpStateManager
 
 
 def test_agent_creation():
@@ -48,7 +48,7 @@ def test_agent_with_custom_backend():
     print("\nTesting agent with custom backend...")
 
     # Create a LocalBackend
-    backend = LocalBackend(project_id="test_agent", storage=StorageType.NONE)
+    backend = LocalBackend(project_id="test_agent", state_manager=NoOpStateManager())
     backend.start()
 
     # Create agent with custom backend
@@ -70,7 +70,7 @@ def test_system_prompt_generation():
     from prompttodraft.agent.system_prompt import get_system_prompt
 
     # Create a LocalBackend for testing
-    backend = LocalBackend(project_id="test_system_prompt", storage=StorageType.NONE)
+    backend = LocalBackend(project_id="test_system_prompt", state_manager=NoOpStateManager())
     backend.start()
 
     # Generate system prompt
@@ -102,7 +102,7 @@ def test_smolagents_adapter():
     print("\nTesting smolagents adapter...")
 
     # Create backend
-    backend = LocalBackend(project_id="test_factory", storage=StorageType.NONE)
+    backend = LocalBackend(project_id="test_factory", state_manager=NoOpStateManager())
     backend.start()
 
     # Create tools using the new adapter
