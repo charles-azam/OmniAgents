@@ -1,11 +1,11 @@
 """Shopping cart tools for benchmark."""
 
-from prompttodraft.benchmark_agent_sdk.types import CheckoutSummary
-from prompttodraft.benchmark_agent_sdk.types import Item
-from prompttodraft.benchmark_agent_sdk.types import ShoppingCart
-from prompttodraft.benchmark_agent_sdk.catalog import get_items_by_category
-from prompttodraft.benchmark_agent_sdk.catalog import get_item_by_name
-from prompttodraft.benchmark_agent_sdk.catalog import get_categories
+from prompttodraft.benchmark.agent_sdk.types import CheckoutSummary
+from prompttodraft.benchmark.agent_sdk.types import Item
+from prompttodraft.benchmark.agent_sdk.types import ShoppingCart
+from prompttodraft.benchmark.agent_sdk.catalog import get_items_by_category
+from prompttodraft.benchmark.agent_sdk.catalog import get_item_by_name
+from prompttodraft.benchmark.agent_sdk.catalog import get_categories
 
 # Global shopping cart state (will be reset between benchmark runs)
 _shopping_cart = ShoppingCart()

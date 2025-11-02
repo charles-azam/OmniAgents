@@ -2,11 +2,11 @@
 Test the new Gemini-style agent implementation.
 
 This test verifies that the agent can be created with different backends
-and has access to all 9 tools.
+and has access to all 10 tools.
 """
 import os
 from prompttodraft.tools.agent import create_agent
-from prompttodraft.tools.factory import ToolFactory
+from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
 from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.state_manager import StorageType
 
@@ -18,8 +18,8 @@ def test_agent_creation():
     # Create agent with defaults (LocalBackend, Groq model)
     agent = create_agent(cwd=os.getcwd(), log_file=None)
 
-    # Verify agent has tools (9 custom tools + 1 built-in final_answer tool)
-    assert len(agent.tools) == 10, f"Expected 10 tools, got {len(agent.tools)}"
+    # Verify agent has tools (10 custom tools + 1 built-in final_answer tool)
+    assert len(agent.tools) == 11, f"Expected 11 tools, got {len(agent.tools)}"
 
     # Verify tool names (including smolagents' built-in final_answer tool)
     expected_tool_names = {
@@ -32,6 +32,7 @@ def test_agent_creation():
         "run_shell_command",
         "read_many_files",
         "save_memory",
+        "uv",
         "final_answer",  # Built-in smolagents tool
     }
 
@@ -53,8 +54,8 @@ def test_agent_with_custom_backend():
     # Create agent with custom backend
     agent = create_agent(cwd=os.getcwd(), backend=backend, log_file=None)
 
-    # Verify agent has tools (9 custom tools + 1 built-in final_answer tool)
-    assert len(agent.tools) == 10
+    # Verify agent has tools (10 custom tools + 1 built-in final_answer tool)
+    assert len(agent.tools) == 11
 
     print("✓ Agent created successfully with custom backend")
 
@@ -96,19 +97,19 @@ def test_system_prompt_generation():
     print(f"  Prompt length: {len(system_prompt)} characters")
 
 
-def test_tool_factory():
-    """Test that ToolFactory creates tools correctly."""
-    print("\nTesting ToolFactory...")
+def test_smolagents_adapter():
+    """Test that create_smolagents_tools creates tools correctly."""
+    print("\nTesting smolagents adapter...")
 
     # Create backend
     backend = LocalBackend(project_id="test_factory", storage=StorageType.NONE)
     backend.start()
 
-    # Create tools
-    tools = ToolFactory.create_smolagents_tools(backend=backend)
+    # Create tools using the new adapter
+    tools = create_smolagents_tools(backend=backend)
 
-    # Verify we created 9 custom tools (final_answer is added by smolagents when creating the agent)
-    assert len(tools) == 9
+    # Verify we created 10 custom tools (final_answer is added by smolagents when creating the agent)
+    assert len(tools) == 10, f"Expected 10 tools, got {len(tools)}"
 
     # Verify each tool has correct attributes
     for tool in tools:
@@ -116,7 +117,23 @@ def test_tool_factory():
         assert hasattr(tool, "description")
         assert hasattr(tool, "forward")
 
-    print(f"✓ ToolFactory created {len(tools)} tools successfully")
+    # Verify all expected tool names are present
+    tool_names = {tool.name for tool in tools}
+    expected_names = {
+        "write_file",
+        "read_file",
+        "list_directory",
+        "glob",
+        "search_file_content",
+        "replace",
+        "run_shell_command",
+        "read_many_files",
+        "save_memory",
+        "uv",
+    }
+    assert tool_names == expected_names, f"Tool names mismatch: {tool_names}"
+
+    print(f"✓ Smolagents adapter created {len(tools)} tools successfully")
 
     # Cleanup
     backend.shutdown()
@@ -130,7 +147,7 @@ if __name__ == "__main__":
     test_agent_creation()
     test_agent_with_custom_backend()
     test_system_prompt_generation()
-    test_tool_factory()
+    test_smolagents_adapter()
 
     print("\n" + "="*80)
     print("✅ ALL AGENT TESTS PASSED!")

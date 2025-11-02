@@ -1,171 +1,147 @@
-"""Smolagents benchmark runner for shopping cart optimizer."""
+"""OpenAI Agents SDK benchmark runner for shopping cart optimizer."""
 
+from __future__ import annotations
+
+import asyncio
 import json
 import os
 from pathlib import Path
 
-from smolagents import ToolCallingAgent
-from smolagents import InferenceClientModel
-from smolagents import OpenAIModel
-from smolagents import tool
+from agents import Agent
+from agents import Runner
+from agents import function_tool
+from agents.extensions.models.litellm_model import LitellmModel
 
-from prompttodraft.benchmark_agent_sdk.config import MODEL_CONFIGS_NO_XAI, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
-from prompttodraft.benchmark_agent_sdk.metrics import MetricsTracker
-from prompttodraft.benchmark_agent_sdk.session import ShoppingSession
-
-from phoenix.otel import register
-from openinference.instrumentation.smolagents import SmolagentsInstrumentor
+from prompttodraft.benchmark.agent_sdk.config import MODEL_CONFIGS, REQUIRED_API_KEYS, SYSTEM_PROMPT, TARGET_BUDGET, TASK_DESCRIPTION, get_pricing_for_provider
+from prompttodraft.benchmark.agent_sdk.metrics import MetricsTracker
+from prompttodraft.benchmark.agent_sdk.session import ShoppingSession
 
 
-def initialize_instrumentation() -> None:
-    """Initialize Phoenix instrumentation for Smolagents."""
-    register()
-    SmolagentsInstrumentor().instrument()
-
-
-def create_smolagents_tools(session: ShoppingSession, metrics_tracker: MetricsTracker) -> list:
+def create_agent_tools(session: ShoppingSession, metrics_tracker: MetricsTracker) -> list:
     """
-    Create smolagents-compatible tools for a shopping session.
+    Create OpenAI Agents tools for a shopping session.
 
     Args:
         session: The shopping session instance.
         metrics_tracker: Metrics tracker to record tool calls.
 
     Returns:
-        List of smolagents tool objects.
+        List of OpenAI Agents tool objects.
     """
 
-    @tool
-    def list_categories_tool() -> list[str]:
-        """
-        Get a list of all available shopping categories.
-
-        Returns:
-            List of category names.
-        """
+    @function_tool
+    def list_categories() -> list[str]:
+        """Get a list of all available shopping categories."""
         metrics_tracker.record_tool_call(tool_name="list_categories")
         return session.list_categories()
 
-    @tool
-    def search_item_tool(category: str) -> list[dict]:
+    @function_tool
+    def search_item(category: str) -> list[dict]:
         """
         Search for items in a specific category.
-        Available categories: electronics, books, clothing, food, toys.
 
         Args:
-            category: The category to search in.
-
-        Returns:
-            List of items with name, price, and description.
+            category: The category to search in. Available: electronics, books, clothing, food, toys.
         """
         metrics_tracker.record_tool_call(tool_name="search_item")
         return session.search_item(category=category)
 
-    @tool
-    def get_price_tool(item_name: str) -> float | str:
+    @function_tool
+    def get_price(item_name: str) -> float | str:
         """
         Get the price of a specific item by name.
 
         Args:
             item_name: The name of the item.
-
-        Returns:
-            The price of the item or error message.
         """
         metrics_tracker.record_tool_call(tool_name="get_price")
         return session.get_price(item_name=item_name)
 
-    @tool
-    def add_to_cart_tool(item_name: str) -> str:
+    @function_tool
+    def add_to_cart(item_name: str) -> str:
         """
         Add an item to the shopping cart.
 
         Args:
             item_name: The name of the item to add.
-
-        Returns:
-            Success message with updated cart total.
         """
         metrics_tracker.record_tool_call(tool_name="add_to_cart")
         return session.add_to_cart(item_name=item_name)
 
-    @tool
-    def remove_from_cart_tool(item_name: str) -> str:
+    @function_tool
+    def remove_from_cart(item_name: str) -> str:
         """
         Remove an item from the shopping cart.
 
         Args:
             item_name: The name of the item to remove.
-
-        Returns:
-            Success message with updated cart total.
         """
         metrics_tracker.record_tool_call(tool_name="remove_from_cart")
         return session.remove_from_cart(item_name=item_name)
 
-    @tool
-    def get_cart_total_tool() -> float:
-        """
-        Get the current total price of all items in the cart.
-
-        Returns:
-            The total price of items in the cart.
-        """
+    @function_tool
+    def get_cart_total() -> float:
+        """Get the current total price of all items in the cart."""
         metrics_tracker.record_tool_call(tool_name="get_cart_total")
         return session.get_cart_total()
 
-    @tool
-    def checkout_tool() -> dict:
-        """
-        Finalize the purchase and complete the shopping task.
-        Call this when you are satisfied with your cart selection.
-
-        Returns:
-            Summary of the cart including total, item count, and items.
-        """
+    @function_tool
+    def checkout() -> dict:
+        """Finalize the purchase and complete the shopping task."""
         metrics_tracker.record_tool_call(tool_name="checkout")
-        result = session.checkout()
-        return result.model_dump()
+        return session.checkout().model_dump()
 
     return [
-        list_categories_tool,
-        search_item_tool,
-        get_price_tool,
-        add_to_cart_tool,
-        remove_from_cart_tool,
-        get_cart_total_tool,
-        checkout_tool,
+        list_categories,
+        search_item,
+        get_price,
+        add_to_cart,
+        remove_from_cart,
+        get_cart_total,
+        checkout,
     ]
 
 
-def create_model(provider: str, model_id: str):
+def get_litellm_model_name(provider: str, model_id: str) -> str:
     """
-    Create a smolagents model from provider and model_id.
+    Convert provider and model_id to LiteLLM format.
 
     Args:
-        provider: Provider name (openai, huggingface, xai).
+        provider: Provider name.
         model_id: Model identifier.
 
     Returns:
-        Configured smolagents model.
+        LiteLLM model string.
     """
     if provider == "openai":
-        return OpenAIModel(model_id=model_id)
+        return model_id
     elif provider == "huggingface":
-        return InferenceClientModel(model_id=model_id)
+        return f"huggingface/{model_id}"
     elif provider == "xai":
-        return OpenAIModel(
-            model_id=model_id,
-            api_key=os.getenv("XAI_API_KEY"),
-            api_base="https://api.x.ai/v1"
-        )
+        return f"xai/{model_id}"
     else:
-        raise ValueError(f"Unsupported provider: {provider}")
+        return model_id
 
 
-def run_single_benchmark(provider: str, model_id: str, display_name: str, output_dir: Path) -> dict:
+def get_api_key_for_provider(provider: str) -> str | None:
     """
-    Run a single benchmark with smolagents.
+    Get API key for a provider.
+
+    Args:
+        provider: Provider name.
+
+    Returns:
+        API key value or None.
+    """
+    key_name = REQUIRED_API_KEYS.get(provider)
+    if not key_name:
+        return None
+    return os.getenv(key_name)
+
+
+async def run_single_benchmark(provider: str, model_id: str, display_name: str, output_dir: Path) -> dict:
+    """
+    Run a single benchmark with OpenAI Agents SDK.
 
     Args:
         provider: Provider name.
@@ -185,30 +161,44 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str, output
     metrics_tracker = MetricsTracker(target_budget=TARGET_BUDGET)
 
     # Create tools for this session
-    tools = create_smolagents_tools(session=session, metrics_tracker=metrics_tracker)
+    tools = create_agent_tools(session=session, metrics_tracker=metrics_tracker)
 
-    # Initialize smolagents model
-    model = create_model(provider=provider, model_id=model_id)
+    # Create agent with appropriate model
+    if provider == "openai":
+        # For OpenAI, just pass model name as string (uses OPENAI_API_KEY by default)
+        agent = Agent(
+            name="shopping_assistant",
+            instructions=SYSTEM_PROMPT,
+            tools=tools,
+            model=model_id,
+        )
+    else:
+        # For other providers, use LiteLLM
+        api_key = get_api_key_for_provider(provider=provider)
+        litellm_model_name = get_litellm_model_name(provider=provider, model_id=model_id)
+        model = LitellmModel(model=litellm_model_name, api_key=api_key)
 
-    # Create agent
-    agent = ToolCallingAgent(
-        tools=tools,
-        model=model,
-        max_steps=10,
-    )
+        agent = Agent(
+            name="shopping_assistant",
+            instructions=SYSTEM_PROMPT,
+            tools=tools,
+            model=model,
+        )
 
     # Start metrics tracking
     metrics_tracker.start_timer()
 
-    # Run the agent
-    agent.run(task=TASK_DESCRIPTION)
+    # Run agent
+    result = await Runner.run(agent, TASK_DESCRIPTION, max_turns=30)
+
+    print(f"\nFinal output: {result.final_output}")
 
     # Stop metrics tracking
     metrics_tracker.stop_timer()
 
     # Build and display results
     benchmark_result = metrics_tracker.build_result(
-        framework=f"Smolagents ({provider})",
+        framework=f"OpenAI Agents SDK ({provider})",
         model=display_name,
         task_description=TASK_DESCRIPTION,
         cart=session.cart,
@@ -230,7 +220,7 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str, output
 
     # Create safe filename from model display name
     safe_filename = display_name.replace("/", "_").replace(" ", "_").replace("(", "").replace(")", "").lower()
-    output_file = output_dir / f"smolagents_{safe_filename}_result.json"
+    output_file = output_dir / f"openai_agents_{safe_filename}_result.json"
     with open(output_file, "w") as f:
         json.dump(benchmark_result.model_dump(), f, indent=2)
 
@@ -239,17 +229,15 @@ def run_single_benchmark(provider: str, model_id: str, display_name: str, output
     return benchmark_result.model_dump()
 
 
-def main() -> list[dict]:
+async def main() -> list[dict]:
     """
-    Run the smolagents shopping cart benchmark with multiple models.
+    Run the OpenAI Agents SDK shopping cart benchmark with multiple models.
 
     Returns:
         List of benchmark results dictionaries.
     """
-    initialize_instrumentation()
-
     missing_keys = []
-    for model_config in MODEL_CONFIGS_NO_XAI:
+    for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
         if not os.getenv(key):
@@ -267,7 +255,7 @@ def main() -> list[dict]:
     # Run benchmarks for each model
     completed_count = 0
     results = []
-    for model_config in MODEL_CONFIGS_NO_XAI:
+    for model_config in MODEL_CONFIGS:
         provider = model_config["provider"]
         key = REQUIRED_API_KEYS[provider]
 
@@ -275,7 +263,7 @@ def main() -> list[dict]:
             print(f"\nSkipping {model_config['display_name']} (missing {key})")
             continue
 
-        result = run_single_benchmark(
+        result = await run_single_benchmark(
             provider=provider,
             model_id=model_config["model_id"],
             display_name=model_config["display_name"],
@@ -285,7 +273,7 @@ def main() -> list[dict]:
         completed_count += 1
 
     print("\n" + "=" * 60)
-    print(f"Completed {completed_count} Smolagents benchmark(s)!")
+    print(f"Completed {completed_count} OpenAI Agents SDK benchmark(s)!")
     print("=" * 60)
 
     return results

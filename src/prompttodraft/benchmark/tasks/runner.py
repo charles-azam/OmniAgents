@@ -12,8 +12,8 @@ from typing import Literal
 
 from smolagents import CodeAgent, ApiModel
 
-from prompttodraft.benchmark_tasks.base_task import BenchmarkTask
-from prompttodraft.benchmark_tasks.metrics import BenchmarkResult
+from prompttodraft.benchmark.tasks.base_task import BenchmarkTask
+from prompttodraft.benchmark.tasks.metrics import BenchmarkResult
 from prompttodraft.tools.factory import ToolFactory
 
 

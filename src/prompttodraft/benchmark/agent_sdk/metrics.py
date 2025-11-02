@@ -1,9 +1,9 @@
 """Metrics tracking for benchmark execution."""
 
 import time
-from prompttodraft.benchmark_agent_sdk.types import BenchmarkMetrics
-from prompttodraft.benchmark_agent_sdk.types import BenchmarkResult
-from prompttodraft.benchmark_agent_sdk.types import ShoppingCart
+from prompttodraft.benchmark.agent_sdk.types import BenchmarkMetrics
+from prompttodraft.benchmark.agent_sdk.types import BenchmarkResult
+from prompttodraft.benchmark.agent_sdk.types import ShoppingCart
 
 
 class MetricsTracker:

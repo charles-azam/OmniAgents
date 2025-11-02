@@ -7,9 +7,9 @@ import tempfile
 import json
 from pathlib import Path
 
-from prompttodraft.benchmark_tasks.runner import BenchmarkRunner
-from prompttodraft.benchmark_tasks.tasks.task_search_replace import SearchReplaceTask
-from prompttodraft.benchmark_tasks.metrics import AggregateResults
+from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
+from prompttodraft.benchmark.tasks.tasks.task_search_replace import SearchReplaceTask
+from prompttodraft.benchmark.tasks.metrics import AggregateResults
 
 
 def main():

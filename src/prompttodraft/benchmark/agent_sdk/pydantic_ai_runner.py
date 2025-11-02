@@ -10,16 +10,16 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from openai import AsyncOpenAI
 
-from prompttodraft.benchmark_agent_sdk.metrics import MetricsTracker
-from prompttodraft.benchmark_agent_sdk.session import ShoppingSession
-from prompttodraft.benchmark_agent_sdk.config import (
+from prompttodraft.benchmark.agent_sdk.metrics import MetricsTracker
+from prompttodraft.benchmark.agent_sdk.session import ShoppingSession
+from prompttodraft.benchmark.agent_sdk.config import (
     SYSTEM_PROMPT,
     TASK_DESCRIPTION,
     TARGET_BUDGET,
     MODEL_CONFIGS,
     REQUIRED_API_KEYS,
 )
-from prompttodraft.benchmark_agent_sdk.config import get_pricing_for_provider
+from prompttodraft.benchmark.agent_sdk.config import get_pricing_for_provider
 
 
 def setup_logfire() -> None:

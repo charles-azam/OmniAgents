@@ -8,7 +8,7 @@ Exercises: grep, edit, bash (tests)
 from pathlib import Path
 import subprocess
 
-from prompttodraft.benchmark_tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
 
 
 class SearchReplaceTask(BenchmarkTask):

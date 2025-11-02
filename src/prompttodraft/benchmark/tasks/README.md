@@ -17,10 +17,10 @@ This benchmark suite helps you:
 ```python
 from pathlib import Path
 import tempfile
-from prompttodraft.benchmark_tasks.runner import BenchmarkRunner
-from prompttodraft.benchmark_tasks.tasks.task_search_replace import SearchReplaceTask
-from prompttodraft.benchmark_tasks.reporting.report_generator import save_report
-from prompttodraft.benchmark_tasks.metrics import AggregateResults
+from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
+from prompttodraft.benchmark.tasks.tasks.task_search_replace import SearchReplaceTask
+from prompttodraft.benchmark.tasks.reporting.report_generator import save_report
+from prompttodraft.benchmark.tasks.metrics import AggregateResults
 
 # Create workspace
 with tempfile.TemporaryDirectory() as tmpdir:
@@ -131,7 +131,7 @@ To create a new benchmark task:
 1. **Subclass `BenchmarkTask`**:
 
 ```python
-from prompttodraft.benchmark_tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
 
 class MyCustomTask(BenchmarkTask):
     def get_task_config(self) -> TaskSetup:
@@ -187,7 +187,7 @@ result = runner.run_task(task, framework="smolagents", environment="local")
 ### Markdown Reports
 
 ```python
-from prompttodraft.benchmark_tasks.reporting.report_generator import generate_markdown_report
+from prompttodraft.benchmark.tasks.reporting.report_generator import generate_markdown_report
 
 markdown = generate_markdown_report(aggregate_results)
 print(markdown)
@@ -214,7 +214,7 @@ Output:
 ### HTML Reports
 
 ```python
-from prompttodraft.benchmark_tasks.reporting.report_generator import save_report
+from prompttodraft.benchmark.tasks.reporting.report_generator import save_report
 
 save_report(aggregate_results, "report.html", format="html")
 ```
@@ -228,7 +228,7 @@ Generates a beautiful HTML report with:
 ## Running Multiple Tasks
 
 ```python
-from prompttodraft.benchmark_tasks.runner import BenchmarkRunner
+from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
 
 # Create tasks
 tasks = [
