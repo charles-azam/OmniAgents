@@ -275,34 +275,80 @@ class GitStateManager(StateManager):
         result = backend.execute_command(command="git status")
         return result.exit_code == 0
 
-    def _initialize_git(self, backend: "ExecutionBackend", branch_name: str) -> None:
-        """Initialize git in working directory and set up remote."""
+    def _ensure_git_initialized(self, backend: "ExecutionBackend", branch_name: str) -> bool:
+        """
+        Ensure git is initialized with proper configuration and branch exists locally.
+
+        This method guarantees that:
+        1. Git is initialized in the working directory
+        2. Remote origin is configured
+        3. User name/email are set
+        4. The branch exists locally (either from remote or newly created)
+
+        Args:
+            backend: ExecutionBackend instance
+            branch_name: Name of the branch to ensure exists
+
+        Returns:
+            True if branch existed on remote (files available to load)
+            False if branch was newly created (no files to load)
+        """
         auth_url = self._get_authenticated_url()
 
-        backend.execute_command(command="git init")
-        backend.execute_command(command=f"git remote add origin {auth_url}")
-        backend.execute_command(command='git config user.name "PromptToDraft"')
-        backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
+        # Initialize git if not already initialized
+        if not self._is_git_initialized(backend=backend):
+            backend.execute_command(command="git init")
+            backend.execute_command(command=f"git remote add origin {auth_url}")
+            backend.execute_command(command='git config user.name "PromptToDraft"')
+            backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
 
-        # Try to fetch the branch if it exists
+        # Ensure we're on the correct branch
+        # Check current branch
+        current_branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD")
+        current_branch = current_branch_result.output.strip()
+
+        if current_branch != branch_name:
+            # Check if branch exists locally
+            branch_exists_result = backend.execute_command(command=f"git rev-parse --verify {branch_name}")
+
+            if branch_exists_result.exit_code == 0:
+                # Branch exists locally, just checkout
+                backend.execute_command(command=f"git checkout {branch_name}")
+            else:
+                # Branch doesn't exist locally, try to fetch from remote
+                fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
+
+                if fetch_result.exit_code == 0:
+                    # Branch exists on remote, create tracking branch
+                    backend.execute_command(command=f"git checkout -b {branch_name} origin/{branch_name}")
+                    return True
+                else:
+                    # Branch doesn't exist on remote, create new local branch
+                    backend.execute_command(command=f"git checkout -b {branch_name}")
+                    return False
+
+        # Already on correct branch, check if remote exists
         fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
-        if fetch_result.exit_code == 0:
-            # Branch exists on remote, check it out
-            backend.execute_command(command=f"git checkout -b {branch_name} origin/{branch_name}")
-        else:
-            # Branch doesn't exist, create new one
-            backend.execute_command(command=f"git checkout -b {branch_name}")
+        return fetch_result.exit_code == 0
 
     def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
-        """Save working directory to Git branch."""
+        """
+        Save working directory to Git branch.
+
+        Assumes git is already initialized (by load_latest during backend start).
+        Creates a commit with current files and pushes to remote.
+
+        Args:
+            backend: ExecutionBackend instance
+            message: Commit message (defaults to timestamped snapshot message)
+
+        Returns:
+            Commit SHA or "no-changes" if nothing to commit
+        """
         branch_name = self._get_branch_name(project_id=backend.project_id)
 
         # Ensure .gitignore exists
         self._ensure_gitignore(backend=backend)
-
-        # Initialize git if needed
-        if not self._is_git_initialized(backend=backend):
-            self._initialize_git(backend=backend, branch_name=branch_name)
 
         # Stage all files (gitignore handles filtering)
         backend.execute_command(command="git add .")
@@ -328,42 +374,29 @@ class GitStateManager(StateManager):
         return sha_result.output.strip()
 
     def load_latest(self, backend: "ExecutionBackend") -> bool:
-        """Load latest snapshot from Git branch."""
+        """
+        Load latest snapshot from Git branch.
+
+        Ensures git is initialized and branch exists locally.
+        If branch exists on remote, loads the latest files.
+
+        Returns:
+            True if files were loaded from remote
+            False if no remote branch exists (new project)
+        """
         branch_name = self._get_branch_name(project_id=backend.project_id)
-        auth_url = self._get_authenticated_url()
 
-        # Check if git is already initialized
-        if self._is_git_initialized(backend=backend):
-            # Fetch latest changes
-            fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
-            if fetch_result.exit_code != 0:
-                # Branch doesn't exist on remote
-                return False
+        # Ensure git is initialized and branch exists locally
+        # Returns True if branch existed on remote, False if newly created
+        branch_existed_remotely = self._ensure_git_initialized(backend=backend, branch_name=branch_name)
 
-            # Reset to remote branch
+        if branch_existed_remotely:
+            # Branch exists on remote, load latest files
             backend.execute_command(command=f"git reset --hard origin/{branch_name}")
             return True
         else:
-            # Clone the branch
-            # Initialize git and fetch
-            init_result = backend.execute_command(command="git init")
-            if init_result.exit_code != 0:
-                return False
-
-            backend.execute_command(command=f"git remote add origin {auth_url}")
-            backend.execute_command(command='git config user.name "PromptToDraft"')
-            backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
-
-            # Fetch the specific branch
-            fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
-            if fetch_result.exit_code != 0:
-                # Branch doesn't exist on remote, create new local branch
-                backend.execute_command(command=f"git checkout -b {branch_name}")
-                return False
-
-            # Checkout the branch
-            backend.execute_command(command=f"git checkout -b {branch_name} origin/{branch_name}")
-            return True
+            # New branch, no files to load
+            return False
 
     def cleanup(self, project_id: str) -> None:
         """Delete the branch for this project."""
