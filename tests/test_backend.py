@@ -628,7 +628,6 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
             except:
                 pass
 
-
 def test_local_backend_git_storage():
     """Test LocalBackend with Git storage."""
     project_id = get_project_id(base_name="test_backend_git_local")
@@ -656,6 +655,6 @@ if __name__ == "__main__":
     # test_docker_backend_e2e()
     # test_docker_backend_container_reuse()
     # test_e2b_backend_e2e()
-    test_local_backend_git_storage()
+    # test_local_backend_git_storage()
     test_docker_backend_git_storage()
     test_e2b_backend_git_storage()
