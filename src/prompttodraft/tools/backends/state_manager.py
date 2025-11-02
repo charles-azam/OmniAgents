@@ -357,7 +357,8 @@ class GitStateManager(StateManager):
             # Fetch the specific branch
             fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
             if fetch_result.exit_code != 0:
-                # Branch doesn't exist
+                # Branch doesn't exist on remote, create new local branch
+                backend.execute_command(command=f"git checkout -b {branch_name}")
                 return False
 
             # Checkout the branch

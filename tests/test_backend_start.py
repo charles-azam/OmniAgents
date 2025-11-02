@@ -104,6 +104,10 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
         # === SHUTDOWN (should create branch and commit) ===
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
+        
+        snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+        assert len(snapshots) == 1, f"Branch should have 1 commit, but found {len(snapshots)} commits"
+        assert snapshots[0]["message"] == "Shutdown snapshot", f"Commit message should be 'Shutdown snapshot', but found {snapshots[0]['message']}"
 
         # === RESTART AND VERIFY FILES LOADED ===
         backend.start()
@@ -189,3 +193,8 @@ def test_e2b_backend_git_first_start():
     project_id = get_project_id(base_name="test_git_first_start_e2b")
     backend = E2BBackend(project_id=project_id, storage=StorageType.GIT)
     run_backend_git_first_start_test(backend=backend)
+
+if __name__ == "__main__":
+    test_local_backend_git_first_start()
+    test_docker_backend_git_first_start()
+    test_e2b_backend_git_first_start()
