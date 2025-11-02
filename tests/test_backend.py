@@ -500,7 +500,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         # Pre-populate Git branch with test files to verify load works
         # We'll manually create a commit on the state branch
         branch_name = git_manager._get_branch_name(project_id=backend.project_id)
-        repo_url = git_manager.repo_url
+        auth_url = git_manager._get_authenticated_url()
 
         # Create temp directory with initial files
         import tempfile
@@ -509,7 +509,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
 
             # Initialize git repo
             subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-            subprocess.run(["git", "remote", "add", "origin", repo_url], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "remote", "add", "origin", auth_url], cwd=tmp_path, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, check=True, capture_output=True)
             subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, check=True, capture_output=True)
             subprocess.run(["git", "checkout", "-b", branch_name], cwd=tmp_path, check=True, capture_output=True)
