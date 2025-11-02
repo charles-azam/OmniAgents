@@ -472,7 +472,7 @@ def create_agent(
 
     # Get the dynamic system prompt with model ID
     model_id = getattr(model, "model_id", "groq/gpt-oss-120b")
-    system_prompt = get_system_prompt(cwd=cwd, model_id=model_id)
+    system_prompt = get_system_prompt(backend=backend, model_id=model_id)
 
     # Create tool instances using the ToolFactory
     tool_instances = ToolFactory.create_smolagents_tools(backend=backend)

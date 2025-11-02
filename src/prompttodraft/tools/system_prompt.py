@@ -5,17 +5,20 @@ This module provides functions to generate dynamic system prompts
 with directory structure and git information.
 """
 import datetime
-import os
 import platform
-import subprocess
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from prompttodraft.tools.backends.execution_backend import ExecutionBackend
 
 
-def get_directory_structure(start_path: str, ignore_patterns: list[str] | None = None) -> str:
+def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore_patterns: list[str] | None = None) -> str:
     """
-    Generate a nested directory structure as a string.
+    Generate a nested directory structure as a string using backend operations.
 
     Args:
+        backend: ExecutionBackend instance to use for filesystem operations
         start_path: The starting directory path
         ignore_patterns: List of patterns to ignore
 
@@ -26,176 +29,112 @@ def get_directory_structure(start_path: str, ignore_patterns: list[str] | None =
         ignore_patterns = [
             ".git",
             "__pycache__",
-            "*.pyc",
-            ".*",
-            "venv",
-            "env",
             ".venv",
             ".env",
-            "dist",
-            "build",
             "node_modules",
-            "*.egg-info",
-            "*.dist-info",
-            "site-packages",
-            "lib",
-            "include",
-            "bin",
-            ".cache",
-            "tmp",
-            "temp",
-            "typings",
-            "stubs",
-            "vendored",
             ".pytest_cache",
-            ".coverage",
-            ".vscode",
-            ".idea",
-            ".atom",
-            "vendor",
-            "third_party",
-            "external",
-            "htmlcov",
-            "coverage",
-            "benchmark",
+            ".cache",
         ]
 
-    # Get the working directory path
-    cwd = Path(start_path).resolve()
+    # Get all files recursively using backend
+    files = backend.list_directory(path=start_path, recursive=True)
 
     # Create formatted string
-    structure = f"- {cwd}/\n"
-
-    # We'll use a list to store the structure
+    structure = f"- {start_path}/\n"
     dir_structure = []
     max_files = 100
     file_count = 0
 
-    for root, dirs, files in os.walk(cwd, topdown=True):
-        # Skip ignored directories
-        dirs[:] = [
-            d
-            for d in dirs
-            if not any(
-                d == pattern
-                or (pattern.startswith("*") and d.endswith(pattern[1:]))
-                or (pattern == ".*" and d.startswith("."))
-                for pattern in ignore_patterns
-            )
-        ]
+    # Group files by directory
+    dirs_seen = set()
 
+    for file_info in files:
         # Skip if we've reached max files
         if file_count >= max_files:
             if len(dir_structure) > 0 and not dir_structure[-1].endswith("(truncated)"):
                 dir_structure.append("  ... (truncated for brevity)")
             break
 
-        level = root.replace(str(cwd), "").count(os.sep)
-        indent = "  " * (level + 1)
-        rel_path = os.path.relpath(root, start_path)
+        rel_path = Path(file_info.path).relative_to(start_path)
 
-        # Skip if this path contains any ignored pattern components
-        if any(pattern in rel_path.split(os.sep) for pattern in ignore_patterns if not pattern.startswith("*")):
+        # Skip ignored patterns
+        if any(pattern in str(rel_path).split("/") for pattern in ignore_patterns):
             continue
 
-        if rel_path != ".":
-            path_parts = rel_path.split(os.sep)
-            dir_name = path_parts[-1]
-            dir_structure.append(f"{indent}- {dir_name}/")
+        # Skip lock files and other large generated files
+        if str(rel_path).endswith((".lock", ".sum", ".mod", ".bin", ".whl")):
+            continue
 
-        # Limit files per directory
-        max_files_per_dir = 10
-        dir_files = []
+        # Calculate indentation level
+        level = len(rel_path.parts) - 1 if not file_info.is_dir else len(rel_path.parts)
+        indent = "  " * (level + 1)
 
-        sub_indent = "  " * (level + 2)
-        for file in sorted(files):
-            # Skip ignored files
-            if any(
-                file == pattern
-                or (pattern.startswith("*") and file.endswith(pattern[1:]))
-                or (pattern == ".*" and file.startswith("."))
-                for pattern in ignore_patterns
-            ):
-                continue
+        # Add parent directories if not seen
+        parent = rel_path.parent
+        if parent != Path(".") and str(parent) not in dirs_seen:
+            dirs_seen.add(str(parent))
+            parent_level = len(parent.parts)
+            parent_indent = "  " * (parent_level + 1)
+            dir_structure.append(f"{parent_indent}- {parent.name}/")
 
-            # Skip lock files and other large generated files
-            if file.endswith((".lock", ".sum", ".mod", ".bin", ".whl")):
-                continue
-
-            dir_files.append(f"{sub_indent}- {file}")
-            file_count += 1
-
-            if file_count >= max_files:
-                break
-
-        # Add directory files (limited)
-        if len(dir_files) > max_files_per_dir:
-            dir_structure.extend(dir_files[:max_files_per_dir])
-            dir_structure.append(f"{sub_indent}  ... ({len(dir_files) - max_files_per_dir} more files)")
+        # Add file or directory
+        if file_info.is_dir:
+            if str(rel_path) not in dirs_seen:
+                dirs_seen.add(str(rel_path))
+                dir_structure.append(f"{indent}- {rel_path.name}/")
         else:
-            dir_structure.extend(dir_files)
-
-    # If we reached the max files, add a note
-    if file_count >= max_files:
-        dir_structure.append("  ... (truncated for brevity)")
+            dir_structure.append(f"{indent}- {rel_path.name}")
+            file_count += 1
 
     return "".join([structure] + [f"{line}\n" for line in dir_structure])
 
 
-def is_git_repo(path: str) -> bool:
+def is_git_repo(backend: "ExecutionBackend") -> bool:
     """
-    Check if the given path is a git repository.
+    Check if the working directory is a git repository.
 
     Args:
-        path: Path to check
+        backend: ExecutionBackend instance to use for command execution
 
     Returns:
-        True if path is a git repository
+        True if working directory is a git repository
     """
-    result = subprocess.run(
-        ["git", "-C", path, "rev-parse", "--is-inside-work-tree"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.returncode == 0 and result.stdout.strip() == "true"
+    result = backend.execute_command(command="git rev-parse --is-inside-work-tree")
+    return result.exit_code == 0 and result.output.strip() == "true"
 
 
-def get_git_status(cwd: str) -> str:
+def get_git_status(backend: "ExecutionBackend") -> str:
     """
-    Get git status information for the context.
+    Get git status information for the context using backend.
 
     Args:
-        cwd: Current working directory
+        backend: ExecutionBackend instance to use for command execution
 
     Returns:
         Formatted git status string
     """
     # Get current branch
-    branch_cmd = ["git", "-C", cwd, "rev-parse", "--abbrev-ref", "HEAD"]
-    branch = subprocess.run(branch_cmd, capture_output=True, text=True, check=False).stdout.strip()
+    branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD")
+    branch = branch_result.output.strip() if branch_result.exit_code == 0 else "unknown"
 
     # Get remote main branch
-    main_branch_cmd = ["git", "-C", cwd, "remote", "show", "origin"]
-    main_output = subprocess.run(main_branch_cmd, capture_output=True, text=True, check=False).stdout
+    main_result = backend.execute_command(command="git remote show origin")
     main_branch = "main"
-    for line in main_output.splitlines():
-        if "HEAD branch" in line:
-            main_branch = line.split(":")[-1].strip()
+    if main_result.exit_code == 0:
+        for line in main_result.output.splitlines():
+            if "HEAD branch" in line:
+                main_branch = line.split(":")[-1].strip()
 
     # Get status
-    status_cmd = ["git", "-C", cwd, "status", "--porcelain"]
-    status_output = subprocess.run(status_cmd, capture_output=True, text=True, check=False).stdout
-
-    if status_output.strip():
-        status_lines = status_output.strip().split("\n")
-        status = "\n".join(status_lines)
+    status_result = backend.execute_command(command="git status --porcelain")
+    if status_result.exit_code == 0 and status_result.output.strip():
+        status = status_result.output.strip()
     else:
         status = "(clean)"
 
     # Get recent commits
-    log_cmd = ["git", "-C", cwd, "log", "--oneline", "--max-count=5"]
-    log_output = subprocess.run(log_cmd, capture_output=True, text=True, check=False).stdout.strip()
+    log_result = backend.execute_command(command="git log --oneline --max-count=5")
+    log_output = log_result.output.strip() if log_result.exit_code == 0 else ""
 
     git_status_text = f"""This is the git status at the start of the conversation. Note that this status is a snapshot in time, and will not update during the conversation.
 Current branch: {branch}
@@ -210,38 +149,39 @@ Recent commits:
     return git_status_text
 
 
-def load_memory(cwd: str) -> str:
+def load_memory(backend: "ExecutionBackend") -> str:
     """
     Load memory from .gemini/GEMINI.md if it exists.
 
     Args:
-        cwd: Current working directory
+        backend: ExecutionBackend instance to use for file operations
 
     Returns:
         Memory content or empty string if file doesn't exist
     """
-    memory_file = os.path.join(cwd, ".gemini", "GEMINI.md")
-    if os.path.exists(memory_file):
-        with open(memory_file, "r") as f:
-            content = f.read().strip()
-            if content:
-                return content
+    working_dir = backend.get_working_directory()
+    memory_file = f"{working_dir}/.gemini/GEMINI.md"
+
+    if backend.file_exists(path=memory_file):
+        content = backend.read_file(file_path=memory_file).strip()
+        if content:
+            return content
     return ""
 
 
-def get_system_prompt(cwd: str | None = None, model_id: str = "groq/gpt-oss-120b") -> str:
+def get_system_prompt(backend: "ExecutionBackend", model_id: str = "groq/gpt-oss-120b") -> str:
     """
     Generate the system prompt with dynamic values filled in.
 
     Args:
-        cwd: Current working directory (defaults to os.getcwd())
+        backend: ExecutionBackend instance to use for filesystem/command operations
         model_id: Model identifier to include in the prompt
 
     Returns:
         Formatted system prompt string
     """
-    if cwd is None:
-        cwd = os.getcwd()
+    import os
+    cwd = backend.get_working_directory()
 
     # The system message template is in the same directory as this file
     template_path = os.path.join(os.path.dirname(__file__), "system_message.txt")
@@ -253,10 +193,10 @@ def get_system_prompt(cwd: str | None = None, model_id: str = "groq/gpt-oss-120b
     today = datetime.datetime.now().strftime("%-m/%-d/%Y")
 
     # Check if directory is a git repo
-    is_repo = is_git_repo(cwd)
+    is_repo = is_git_repo(backend=backend)
 
     # Get directory structure
-    dir_structure = get_directory_structure(cwd)
+    dir_structure = get_directory_structure(backend=backend, start_path=cwd)
 
     # Replace placeholders in the template with actual values
     system_message = system_message.replace("{working_directory}", cwd)
@@ -270,11 +210,11 @@ def get_system_prompt(cwd: str | None = None, model_id: str = "groq/gpt-oss-120b
 
     # Add git status if it's a git repository
     if is_repo:
-        git_status = get_git_status(cwd)
+        git_status = get_git_status(backend=backend)
         system_message = system_message + f'\n<context name="gitStatus">{git_status}</context>\n'
 
     # Load and append memory from .gemini/GEMINI.md if it exists
-    memory_content = load_memory(cwd)
+    memory_content = load_memory(backend=backend)
     if memory_content:
         system_message = system_message + f'\n\n<context name="memory">User Memory (from .gemini/GEMINI.md):\n\n{memory_content}</context>\n'
 
