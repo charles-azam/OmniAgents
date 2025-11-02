@@ -5,10 +5,10 @@ This test verifies that the agent can be created with different backends
 and has access to all 10 tools.
 """
 import os
-from prompttodraft.tools.agent import create_agent
-from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.agent import create_agent
+from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.state_manager import StorageType
 
 
 def test_agent_creation():
@@ -67,7 +67,7 @@ def test_system_prompt_generation():
     """Test that system prompt is generated correctly."""
     print("\nTesting system prompt generation...")
 
-    from prompttodraft.tools.system_prompt import get_system_prompt
+    from prompttodraft.agent.system_prompt import get_system_prompt
 
     # Create a LocalBackend for testing
     backend = LocalBackend(project_id="test_system_prompt", storage=StorageType.NONE)

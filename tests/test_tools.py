@@ -17,24 +17,24 @@ import os
 from pathlib import Path
 import pytest
 
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus
+from prompttodraft.agent.backends.state_manager import StorageType
 
-from prompttodraft.tools.core.list_directory_tool import ListDirectoryTool
-from prompttodraft.tools.core.read_file_tool import ReadFileTool
-from prompttodraft.tools.core.write_file_tool import WriteFileTool
-from prompttodraft.tools.core.glob_tool import GlobTool
-from prompttodraft.tools.core.search_file_content_tool import SearchFileContentTool
-from prompttodraft.tools.core.replace_tool import ReplaceTool
-from prompttodraft.tools.core.run_shell_command_tool import RunShellCommandTool
-from prompttodraft.tools.core.read_many_files_tool import ReadManyFilesTool
-from prompttodraft.tools.core.save_memory_tool import SaveMemoryTool
-from prompttodraft.tools.core.uv_tool import UVTool
+from prompttodraft.agent.core.list_directory_tool import ListDirectoryTool
+from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.core.write_file_tool import WriteFileTool
+from prompttodraft.agent.core.glob_tool import GlobTool
+from prompttodraft.agent.core.search_file_content_tool import SearchFileContentTool
+from prompttodraft.agent.core.replace_tool import ReplaceTool
+from prompttodraft.agent.core.run_shell_command_tool import RunShellCommandTool
+from prompttodraft.agent.core.read_many_files_tool import ReadManyFilesTool
+from prompttodraft.agent.core.save_memory_tool import SaveMemoryTool
+from prompttodraft.agent.core.uv_tool import UVTool
 
-from prompttodraft.tools.outputs.models import (
+from prompttodraft.agent.outputs.models import (
     FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,

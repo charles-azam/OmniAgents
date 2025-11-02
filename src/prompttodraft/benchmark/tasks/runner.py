@@ -14,7 +14,7 @@ from smolagents import CodeAgent, ApiModel
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask
 from prompttodraft.benchmark.tasks.metrics import BenchmarkResult
-from prompttodraft.tools.factory import ToolFactory
+from prompttodraft.agent.factory import ToolFactory
 
 
 class AgentExecutionError(Exception):

@@ -7,14 +7,14 @@ import subprocess
 import shutil
 from pathlib import Path
 
-from prompttodraft.tools.backends.execution_backend import (
+from prompttodraft.agent.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StorageType
 from prompttodraft.common import LOCAL_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds

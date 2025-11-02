@@ -10,14 +10,14 @@ from pathlib import Path
 import docker
 from docker.models.containers import Container
 
-from prompttodraft.tools.backends.execution_backend import (
+from prompttodraft.agent.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StorageType
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds

@@ -10,14 +10,14 @@ from e2b.sandbox.filesystem.filesystem import FileType as E2BFileType
 from e2b.sandbox.commands.command_handle import CommandExitException
 from e2b.exceptions import NotFoundException
 
-from prompttodraft.tools.backends.execution_backend import (
+from prompttodraft.agent.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StorageType
 from prompttodraft.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds

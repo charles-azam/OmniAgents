@@ -5,10 +5,10 @@ This tool writes content to a specified file, creating it if it doesn't exist.
 """
 from pathlib import Path
 
-from prompttodraft.tools.core.base_tool import CoreTool
-from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
-from prompttodraft.tools.outputs.models import (
+from prompttodraft.agent.core.base_tool import CoreTool
+from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.agent.outputs.models import (
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,

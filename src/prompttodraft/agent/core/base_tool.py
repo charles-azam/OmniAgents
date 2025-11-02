@@ -5,9 +5,9 @@ This module defines the abstract base class that all core tools inherit from.
 """
 from abc import ABC, abstractmethod
 
-from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
-from prompttodraft.tools.outputs.models import ToolOutputModel
+from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend
+from prompttodraft.agent.outputs.models import ToolOutputModel
 
 
 class CoreTool(ABC):

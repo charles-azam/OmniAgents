@@ -11,11 +11,11 @@ from pathlib import Path
 import pytest
 
 from prompttodraft.common import DOCKER_BACKEND_PATH, GCP_DATA_PATH, LOCAL_BACKEND_PATH
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.state_manager import GitStateManager, StorageType
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.state_manager import GitStateManager, StorageType
 
 
 def get_project_id(base_name: str) -> str:

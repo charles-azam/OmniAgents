@@ -5,11 +5,11 @@ Tests the initialize_project function with different backends (local, docker, e2
 """
 import pytest
 
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus
+from prompttodraft.agent.backends.state_manager import StorageType
 from prompttodraft.utils import initialize_project
 
 

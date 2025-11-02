@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompttodraft.tools.backends.execution_backend import ExecutionBackend
+    from prompttodraft.agent.backends.execution_backend import ExecutionBackend
 
 
 def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore_patterns: list[str] | None = None) -> str:

@@ -1,8 +1,8 @@
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from prompttodraft.agent.backends.state_manager import StorageType
 from pathlib import Path
 import pytest
 import os
@@ -470,7 +470,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
 
     # === FRESH START CLEANUP ===
     # Clean Git branch if exists
-    from prompttodraft.tools.backends.state_manager import GitStateManager
+    from prompttodraft.agent.backends.state_manager import GitStateManager
     git_manager = GitStateManager()
     git_manager.cleanup(project_id=backend.project_id)
 

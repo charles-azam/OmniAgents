@@ -26,10 +26,10 @@ See `gemini_cli_tool.md` for complete Gemini CLI specifications.
 All tools inherit from `CoreTool` base class and follow this pattern:
 
 ```python
-from prompttodraft.tools.core.base_tool import CoreTool
-from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend
-from prompttodraft.tools.outputs.models import ToolOutputModel
+from prompttodraft.agent.core.base_tool import CoreTool
+from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend
+from prompttodraft.agent.outputs.models import ToolOutputModel
 
 class ExampleTool(CoreTool):
     # Tool metadata for framework adapters
@@ -99,7 +99,7 @@ These tools are reverse-engineered from Gemini CLI. See `gemini_cli_tool.md` for
 1. **Create tool file** in `core/`:
 
 ```python
-from prompttodraft.tools.core.base_tool import CoreTool
+from prompttodraft.agent.core.base_tool import CoreTool
 
 class NewTool(CoreTool):
     metadata = ToolMetadata(

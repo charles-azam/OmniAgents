@@ -44,10 +44,10 @@ uv sync
 ## Usage
 
 ```python
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.e2b_backend import E2BBackend
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.agent.backends.state_manager import StorageType
 
 # Choose your backend with storage option
 backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
@@ -72,7 +72,7 @@ backend.shutdown()
 
 **GitHub Storage (default):**
 ```python
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StorageType
 
 backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
 ```

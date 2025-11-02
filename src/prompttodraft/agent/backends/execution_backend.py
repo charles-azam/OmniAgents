@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from prompttodraft.tools.backends.state_manager import (
+from prompttodraft.agent.backends.state_manager import (
     StateManager,
     GCSStateManager,
     GitStateManager,

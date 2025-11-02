@@ -5,10 +5,10 @@ This tool saves and recalls information across sessions by appending to a memory
 """
 from pathlib import Path
 
-from prompttodraft.tools.core.base_tool import CoreTool
-from prompttodraft.tools.core.metadata import ToolMetadata
-from prompttodraft.tools.backends.execution_backend import ExecutionBackend, FileType
-from prompttodraft.tools.outputs.models import (
+from prompttodraft.agent.core.base_tool import CoreTool
+from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.agent.outputs.models import (
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,
@@ -49,8 +49,8 @@ class SaveMemoryTool(CoreTool):
             Absolute path to the memory file
         """
         # For Docker and E2B backends, use working directory to avoid permission issues
-        from prompttodraft.tools.backends.docker_backend import DockerBackend
-        from prompttodraft.tools.backends.e2b_backend import E2BBackend
+        from prompttodraft.agent.backends.docker_backend import DockerBackend
+        from prompttodraft.agent.backends.e2b_backend import E2BBackend
 
         if isinstance(self.backend, (DockerBackend, E2BBackend)):
             return str(Path(self.backend.get_working_directory()) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)

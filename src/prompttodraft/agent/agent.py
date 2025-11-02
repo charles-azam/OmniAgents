@@ -17,7 +17,7 @@ from rich.table import Table
 from rich.text import Text
 from smolagents import AgentLogger, LogLevel, Tool, ToolCallingAgent, ApiModel, InferenceClientModel
 
-from prompttodraft.tools.outputs.models import (
+from prompttodraft.agent.outputs.models import (
     CodeOutputModel,
     ErrorOutputModel,
     FileListOutputModel,
@@ -440,11 +440,11 @@ def create_agent(
     """
     from dotenv import load_dotenv
 
-    from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
-    from prompttodraft.tools.backends.execution_backend import ExecutionBackend
-    from prompttodraft.tools.backends.local_backend import LocalBackend
-    from prompttodraft.tools.backends.state_manager import StorageType
-    from prompttodraft.tools.system_prompt import get_system_prompt
+    from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+    from prompttodraft.agent.backends.execution_backend import ExecutionBackend
+    from prompttodraft.agent.backends.local_backend import LocalBackend
+    from prompttodraft.agent.backends.state_manager import StorageType
+    from prompttodraft.agent.system_prompt import get_system_prompt
     from prompttodraft.utils import initialize_project
 
     # Initialize environment variables

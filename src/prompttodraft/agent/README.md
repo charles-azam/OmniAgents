@@ -105,10 +105,10 @@ tools/
 Combine **any execution environment** with **any framework** and **any storage**:
 
 ```python
-from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.docker_backend import DockerBackend
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.agent.backends.state_manager import StorageType
 
 # Local execution with smolagents + Git storage
 backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
@@ -147,8 +147,8 @@ tools = create_smolagents_tools(backend=docker_backend)
 ### Using Core Tools Directly
 
 ```python
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.core.read_file_tool import ReadFileTool
 
 # Create backend
 backend = LocalBackend(project_id="my-project")
@@ -165,9 +165,9 @@ output = result.handle()
 ### Using with smolagents
 
 ```python
-from prompttodraft.tools.adapters.smolagents_adapter import create_smolagents_tools
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.state_manager import StorageType
 from smolagents import CodeAgent
 
 # Create backend and tools (with Git storage)
@@ -216,8 +216,8 @@ Backends handle persistent state with cloud storage using two storage options:
 ### Usage
 
 ```python
-from prompttodraft.tools.backends.local_backend import LocalBackend
-from prompttodraft.tools.backends.state_manager import StorageType
+from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.state_manager import StorageType
 
 # Using Git storage (default)
 backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
