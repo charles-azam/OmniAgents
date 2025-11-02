@@ -17,7 +17,7 @@ from prompttodraft.agent.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StateManager
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -28,12 +28,12 @@ CONTAINER_WORKSPACE = "/workspace"
 class DockerBackend(ExecutionBackend):
     """Docker execution backend."""
 
-    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT):
+    def __init__(self, project_id: str, state_manager: StateManager):
+        super().__init__(state_manager=state_manager)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._container: Container | None = None
         self._client = docker.from_env()
-        self._state_manager = self._create_state_manager(storage=storage)
 
     @property
     def project_id(self) -> str:
@@ -65,7 +65,7 @@ class DockerBackend(ExecutionBackend):
                 self._container.start()
             self._status = BackendStatus.RUNNING
             # Load latest state from state manager
-            self._state_manager.load_latest(backend=self)
+            self.state_manager.load_latest(backend=self)
             return
 
         # No container exists, create new one
@@ -102,7 +102,7 @@ class DockerBackend(ExecutionBackend):
 
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
-        self._state_manager.load_latest(backend=self)
+        self.state_manager.load_latest(backend=self)
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown
@@ -110,7 +110,7 @@ class DockerBackend(ExecutionBackend):
             # Already shut down, nothing to do
             return
 
-        self._state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
         self._container.stop()
         self._container.remove()
         self._container = None

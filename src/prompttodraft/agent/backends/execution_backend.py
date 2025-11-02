@@ -9,13 +9,7 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
-from prompttodraft.agent.backends.state_manager import (
-    StateManager,
-    GCSStateManager,
-    GitStateManager,
-    NoOpStateManager,
-    StorageType
-)
+from prompttodraft.agent.backends.state_manager import StateManager
 
 
 class BackendStatus(Enum):
@@ -56,19 +50,17 @@ class CommandResult:
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
-    @abstractmethod
-    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT) -> None:
+    def __init__(self, state_manager: StateManager) -> None:
         """
-        Create a backend instance for a specific project.
+        Create a backend instance with a state manager.
 
         Args:
-            project_id: Identifier for the project
-            storage: Storage backend for state persistence:
-                - StorageType.GIT: Use GitHub branches (default)
-                - StorageType.GCS: Use Google Cloud Storage buckets
-                - StorageType.NONE: No state persistence
+            state_manager: StateManager instance for state persistence
+                - GitStateManager(): Use GitHub branches
+                - GCSStateManager(): Use Google Cloud Storage buckets
+                - NoOpStateManager(): No state persistence
         """
-        pass
+        self.state_manager = state_manager
 
     @property
     @abstractmethod
@@ -112,33 +104,6 @@ class ExecutionBackend(ABC):
             Current backend status
         """
         pass
-
-    # === State Management ===
-
-    def _create_state_manager(self, storage: StorageType) -> StateManager:
-        """
-        Create appropriate StateManager based on storage parameter.
-
-        Args:
-            storage: Storage backend type (StorageType enum)
-
-        Returns:
-            StateManager instance
-
-        Raises:
-            ValueError: If storage type is not recognized
-        """
-        if storage == StorageType.GIT:
-            return GitStateManager()
-        elif storage == StorageType.GCS:
-            return GCSStateManager()
-        elif storage == StorageType.NONE:
-            return NoOpStateManager()
-        else:
-            raise ValueError(
-                f"Unknown storage type: {storage}. "
-                f"Valid options: StorageType.GIT, StorageType.GCS, StorageType.NONE"
-            )
 
     # === Command Execution ===
 

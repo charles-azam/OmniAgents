@@ -14,7 +14,7 @@ from prompttodraft.agent.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StateManager
 from prompttodraft.common import LOCAL_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -23,10 +23,10 @@ DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 class LocalBackend(ExecutionBackend):
     """Local execution backend."""
 
-    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT):
+    def __init__(self, project_id: str, state_manager: StateManager):
+        super().__init__(state_manager=state_manager)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
-        self._state_manager = self._create_state_manager(storage=storage)
 
     @property
     def project_id(self) -> str:
@@ -41,11 +41,11 @@ class LocalBackend(ExecutionBackend):
         self._project_path.mkdir(parents=True, exist_ok=True)
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
-        self._state_manager.load_latest(backend=self)
+        self.state_manager.load_latest(backend=self)
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown
-        self._state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:

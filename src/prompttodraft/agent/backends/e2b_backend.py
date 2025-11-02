@@ -17,7 +17,7 @@ from prompttodraft.agent.backends.execution_backend import (
     FileInfo,
     CommandResult,
 )
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import StateManager
 from prompttodraft.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -28,11 +28,11 @@ SANDBOX_WORKING_DIR = "/tmp/workspace"  # Working directory inside E2B sandbox
 class E2BBackend(ExecutionBackend):
     """E2B execution backend."""
 
-    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT):
+    def __init__(self, project_id: str, state_manager: StateManager):
+        super().__init__(state_manager=state_manager)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._sandbox: Sandbox | None = None
-        self._state_manager = self._create_state_manager(storage=storage)
 
     @property
     def project_id(self) -> str:
@@ -59,7 +59,7 @@ class E2BBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
 
         # Load existing files from state manager if any
-        self._state_manager.load_latest(backend=self)
+        self.state_manager.load_latest(backend=self)
 
     def shutdown(self) -> None:
         # Sync files via state manager and kill sandbox
@@ -68,7 +68,7 @@ class E2BBackend(ExecutionBackend):
             return
 
         # Sync before killing sandbox
-        self._state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
 
         self._sandbox.kill()
         self._sandbox = None

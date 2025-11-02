@@ -30,7 +30,11 @@ from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.docker_backend import DockerBackend
 from prompttodraft.agent.backends.e2b_backend import E2BBackend
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import (
+    NoOpStateManager,
+    GitStateManager,
+    GCSStateManager,
+)
 
 from prompttodraft.agent.core.list_directory_tool import ListDirectoryTool
 from prompttodraft.agent.core.read_file_tool import ReadFileTool
@@ -57,12 +61,7 @@ def cleanup_backend(backend: ExecutionBackend) -> None:
 
     # Clean persistent storage (Git/GCS/None) via state manager
     # The state manager's cleanup() handles storage-specific cleanup
-    if hasattr(backend, '_state_manager') and backend._state_manager:
-        try:
-            backend._state_manager.cleanup(project_id=backend.project_id)
-        except Exception:
-            # Ignore cleanup errors (branch/bucket might not exist yet)
-            pass
+    backend.state_manager.cleanup(project_id=backend.project_id)
 
     # Clean local data directory (backend-specific paths)
     if isinstance(backend, LocalBackend):
@@ -400,41 +399,41 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
 def test_tools_local_backend():
     """Test all tools with LocalBackend."""
-    backend = LocalBackend(project_id="test_tools_local", storage=StorageType.NONE)
+    backend = LocalBackend(project_id="test_tools_local", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 def test_tools_docker_backend():
     """Test all tools with DockerBackend."""
-    backend = DockerBackend(project_id="test_tools_docker", storage=StorageType.NONE)
+    backend = DockerBackend(project_id="test_tools_docker", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_tools_e2b_backend():
     """Test all tools with E2BBackend."""
-    backend = E2BBackend(project_id="test_tools_e2b", storage=StorageType.NONE)
+    backend = E2BBackend(project_id="test_tools_e2b", state_manager=NoOpStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_tools_local_backend_with_git_storage():
     """Test all tools with LocalBackend and Git storage."""
-    backend = LocalBackend(project_id="test_tools_local_git", storage=StorageType.GIT)
+    backend = LocalBackend(project_id="test_tools_local_git", state_manager=GitStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_tools_local_backend_with_gcs_storage():
     """Test all tools with LocalBackend and GCS storage."""
-    backend = LocalBackend(project_id="test_tools_local_gcs", storage=StorageType.GCS)
+    backend = LocalBackend(project_id="test_tools_local_gcs", state_manager=GCSStateManager())
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_git_storage_persistence():
     """Test that Git storage properly persists and restores state."""
-    backend = LocalBackend(project_id="test_git_persistence", storage=StorageType.GIT)
+    backend = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
     cleanup_backend(backend=backend)
 
     try:
@@ -448,8 +447,8 @@ def test_git_storage_persistence():
         # Save to Git storage
         backend.shutdown()
 
-        # Create a new backend with same project_id
-        backend2 = LocalBackend(project_id="test_git_persistence", storage=StorageType.GIT)
+        # Create a new backend with same project_id and state manager
+        backend2 = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
         backend2.start()
 
         # Verify file was restored
@@ -467,7 +466,7 @@ def test_git_storage_persistence():
 @pytest.mark.storage
 def test_gcs_storage_persistence():
     """Test that GCS storage properly persists and restores state."""
-    backend = LocalBackend(project_id="test_gcs_persistence", storage=StorageType.GCS)
+    backend = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
     cleanup_backend(backend=backend)
 
     try:
@@ -481,8 +480,8 @@ def test_gcs_storage_persistence():
         # Save to GCS storage
         backend.shutdown()
 
-        # Create a new backend with same project_id
-        backend2 = LocalBackend(project_id="test_gcs_persistence", storage=StorageType.GCS)
+        # Create a new backend with same project_id and state manager
+        backend2 = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
         backend2.start()
 
         # Verify file was restored
