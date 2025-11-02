@@ -40,6 +40,11 @@ class FileInfo:
     path: str
     type: FileType
 
+    @property
+    def is_dir(self) -> bool:
+        """Check if this is a directory."""
+        return self.type == FileType.DIRECTORY
+
 
 @dataclass
 class CommandResult:

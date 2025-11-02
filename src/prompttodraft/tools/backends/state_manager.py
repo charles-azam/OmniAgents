@@ -370,11 +370,11 @@ class GitStateManager(StateManager):
             # No token, cannot delete branch
             return
 
-        from github import Github, GithubException
+        from github import Github, GithubException, Auth
 
         branch_name = self._get_branch_name(project_id=project_id)
 
-        gh = Github(auth=self.github_token)
+        gh = Github(auth=Auth.Token(token=self.github_token))
         repo = gh.get_repo(full_name_or_id=self.repo_path)
 
         # Try to get and delete the branch
@@ -391,11 +391,11 @@ class GitStateManager(StateManager):
             # No token, cannot list commits
             return []
 
-        from github import Github, GithubException
+        from github import Github, GithubException, Auth
 
         branch_name = self._get_branch_name(project_id=project_id)
 
-        gh = Github(auth=self.github_token)
+        gh = Github(auth=Auth.Token(token=self.github_token))
         repo = gh.get_repo(full_name_or_id=self.repo_path)
 
         # Try to get the branch and its commits
