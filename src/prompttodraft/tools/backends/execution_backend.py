@@ -8,10 +8,14 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from datetime import datetime, timezone
 
-from prompttodraft.common import GCP_DATA_PATH
-from prompttodraft import storage_utils
+from prompttodraft.tools.backends.state_manager import (
+    StateManager,
+    GCSStateManager,
+    GitStateManager,
+    NoOpStateManager,
+    StorageType
+)
 
 
 class BackendStatus(Enum):
@@ -36,6 +40,11 @@ class FileInfo:
     path: str
     type: FileType
 
+    @property
+    def is_dir(self) -> bool:
+        """Check if this is a directory."""
+        return self.type == FileType.DIRECTORY
+
 
 @dataclass
 class CommandResult:
@@ -48,12 +57,16 @@ class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
     @abstractmethod
-    def __init__(self, project_id: str) -> None:
+    def __init__(self, project_id: str, storage: StorageType = StorageType.GIT) -> None:
         """
         Create a backend instance for a specific project.
 
         Args:
             project_id: Identifier for the project
+            storage: Storage backend for state persistence:
+                - StorageType.GIT: Use GitHub branches (default)
+                - StorageType.GCS: Use Google Cloud Storage buckets
+                - StorageType.NONE: No state persistence
         """
         pass
 
@@ -102,129 +115,30 @@ class ExecutionBackend(ABC):
 
     # === State Management ===
 
-    def _should_sync_file(self, file_path: str) -> bool:
+    def _create_state_manager(self, storage: StorageType) -> StateManager:
         """
-        Check if a file should be synced to bucket based on gitignore-like rules.
+        Create appropriate StateManager based on storage parameter.
 
         Args:
-            file_path: Relative file path from working directory
+            storage: Storage backend type (StorageType enum)
 
         Returns:
-            True if file should be synced, False otherwise
+            StateManager instance
+
+        Raises:
+            ValueError: If storage type is not recognized
         """
-        path = Path(file_path)
-
-        # Skip any file under a directory that starts with "."
-        for part in path.parts:
-            if part.startswith("."):
-                return False
-
-        # Ignore specific patterns
-        ignore_patterns = [
-            "__pycache__", "node_modules"
-        ]
-
-        for part in path.parts:
-            if part in ignore_patterns or part.endswith(".pyc"):
-                return False
-
-        # Include only specific extensions
-        allowed_extensions = {".py", ".txt", ".md", ".json", ".yaml", ".yml", ".toml"}
-        allowed_filenames = {"pyproject.toml"}
-
-        if path.name in allowed_filenames:
-            return True
-
-        return path.suffix in allowed_extensions
-
-    def sync_to_bucket(self) -> None:
-        """
-        Sync all relevant files from working directory to bucket with timestamp.
-
-        Files are saved under project_id/timestamp/ to create immutable snapshots.
-        This prevents deleted files from being restored on reload.
-
-        Only syncs files matching allowed extensions (.py, .txt, .md, .json, .yaml, .toml)
-        and excludes common ignore patterns (.venv/, __pycache__/, etc.).
-        """
-        working_dir = Path(self.get_working_directory())
-
-        # Create timestamp snapshot
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = GCP_DATA_PATH / self.project_id / timestamp
-
-        # List all files recursively
-        files = self.list_directory(path=working_dir, recursive=True)
-
-        for file_info in files:
-            if file_info.type != FileType.FILE:
-                continue
-
-            # Get relative path from working directory
-            file_path = Path(file_info.path)
-            relative_path = file_path.relative_to(working_dir)
-
-            # Check if file should be synced
-            if not self._should_sync_file(str(relative_path)):
-                continue
-
-            # Read file content
-            content = self.read_file(file_path=file_path)
-
-            # Write to bucket with timestamp (storage_utils expects path relative to GCP_DATA_PATH)
-            bucket_path = project_data_path / relative_path
-            storage_utils.write_to_storage(file_path=bucket_path, content=content)
-
-    def load_from_bucket(self) -> None:
-        """
-        Load all files from the latest snapshot in bucket into the working directory.
-
-        Finds the most recent timestamp snapshot under project_id/ and loads all files
-        from that snapshot. This ensures deleted files are not restored.
-        """
-        working_dir = Path(self.get_working_directory())
-        bucket = storage_utils.get_bucket()
-
-        # Find all timestamp directories for this project
-        prefix = f"{self.project_id}/"
-        timestamps = set()
-
-        for blob in bucket.list_blobs(prefix=prefix):
-            # Extract timestamp from blob path: project_id/timestamp/file/path
-            blob_path = Path(blob.name)
-            parts = blob_path.parts
-
-            if len(parts) >= 2 and parts[0] == self.project_id:
-                timestamps.add(parts[1])
-
-        if not timestamps:
-            # No snapshots exist yet
-            return
-
-        # Get the latest timestamp (lexicographically sorted due to timestamp format)
-        latest_timestamp = max(timestamps)
-
-        # Load files from latest snapshot
-        snapshot_prefix = f"{self.project_id}/{latest_timestamp}/"
-        project_data_path = GCP_DATA_PATH / self.project_id / latest_timestamp
-
-        for blob in bucket.list_blobs(prefix=snapshot_prefix):
-            # Get relative path from snapshot directory
-            blob_path = Path(blob.name)
-            # Remove project_id/timestamp/ prefix to get file relative path
-            relative_path = blob_path.relative_to(self.project_id).relative_to(latest_timestamp)
-
-            # Check if file should be loaded (same filters as sync)
-            if not self._should_sync_file(str(relative_path)):
-                continue
-
-            # Read from bucket
-            bucket_file_path = project_data_path / relative_path
-            content = storage_utils.read_from_storage(file_path=bucket_file_path)
-
-            # Write to working directory
-            dest_path = working_dir / relative_path
-            self.write_file(file_path=dest_path, content=content)
+        if storage == StorageType.GIT:
+            return GitStateManager()
+        elif storage == StorageType.GCS:
+            return GCSStateManager()
+        elif storage == StorageType.NONE:
+            return NoOpStateManager()
+        else:
+            raise ValueError(
+                f"Unknown storage type: {storage}. "
+                f"Valid options: StorageType.GIT, StorageType.GCS, StorageType.NONE"
+            )
 
     # === Command Execution ===
 

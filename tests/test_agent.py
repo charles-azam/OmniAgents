@@ -8,6 +8,7 @@ import os
 from prompttodraft.tools.agent import create_agent
 from prompttodraft.tools.factory import ToolFactory
 from prompttodraft.tools.backends.local_backend import LocalBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 
 
 def test_agent_creation():
@@ -46,7 +47,7 @@ def test_agent_with_custom_backend():
     print("\nTesting agent with custom backend...")
 
     # Create a LocalBackend
-    backend = LocalBackend(project_id="test_agent")
+    backend = LocalBackend(project_id="test_agent", storage=StorageType.NONE)
     backend.start()
 
     # Create agent with custom backend
@@ -67,8 +68,15 @@ def test_system_prompt_generation():
 
     from prompttodraft.tools.system_prompt import get_system_prompt
 
+    # Create a LocalBackend for testing
+    backend = LocalBackend(project_id="test_system_prompt", storage=StorageType.NONE)
+    backend.start()
+
     # Generate system prompt
-    system_prompt = get_system_prompt(cwd=os.getcwd())
+    system_prompt = get_system_prompt(backend=backend, model_id="test-model")
+
+    # Shutdown backend
+    backend.shutdown()
 
     # Verify prompt contains key sections
     assert "Core Mandates" in system_prompt
@@ -93,7 +101,7 @@ def test_tool_factory():
     print("\nTesting ToolFactory...")
 
     # Create backend
-    backend = LocalBackend(project_id="test_factory")
+    backend = LocalBackend(project_id="test_factory", storage=StorageType.NONE)
     backend.start()
 
     # Create tools

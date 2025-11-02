@@ -53,5 +53,7 @@ jobs:
     - name: Run tests (without e2b)
       env:
         BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
+        PROMPTTODRAFT_GITHUB_API_KEY: ${{ secrets.PROMPTTODRAFT_GITHUB_API_KEY }}
+        PROMPTTODRAFT_GITHUB_STATE_REPO: ${{ secrets.PROMPTTODRAFT_GITHUB_STATE_REPO }}
       run: |
           uv run pytest tests -vvvv -m "not e2b"

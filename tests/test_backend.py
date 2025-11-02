@@ -2,8 +2,25 @@ from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
 from prompttodraft.tools.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from prompttodraft.tools.backends.state_manager import StorageType
 from pathlib import Path
 import pytest
+import os
+
+
+def get_project_id(base_name: str) -> str:
+    """
+    Get project ID with CI prefix if running in CI.
+
+    Args:
+        base_name: Base project name
+
+    Returns:
+        Project ID with 'ci-' prefix if CI=true, otherwise base_name
+    """
+    is_ci = os.getenv("CI", "").lower() == "true"
+    return f"ci-{base_name}" if is_ci else base_name
+
 
 def run_backend_e2e_test(backend: ExecutionBackend):
     """
@@ -355,20 +372,23 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
 def test_local_backend_e2e():
     """Test LocalBackend implementation using generic backend test."""
-    backend = LocalBackend(project_id="test_backend_e2e")
+    project_id = get_project_id(base_name="test_backend_e2e")
+    backend = LocalBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 def test_docker_backend_e2e():
     """Test DockerBackend implementation using generic backend test."""
-    backend = DockerBackend(project_id="test_docker_backend_e2e")
+    project_id = get_project_id(base_name="test_docker_backend_e2e")
+    backend = DockerBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_e2b_backend_e2e():
     """Test E2BBackend implementation using generic backend test."""
-    backend = E2BBackend(project_id="test_e2b_backend_e2e")
+    project_id = get_project_id(base_name="test_e2b_backend_e2e")
+    backend = E2BBackend(project_id=project_id, storage=StorageType.GCS)
     run_backend_e2e_test(backend=backend)
 
 
@@ -376,11 +396,11 @@ def test_docker_backend_container_reuse():
     """Test that DockerBackend properly reuses existing containers."""
     import docker
 
-    project_id = "test_docker_reuse"
+    project_id = get_project_id(base_name="test_docker_reuse")
 
     try:
         # Create first backend and start
-        backend1 = DockerBackend(project_id=project_id)
+        backend1 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
         backend1.start()
         assert backend1.get_status() == BackendStatus.RUNNING
 
@@ -401,7 +421,7 @@ def test_docker_backend_container_reuse():
         assert backend1.get_status() == BackendStatus.STOPPED
 
         # Create second backend instance with same project_id
-        backend2 = DockerBackend(project_id=project_id)
+        backend2 = DockerBackend(project_id=project_id, storage=StorageType.NONE)
         assert backend2.get_status() == BackendStatus.UNINITIALIZED
 
         # Start should connect to existing container
@@ -435,8 +455,207 @@ def test_docker_backend_container_reuse():
             pass
 
 
+def run_backend_git_e2e_test(backend: ExecutionBackend):
+    """
+    E2E test for ExecutionBackend with Git storage.
+
+    Tests that state is properly saved/loaded from Git branches instead of GCS.
+
+    Args:
+        backend: An initialized ExecutionBackend instance with StorageType.GIT
+    """
+    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
+    import shutil
+    import subprocess
+
+    # === FRESH START CLEANUP ===
+    # Clean Git branch if exists
+    from prompttodraft.tools.backends.state_manager import GitStateManager
+    git_manager = GitStateManager()
+    git_manager.cleanup(project_id=backend.project_id)
+
+    # Clean Docker container if exists (for DockerBackend)
+    if isinstance(backend, DockerBackend):
+        import docker
+        try:
+            client = docker.from_env()
+            container_name = f"prompttodraft-{backend.project_id}"
+            container = client.containers.get(container_name)
+            container.stop()
+            container.remove()
+        except:
+            pass
+
+    # Clean local working directory
+    if isinstance(backend, LocalBackend):
+        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
+    elif isinstance(backend, DockerBackend):
+        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
+    else:  # E2BBackend
+        working_dir_path = GCP_DATA_PATH / backend.project_id
+    if working_dir_path.exists():
+        shutil.rmtree(working_dir_path)
+
+    try:
+        # Pre-populate Git branch with test files to verify load works
+        # We'll manually create a commit on the state branch
+        branch_name = git_manager._get_branch_name(project_id=backend.project_id)
+        auth_url = git_manager._get_authenticated_url()
+
+        # Create temp directory with initial files
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # Initialize git repo
+            subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "remote", "add", "origin", auth_url], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "checkout", "-b", branch_name], cwd=tmp_path, check=True, capture_output=True)
+
+            # Create test files
+            (tmp_path / "preloaded.py").write_text("# This file was preloaded from git")
+            (tmp_path / "config.json").write_text('{"preloaded": true}')
+            (tmp_path / ".gitignore").write_text(".venv/\n__pycache__/\n*.pyc\n")
+
+            # Commit and push
+            subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial preloaded state"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", branch_name, "--force"], cwd=tmp_path, check=True, capture_output=True)
+
+        # Test status before start
+        assert backend.get_status() == BackendStatus.UNINITIALIZED
+
+        # Test start (should load preloaded files from git)
+        backend.start()
+        assert backend.get_status() == BackendStatus.RUNNING
+
+        # Get working directory
+        working_dir = backend.get_working_directory()
+        assert working_dir is not None
+        assert len(working_dir) > 0
+
+        # Verify preloaded files were loaded from git
+        assert backend.file_exists(path=f"{working_dir}/preloaded.py") == FileType.FILE
+        assert backend.file_exists(path=f"{working_dir}/config.json") == FileType.FILE
+        preloaded_content = backend.read_file(file_path=f"{working_dir}/preloaded.py")
+        assert preloaded_content == "# This file was preloaded from git"
+        config_content = backend.read_file(file_path=f"{working_dir}/config.json")
+        assert config_content == '{"preloaded": true}'
+
+        # Verify .gitignore was loaded
+        assert backend.file_exists(path=f"{working_dir}/.gitignore") == FileType.FILE
+
+        # Clean up preloaded files
+        backend.delete_file(path=f"{working_dir}/preloaded.py")
+        backend.delete_file(path=f"{working_dir}/config.json")
+
+        # Test write_file
+        test_file = f"{working_dir}/test.txt"
+        backend.write_file(file_path=test_file, content="Hello Git World")
+
+        # Test sync/load with shutdown/start cycle
+        sync_test_file = f"{working_dir}/sync_test.py"
+        backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
+
+        # Test shutdown (should commit and push to git)
+        backend.shutdown()
+        assert backend.get_status() == BackendStatus.STOPPED
+
+        # Verify files were synced to git by checking the remote branch
+        snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+        assert len(snapshots) >= 1, "No commits found on git branch"
+
+        # Start again and verify files were loaded
+        backend.start()
+        assert backend.get_status() == BackendStatus.RUNNING
+
+        # Verify files were loaded back
+        assert backend.file_exists(path=test_file) == FileType.FILE
+        loaded_content = backend.read_file(file_path=test_file)
+        assert loaded_content == "Hello Git World"
+
+        assert backend.file_exists(path=sync_test_file) == FileType.FILE
+        sync_loaded_content = backend.read_file(file_path=sync_test_file)
+        assert sync_loaded_content == "# File created before shutdown"
+
+        # Test that deleted files don't come back
+        backend.delete_file(path=sync_test_file)
+        backend.shutdown()
+        backend.start()
+
+        # sync_test.py should not exist after reload
+        assert backend.file_exists(path=sync_test_file) is None
+
+        # Test final state
+        backend.write_file(file_path=test_file, content="Final state")
+        backend.shutdown()
+
+        # Verify final commit exists
+        final_snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+        assert len(final_snapshots) >= 2, "Should have multiple commits"
+
+    finally:
+        # Cleanup
+        try:
+            backend.shutdown()
+        except:
+            pass
+
+        # Delete git branch
+        git_manager.cleanup(project_id=backend.project_id)
+
+        # Clean local directory
+        if isinstance(backend, LocalBackend):
+            working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
+        elif isinstance(backend, DockerBackend):
+            working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
+        else:
+            working_dir_path = GCP_DATA_PATH / backend.project_id
+        if working_dir_path.exists():
+            shutil.rmtree(working_dir_path)
+
+        # Clean Docker container
+        if isinstance(backend, DockerBackend):
+            import docker
+            try:
+                client = docker.from_env()
+                container_name = f"prompttodraft-{backend.project_id}"
+                container = client.containers.get(container_name)
+                container.stop()
+                container.remove()
+            except:
+                pass
+
+
+def test_local_backend_git_storage():
+    """Test LocalBackend with Git storage."""
+    project_id = get_project_id(base_name="test_backend_git_local")
+    backend = LocalBackend(project_id=project_id, storage=StorageType.GIT)
+    run_backend_git_e2e_test(backend=backend)
+
+
+def test_docker_backend_git_storage():
+    """Test DockerBackend with Git storage."""
+    project_id = get_project_id(base_name="test_backend_git_docker")
+    backend = DockerBackend(project_id=project_id, storage=StorageType.GIT)
+    run_backend_git_e2e_test(backend=backend)
+
+
+@pytest.mark.e2b
+def test_e2b_backend_git_storage():
+    """Test E2BBackend with Git storage."""
+    project_id = get_project_id(base_name="test_backend_git_e2b")
+    backend = E2BBackend(project_id=project_id, storage=StorageType.GIT)
+    run_backend_git_e2e_test(backend=backend)
+
+
 if __name__ == "__main__":
-    test_local_backend_e2e()
-    test_docker_backend_e2e()
-    test_docker_backend_container_reuse()
-    test_e2b_backend_e2e()
+    # test_local_backend_e2e()
+    # test_docker_backend_e2e()
+    # test_docker_backend_container_reuse()
+    # test_e2b_backend_e2e()
+    test_local_backend_git_storage()
+    test_docker_backend_git_storage()
+    test_e2b_backend_git_storage()

@@ -47,13 +47,14 @@ uv sync
 from prompttodraft.tools.backends.local_backend import LocalBackend
 from prompttodraft.tools.backends.docker_backend import DockerBackend
 from prompttodraft.tools.backends.e2b_backend import E2BBackend
+from prompttodraft.tools.backends.state_manager import StorageType
 
-# Choose your backend
-backend = LocalBackend(project_id="my-project")
-# backend = DockerBackend(project_id="my-project")
-# backend = E2BBackend(project_id="my-project")
+# Choose your backend with storage option
+backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+# backend = DockerBackend(project_id="my-project", storage=StorageType.GIT)
+# backend = E2BBackend(project_id="my-project", storage=StorageType.GIT)
 
-# Start the backend
+# Start the backend (loads state if it exists)
 backend.start()
 
 # Write a file
@@ -63,9 +64,36 @@ backend.write_file(file_path="hello.py", content="print('Hello, World!')")
 result = backend.execute_command(command="python hello.py")
 print(result.output)  # "Hello, World!"
 
-# Shutdown (syncs files to cloud storage)
+# Shutdown (saves state)
 backend.shutdown()
 ```
+
+### Storage Backends
+
+**GitHub Storage (default):**
+```python
+from prompttodraft.tools.backends.state_manager import StorageType
+
+backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+```
+- Requires: `gh` CLI installed and authenticated
+- State saved to: GitHub branches (e.g., `state/my-project`)
+- Benefits: Free, version controlled, easy to inspect
+
+**GCS Storage:**
+```python
+backend = LocalBackend(project_id="my-project", storage=StorageType.GCS)
+```
+- Requires: GCP credentials configured
+- State saved to: GCS bucket with timestamps
+- Benefits: Enterprise-grade, already set up in many orgs
+
+**No Storage:**
+```python
+backend = LocalBackend(project_id="my-project", storage=StorageType.NONE)
+```
+- No state persistence
+- Best for: Testing, ephemeral workloads
 
 ## Running Tests
 
@@ -81,12 +109,37 @@ uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
 
 ## Configuration
 
+### GitHub State Storage (Default)
+
+Set up a GitHub personal access token with `repo` scope:
+
+1. Go to GitHub Settings → Developer settings → Personal access tokens → Tokens (classic)
+2. Click "Generate new token" and select `repo` scope
+3. Copy the token and set it as an environment variable:
+
+```bash
+export PROMPTTODRAFT_GITHUB_API_KEY="ghp_your_token_here"
+```
+
+Configure the state repository (optional):
+
+```bash
+# Default: charlesazam/prompttodraft-states
+export PROMPTTODRAFT_GITHUB_STATE_REPO="your-org/your-repo"
+```
+
+The token is used for:
+- Pushing/pulling state to GitHub branches
+- Listing commit history
+- Deleting state branches during cleanup
+
 ### Google Cloud Storage
 
-Set up credentials for state persistence:
+Set up credentials for GCS state persistence:
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/gcp-credentials.json"
+export BUCKET_PROMPT_TO_DRAFT="your-bucket-name"
 ```
 
 ### E2B API Key
