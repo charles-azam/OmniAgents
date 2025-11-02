@@ -169,7 +169,7 @@ def load_memory(backend: "ExecutionBackend") -> str:
     return ""
 
 
-def get_system_prompt(backend: "ExecutionBackend", model_id: str = "groq/gpt-oss-120b") -> str:
+def get_system_prompt(backend: "ExecutionBackend", model_id: str) -> str:
     """
     Generate the system prompt with dynamic values filled in.
 

@@ -81,6 +81,13 @@ class ExecutionBackend(ABC):
         Can be called after initialization or after shutdown to restart.
         """
         pass
+    
+    def cleanup(self) -> None:
+        """
+        Cleanup the backend environment.
+        """
+        self.state_manager.cleanup(project_id=self.project_id)
+        
 
     @abstractmethod
     def shutdown(self) -> None:
