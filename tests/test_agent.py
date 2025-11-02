@@ -68,8 +68,15 @@ def test_system_prompt_generation():
 
     from prompttodraft.tools.system_prompt import get_system_prompt
 
+    # Create a LocalBackend for testing
+    backend = LocalBackend(project_id="test_system_prompt", storage=StorageType.NONE)
+    backend.start()
+
     # Generate system prompt
-    system_prompt = get_system_prompt(cwd=os.getcwd())
+    system_prompt = get_system_prompt(backend=backend, model_id="test-model")
+
+    # Shutdown backend
+    backend.shutdown()
 
     # Verify prompt contains key sections
     assert "Core Mandates" in system_prompt
