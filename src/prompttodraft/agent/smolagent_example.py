@@ -8,9 +8,6 @@ from prompttodraft.agent.smolagent_agent import SmolAgentAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
 
-# Enable debug logging
-logging.basicConfig(level=logging.DEBUG)
-
 
 def main() -> None:
     """Run a simple coding task with the agent."""
