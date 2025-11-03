@@ -1,21 +1,17 @@
 """
-Example usage of the SmolAgentAgent.
+Example usage of the PydanticAIAgent.
 
-This demonstrates how to use the smolagent agent with different backends.
+This demonstrates how to use the pydantic_ai agent with different backends.
 """
-import logging
-from prompttodraft.agent.smolagent_agent import SmolAgentAgent
+from prompttodraft.agent.pydantic_ai_agent import PydanticAIAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
-
-# Enable debug logging
-logging.basicConfig(level=logging.DEBUG)
 
 
 def main() -> None:
     """Run a simple coding task with the agent."""
     # Create a backend with git storage
-    project_id = "example-project-smolagent"
+    project_id = "example-project-pydantic-ai"
     state_manager = GitStateManager()
     backend = LocalBackend(
         project_id=project_id,
@@ -26,7 +22,7 @@ def main() -> None:
     backend.start()
 
     # Create the agent
-    agent = SmolAgentAgent(
+    agent = PydanticAIAgent(
         backend=backend,
         model_id="gpt-5-mini",
         provider="openai",
@@ -41,7 +37,6 @@ def main() -> None:
     print("Running task...")
     result = agent.run(task=task)
     print(f"Result: {result}")
-
 
 
 if __name__ == "__main__":

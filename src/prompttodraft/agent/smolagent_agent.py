@@ -96,18 +96,9 @@ class SmolAgentAgent:
         self.backend.start()
         if reset_history:
             self.backend.cleanup()
-        # Generate system prompt with current project context
-        system_prompt = get_system_prompt(backend=self.backend, model_id=self.model_id)
-
-        # Combine system prompt with task
-        full_prompt = f"{system_prompt}\n\n{task}"
-
-        # Reset history if requested
-        if reset_history:
-            self.agent.logs = []
 
         # Run the agent
-        result = self.agent.run(task=full_prompt)
+        result = self.agent.run(task=task)
 
         self.backend.shutdown()
 
