@@ -6,6 +6,9 @@ This demonstrates how to use the LangChain agent with different backends.
 from prompttodraft.agent.langchain_agent import LangChainAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def main() -> None:
