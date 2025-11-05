@@ -3465,7 +3465,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess", marker = "sys_platform != 'win32'" },
+    { name = "ptyprocess" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450 }
 wheels = [
@@ -3639,7 +3639,7 @@ requires-dist = [
     { name = "pydantic-ai", extras = ["examples"], specifier = ">=1.1.0" },
     { name = "pygithub", specifier = ">=2.5.0" },
     { name = "pytest", specifier = ">=8.4.2" },
-    { name = "smolagents", extras = ["telemetry", "toolkit"], git = "https://github.com/huggingface/smolagents.git?rev=main" },
+    { name = "smolagents", extras = ["telemetry", "toolkit"] },
 ]
 
 [[package]]
@@ -4787,8 +4787,8 @@ wheels = [
 
 [[package]]
 name = "smolagents"
-version = "1.23.0.dev0"
-source = { git = "https://github.com/huggingface/smolagents.git?rev=main#ca740cad152e0ee9b04b935afe64e56f34a0a1a2" }
+version = "1.22.0"
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "huggingface-hub" },
     { name = "jinja2" },
@@ -4796,6 +4796,10 @@ dependencies = [
     { name = "python-dotenv" },
     { name = "requests" },
     { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b9/bc/ad2f168b82d26597257adb071c51348dd94da0bc29a6cc10ba4c1bee27c8/smolagents-1.22.0.tar.gz", hash = "sha256:5fb66f48e3b3ab5e8defcef577a89d5b6dfa8fcb55fc98a58e156cb3c59eb68f", size = 213047 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/17/54d7de27b7ac2722ac2c0f452da612bf4af80ae09f90231b44bb7b12b33d/smolagents-1.22.0-py3-none-any.whl", hash = "sha256:5334adb4e7e5814cd814f1d9ad7efa806ef57f53db40635a29d2bd727774c5f5", size = 149836 },
 ]
 
 [package.optional-dependencies]
