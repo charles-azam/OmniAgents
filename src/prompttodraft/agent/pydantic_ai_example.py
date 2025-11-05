@@ -4,16 +4,19 @@ Example usage of the PydanticAIAgent.
 This demonstrates how to use the pydantic_ai agent with different backends.
 """
 from prompttodraft.agent.pydantic_ai_agent import PydanticAIAgent
-from prompttodraft.agent.backends.local_backend import LocalBackend
+from prompttodraft.agent.backends.docker_backend import DockerBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
-def main() -> None:
+def main(reset_history: bool = True) -> None:
     """Run a simple coding task with the agent."""
     # Create a backend with git storage
     project_id = "example-project-pydantic-ai"
     state_manager = GitStateManager()
-    backend = LocalBackend(
+    backend = DockerBackend(
         project_id=project_id,
         state_manager=state_manager,
     )
@@ -22,6 +25,8 @@ def main() -> None:
     backend.start()
 
     # Create the agent
+    # Note: The backend is passed here but will be injected into tools
+    # via pydantic_ai's deps (AgentDependencies) at runtime
     agent = PydanticAIAgent(
         backend=backend,
         model_id="gpt-5-mini",
@@ -29,8 +34,11 @@ def main() -> None:
     )
 
     # Run a task
+    # The backend is automatically passed to tools through RunContext[AgentDependencies]
     task = """
     Create a simple Python script called hello.py that prints "Hello, World!".
+    Run it.
+    Install the matplotlib library.
     Then list the files in the directory to verify it was created.
     """
 
