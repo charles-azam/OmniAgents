@@ -21,6 +21,8 @@ from prompttodraft.agent.core.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.agent.core.save_memory_tool import SaveMemoryTool
 from prompttodraft.agent.core.uv_tool import UVTool
 
+from langsmith import traceable
+
 
 def create_model(provider: str, model_id: str):
     """
@@ -200,6 +202,7 @@ class LangChainAgent:
         # Initialize the LangChain model
         self.model = create_model(provider=provider, model_id=model_id)
 
+    @traceable
     def run(self, task: str, reset_history: bool = True) -> str:
         """
         Run the agent on a task.
