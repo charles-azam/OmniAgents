@@ -11,6 +11,8 @@ wheels/
 *.stl
 *.step
 
+*.DS_Store
+
 .env
 
 # Backend working directories (contains nested projects for testing)
