@@ -8,9 +8,9 @@ This toolkit provides **Gemini CLI-inspired coding tools** with a **3-layer arch
 
 ```
 ┌─────────────────────────────────────────┐
-│    Framework Adapters (Layer 3)         │ 
-│  smolagents, OpenAI, Pydantic-AI, etc.  │
-│  - Reads metadata from core tools       │
+│    Framework Integrations (Layer 3)     │
+│  smolagents, Pydantic-AI, LangChain     │
+│  - Manual tool wrappers per framework   │
 │  - Converts to framework-specific API   │
 └───────────────┬─────────────────────────┘
                 │
@@ -56,11 +56,10 @@ Tools work across **any execution environment** without code changes:
 
 ### 2. Framework Agnostic Core
 
-Core tools have **zero framework dependencies**. Adapters translate tool metadata to framework-specific formats:
-- **smolagents**: `Tool` class with `forward()` method
-- **OpenAI**: Function calling schema
-- **Pydantic-AI**: Tool definitions
-- **Autogen**: Agent tools
+Core tools have **zero framework dependencies**. Framework-specific integrations wrap core tools:
+- **smolagents**: Manual `Tool` wrappers in `smolagent_agent.py`
+- **Pydantic-AI**: Tool definitions in `pydantic_ai_agent.py`
+- **LangChain**: Tool wrappers in `langchain_agent.py`
 
 ### 3. Output Separation
 
@@ -72,12 +71,13 @@ Tools return **Pydantic output models** that handle their own display:
 ## Directory Structure
 
 ```
-tools/
+agent/
 ├── backends/          # Execution environments
 │   ├── execution_backend.py    # Abstract interface
 │   ├── local_backend.py        # Local implementation
 │   ├── docker_backend.py       # Docker container
-│   └── e2b_backend.py          # E2B sandbox
+│   ├── e2b_backend.py          # E2B sandbox
+│   └── state_manager.py        # State persistence (Git/GCS/None)
 ├── core/              # Framework-agnostic tools
 │   ├── base_tool.py           # CoreTool abstract base class
 │   ├── metadata.py            # Tool metadata definition
@@ -94,8 +94,9 @@ tools/
 ├── outputs/           # Output models
 │   ├── models.py              # Pydantic models
 │   └── README.md
-└── adapters/          # Framework integrations
-    └── smolagents_adapter.py  # smolagents integration
+├── smolagent_agent.py  # smolagents framework integration
+├── pydantic_ai_agent.py # Pydantic-AI framework integration
+└── langchain_agent.py  # LangChain framework integration
 ```
 
 ## Architecture Benefits
@@ -105,20 +106,20 @@ tools/
 Combine **any execution environment** with **any framework** and **any storage**:
 
 ```python
-from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.agent.smolagent_agent import SmolAgentAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.docker_backend import DockerBackend
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import GitStateManager, GCSStateManager
 
 # Local execution with smolagents + Git storage
-backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
-tools = create_smolagents_tools(backend=backend)
+agent = SmolAgentAgent(backend=backend, provider="huggingface", model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
 
 # Docker execution with smolagents + GCS storage
-docker_backend = DockerBackend(project_id="my-project", storage=StorageType.GCS)
+docker_backend = DockerBackend(project_id="my-project", state_manager=GCSStateManager())
 docker_backend.start()
-tools = create_smolagents_tools(backend=docker_backend)
+agent = SmolAgentAgent(backend=docker_backend, provider="huggingface", model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
 ```
 
 ### Write Once, Use Anywhere
@@ -134,12 +135,13 @@ tools = create_smolagents_tools(backend=docker_backend)
 2. All tools work automatically
 
 **Add a new framework**:
-1. Create adapter that reads tool metadata
-2. Transform to framework-specific format
+1. Create a new agent file (e.g., `myframework_agent.py`)
+2. Wrap core tools in framework-specific format
+3. See `smolagent_agent.py` as example
 
 **Add a new tool**:
 1. Create core tool inheriting from `CoreTool` with metadata
-2. Add to `create_smolagents_tools()` in adapter
+2. Add manual wrappers in framework agent files
 3. Works in all environments
 
 ## Quick Start
@@ -165,19 +167,19 @@ output = result.handle()
 ### Using with smolagents
 
 ```python
-from prompttodraft.agent.adapters.smolagents_adapter import create_smolagents_tools
+from prompttodraft.agent.smolagent_agent import SmolAgentAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
-from prompttodraft.agent.backends.state_manager import StorageType
-from smolagents import CodeAgent
+from prompttodraft.agent.backends.state_manager import GitStateManager
 
-# Create backend and tools (with Git storage)
-backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+# Create backend (with Git storage)
+backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
-tools = create_smolagents_tools(backend=backend)
 
-# Use with agent
-agent = CodeAgent(tools=tools, model=...)
-agent.run("List all Python files")
+# Create agent
+agent = SmolAgentAgent(backend=backend, provider="huggingface", model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
+
+# Use agent
+result = agent.run("List all Python files")
 ```
 
 ## Output Models
@@ -204,7 +206,7 @@ Backends handle persistent state with cloud storage using two storage options:
 **Git Storage** (default):
 - Uses GitHub branches for state persistence
 - Each project gets its own branch
-- Automatic commit and push on `sync_to_bucket()`
+- Automatic commit and push on `save_snapshot()`
 - Fast and free for small/medium projects
 
 **GCS Storage**:
@@ -217,26 +219,27 @@ Backends handle persistent state with cloud storage using two storage options:
 
 ```python
 from prompttodraft.agent.backends.local_backend import LocalBackend
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import GitStateManager, GCSStateManager, NoOpStateManager
 
 # Using Git storage (default)
-backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Loads from git branch
 
 # Using GCS storage
-backend = LocalBackend(project_id="my-project", storage=StorageType.GCS)
+backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 backend.start()  # Loads from GCS bucket
 
 # No persistence
-backend = LocalBackend(project_id="my-project", storage=StorageType.NONE)
+backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
 
 ### Lifecycle Methods
 
 - `start()`: Load files from storage, create environment
-- `shutdown()`: Sync files to storage, destroy environment
-- `sync_to_bucket()`: Save current state (timestamped snapshots)
-- `load_from_bucket()`: Restore latest state
+- `shutdown()`: Save state and destroy environment
+- State is managed via `StateManager`:
+  - `save_snapshot()`: Save current state (timestamped snapshots)
+  - `load_latest()`: Restore latest state
 
 ## Testing
 

@@ -47,12 +47,12 @@ uv sync
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.docker_backend import DockerBackend
 from prompttodraft.agent.backends.e2b_backend import E2BBackend
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import GitStateManager
 
 # Choose your backend with storage option
-backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
-# backend = DockerBackend(project_id="my-project", storage=StorageType.GIT)
-# backend = E2BBackend(project_id="my-project", storage=StorageType.GIT)
+backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
+# backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
+# backend = E2BBackend(project_id="my-project", state_manager=GitStateManager())
 
 # Start the backend (loads state if it exists)
 backend.start()
@@ -72,9 +72,9 @@ backend.shutdown()
 
 **GitHub Storage (default):**
 ```python
-from prompttodraft.agent.backends.state_manager import StorageType
+from prompttodraft.agent.backends.state_manager import GitStateManager
 
-backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
+backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ```
 - Requires: `gh` CLI installed and authenticated
 - State saved to: GitHub branches (e.g., `state/my-project`)
@@ -82,7 +82,9 @@ backend = LocalBackend(project_id="my-project", storage=StorageType.GIT)
 
 **GCS Storage:**
 ```python
-backend = LocalBackend(project_id="my-project", storage=StorageType.GCS)
+from prompttodraft.agent.backends.state_manager import GCSStateManager
+
+backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ```
 - Requires: GCP credentials configured
 - State saved to: GCS bucket with timestamps
@@ -90,7 +92,9 @@ backend = LocalBackend(project_id="my-project", storage=StorageType.GCS)
 
 **No Storage:**
 ```python
-backend = LocalBackend(project_id="my-project", storage=StorageType.NONE)
+from prompttodraft.agent.backends.state_manager import NoOpStateManager
+
+backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
 - No state persistence
 - Best for: Testing, ephemeral workloads
