@@ -8,25 +8,25 @@ This toolkit provides **Gemini CLI-inspired coding tools** with a **3-layer arch
 
 ```
 ┌─────────────────────────────────────────┐
-│    Framework Adapters (Layer 3)        │
-│  smolagents, OpenAI, Pydantic-AI, etc. │
-│  - Reads metadata from core tools      │
-│  - Converts to framework-specific API  │
+│    Framework Adapters (Layer 3)         │ 
+│  smolagents, OpenAI, Pydantic-AI, etc.  │
+│  - Reads metadata from core tools       │
+│  - Converts to framework-specific API   │
 └───────────────┬─────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────┐
 │    Core Tools (Layer 2)                 │
 │  Gemini CLI-based tools                 │
-│  - list_directory, read_file, etc.     │
-│  - Business logic & validation         │
-│  - Returns ToolOutputModel instances   │
+│  - list_directory, read_file, etc.      │
+│  - Business logic & validation          │
+│  - Returns ToolOutputModel instances    │
 └───────────────┬─────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────┐
 │    Execution Backends (Layer 1)         │
 │  Local, Docker, E2B                     │
-│  - Primitive operations only           │
-│  - execute_command, read_file, etc.    │
+│  - Primitive operations only            │
+│  - execute_command, read_file, etc.     │
 └─────────────────────────────────────────┘
 ```
 
@@ -265,3 +265,5 @@ result = tool.execute(command="echo test")
 - [`backends/README.md`](backends/README.md) - Execution backend details
 - [`core/README.md`](core/README.md) - Core tools and Gemini CLI reference
 - [`outputs/README.md`](outputs/README.md) - Output models and display modes
+
+

@@ -173,8 +173,3 @@ Contributions are welcome! Please ensure all tests pass before submitting a PR.
 
 See LICENSE file for details.
 
-Langchain a tourné MAIS le git n'a pas été sauvegardé, on veut rajouter les logs dessus
-
-Il faut faire fonctionn pydantic et simplifier le code
-
-Il faut faire fonctionner smolagents
