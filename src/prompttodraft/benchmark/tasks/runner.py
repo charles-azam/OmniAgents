@@ -17,6 +17,17 @@ from prompttodraft.benchmark.tasks.metrics import BenchmarkResult
 from prompttodraft.agent.factory import ToolFactory
 
 
+# Token estimation (simple character-based approximation)
+def estimate_tokens(text: str) -> int:
+    """
+    Estimate token count using character-based approximation.
+
+    This is a simple heuristic: ~4 characters per token for English text.
+    For more accurate counting, consider using tiktoken library.
+    """
+    return len(text) // 4
+
+
 class AgentExecutionError(Exception):
     """Raised when agent execution fails."""
     pass
@@ -98,6 +109,9 @@ class BenchmarkRunner:
             result.execution_time = execution_time
             result.tool_calls_total = agent_metrics["tool_calls_total"]
             result.tool_calls_by_type = agent_metrics["tool_calls_by_type"]
+            result.prompt_tokens = agent_metrics.get("prompt_tokens", 0)
+            result.completion_tokens = agent_metrics.get("completion_tokens", 0)
+            result.total_tokens = result.prompt_tokens + result.completion_tokens
 
             # Evaluate solution
             if verbose:
@@ -120,6 +134,7 @@ class BenchmarkRunner:
                 print(f"  Correctness: {result.correctness_score:.1%}")
                 print(f"  Code quality: {result.code_quality_score:.1%}")
                 print(f"  Tool calls: {result.tool_calls_total}")
+                print(f"  Tokens: {result.total_tokens} (prompt: {result.prompt_tokens}, completion: {result.completion_tokens})")
                 print(f"  Time: {result.execution_time:.1f}s")
 
                 if result.errors:
@@ -209,6 +224,42 @@ class BenchmarkRunner:
         # Create model
         model = ApiModel(model_id=self.model_id)
 
+        # Track tokens
+        prompt_tokens = 0
+        completion_tokens = 0
+
+        # Wrap model to track tokens
+        original_call = model.__call__
+
+        def wrapped_call(messages, *args, **kwargs):
+            nonlocal prompt_tokens, completion_tokens
+
+            # Estimate prompt tokens from messages
+            prompt_text = ""
+            if isinstance(messages, list):
+                for msg in messages:
+                    if isinstance(msg, dict) and "content" in msg:
+                        prompt_text += str(msg["content"])
+                    elif isinstance(msg, str):
+                        prompt_text += msg
+            elif isinstance(messages, str):
+                prompt_text = messages
+
+            prompt_tokens += estimate_tokens(prompt_text)
+
+            # Call original method
+            result = original_call(messages, *args, **kwargs)
+
+            # Estimate completion tokens from result
+            if isinstance(result, str):
+                completion_tokens += estimate_tokens(result)
+            elif hasattr(result, "content"):
+                completion_tokens += estimate_tokens(str(result.content))
+
+            return result
+
+        model.__call__ = wrapped_call
+
         # Create agent
         agent = CodeAgent(
             tools=tools,
@@ -256,7 +307,9 @@ class BenchmarkRunner:
 
         return {
             "tool_calls_total": tool_calls_total,
-            "tool_calls_by_type": tool_calls_by_type
+            "tool_calls_by_type": tool_calls_by_type,
+            "prompt_tokens": prompt_tokens,
+            "completion_tokens": completion_tokens
         }
 
     def run_suite(
