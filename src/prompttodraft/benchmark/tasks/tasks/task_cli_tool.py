@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
 
 
 class CLIToolTask(BenchmarkTask):
@@ -79,57 +80,8 @@ Run tests with: `python -m pytest -v`""",
 
     def setup(self) -> None:
         """Set up the workspace with sample files."""
-        # Create tests directory
-        tests_dir = self.workspace_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-        (tests_dir / "__init__.py").write_text("")
-
-        # Create sample text files for testing
-        sample1 = """Hello world!
-This is a sample text file.
-It has multiple lines.
-"""
-        (self.workspace_dir / "sample1.txt").write_text(sample1)
-
-        sample2 = """Python is great.
-CLI tools are useful.
-"""
-        (self.workspace_dir / "sample2.txt").write_text(sample2)
-
-        # Create pytest.ini
-        pytest_ini = """[pytest]
-python_files = test_*.py
-python_functions = test_*
-testpaths = tests
-"""
-        (self.workspace_dir / "pytest.ini").write_text(pytest_ini)
-
-        # Create pyproject.toml
-        pyproject_toml = '''[project]
-name = "wordcount-cli"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = []
-'''
-        (self.workspace_dir / "pyproject.toml").write_text(pyproject_toml)
-
-        # Create README
-        readme = """# Word Count CLI Tool
-
-Implement a command-line tool for counting words, lines, and characters.
-
-## Requirements
-- Use argparse for CLI
-- Support -l, -w, -c flags
-- Handle multiple files
-- Error handling
-- Include tests
-
-## Sample Files
-- sample1.txt: 3 lines, 12 words, 62 chars
-- sample2.txt: 2 lines, 6 words, 37 chars
-"""
-        (self.workspace_dir / "README.md").write_text(readme)
+        # Copy all files from the cli_tool fixture
+        copy_fixture_dir("cli_tool", self.workspace_dir)
 
     def get_initial_prompt(self) -> str:
         """Get the initial prompt."""

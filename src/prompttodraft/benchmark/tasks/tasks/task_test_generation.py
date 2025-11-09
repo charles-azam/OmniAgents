@@ -10,6 +10,7 @@ import subprocess
 import re
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
 
 
 class TestGenerationTask(BenchmarkTask):
@@ -50,127 +51,8 @@ Install pytest-cov if needed: `uv pip install pytest pytest-cov`""",
 
     def setup(self) -> None:
         """Set up the workspace with a module to test."""
-        # Create utils module with various functions
-        utils_code = '''"""Utility functions for mathematical operations and string processing."""
-
-
-def add_numbers(a: float, b: float) -> float:
-    """Add two numbers."""
-    return a + b
-
-
-def multiply_numbers(a: float, b: float) -> float:
-    """Multiply two numbers."""
-    return a * b
-
-
-def divide_numbers(a: float, b: float) -> float:
-    """
-    Divide two numbers.
-
-    Raises:
-        ValueError: If b is zero
-    """
-    if b == 0:
-        raise ValueError("Cannot divide by zero")
-    return a / b
-
-
-def reverse_string(text: str) -> str:
-    """Reverse a string."""
-    return text[::-1]
-
-
-def count_vowels(text: str) -> int:
-    """Count vowels in a string."""
-    if not text:
-        return 0
-    vowels = "aeiouAEIOU"
-    return sum(1 for char in text if char in vowels)
-
-
-def is_palindrome(text: str) -> bool:
-    """Check if a string is a palindrome (ignoring spaces and case)."""
-    cleaned = "".join(text.split()).lower()
-    return cleaned == cleaned[::-1]
-
-
-def factorial(n: int) -> int:
-    """
-    Calculate factorial of n.
-
-    Raises:
-        ValueError: If n is negative
-    """
-    if n < 0:
-        raise ValueError("Factorial not defined for negative numbers")
-    if n == 0 or n == 1:
-        return 1
-    result = 1
-    for i in range(2, n + 1):
-        result *= i
-    return result
-
-
-def find_max(numbers: list[float]) -> float:
-    """
-    Find maximum number in a list.
-
-    Raises:
-        ValueError: If list is empty
-    """
-    if not numbers:
-        raise ValueError("Cannot find max of empty list")
-    return max(numbers)
-'''
-
-        # Write utils module
-        (self.workspace_dir / "utils.py").write_text(utils_code)
-
-        # Create tests directory
-        tests_dir = self.workspace_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-        (tests_dir / "__init__.py").write_text("")
-
-        # Create pytest.ini
-        pytest_ini = """[pytest]
-python_files = test_*.py
-python_functions = test_*
-testpaths = tests
-"""
-        (self.workspace_dir / "pytest.ini").write_text(pytest_ini)
-
-        # Create pyproject.toml for dependencies
-        pyproject_toml = '''[project]
-name = "test-generation"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = []
-'''
-        (self.workspace_dir / "pyproject.toml").write_text(pyproject_toml)
-
-        # Create README
-        readme = """# Test Generation Task
-
-Generate comprehensive tests for the utils.py module.
-
-## Module Functions
-- add_numbers(a, b) - Add two numbers
-- multiply_numbers(a, b) - Multiply two numbers
-- divide_numbers(a, b) - Divide (raises ValueError on division by zero)
-- reverse_string(text) - Reverse a string
-- count_vowels(text) - Count vowels
-- is_palindrome(text) - Check if palindrome
-- factorial(n) - Calculate factorial (raises ValueError for negative)
-- find_max(numbers) - Find max (raises ValueError for empty list)
-
-## Testing Requirements
-- Test all functions
-- Include edge cases
-- Test error handling
-- Achieve >80% coverage
-"""
-        (self.workspace_dir / "README.md").write_text(readme)
+        # Copy all files from the test_generation fixture
+        copy_fixture_dir("test_generation", self.workspace_dir)
 
     def get_initial_prompt(self) -> str:
         """Get the initial prompt."""

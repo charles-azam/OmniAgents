@@ -10,6 +10,7 @@ import subprocess
 import csv
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
 
 
 class DataProcessingTask(BenchmarkTask):
@@ -65,66 +66,8 @@ Run tests with: `python -m pytest -v`""",
 
     def setup(self) -> None:
         """Set up the workspace with sample CSV data."""
-        # Create sample sales data
-        sales_data = """date,product,quantity,price
-2024-01-01,Laptop,3,999.99
-2024-01-01,Mouse,10,25.50
-2024-01-02,Keyboard,8,75.00
-2024-01-02,Monitor,2,299.99
-2024-01-03,Laptop,6,999.99
-2024-01-03,Mouse,15,25.50
-2024-01-04,Keyboard,4,75.00
-2024-01-04,Monitor,5,299.99
-2024-01-05,Laptop,7,999.99
-2024-01-05,Mouse,20,25.50
-"""
-        (self.workspace_dir / "sales_data.csv").write_text(sales_data)
-
-        # Create tests directory
-        tests_dir = self.workspace_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-        (tests_dir / "__init__.py").write_text("")
-
-        # Create pytest.ini
-        pytest_ini = """[pytest]
-python_files = test_*.py
-python_functions = test_*
-testpaths = tests
-"""
-        (self.workspace_dir / "pytest.ini").write_text(pytest_ini)
-
-        # Create pyproject.toml
-        pyproject_toml = '''[project]
-name = "data-processing"
-version = "0.1.0"
-requires-python = ">=3.10"
-dependencies = []
-'''
-        (self.workspace_dir / "pyproject.toml").write_text(pyproject_toml)
-
-        # Create README
-        readme = """# Sales Data Processing
-
-Process CSV sales data with filtering and aggregation.
-
-## Input Data (sales_data.csv)
-- date, product, quantity, price
-- 10 rows of sample data
-
-## Task
-1. Filter: quantity >= 5 AND price >= 10.0
-2. Calculate total sales per product
-3. Sort by total sales descending
-4. Output to output.csv
-
-## Expected Results
-After filtering (quantity >= 5, price >= 10):
-- Laptop: 2 rows (6 qty @ 999.99, 7 qty @ 999.99) = 12,999.87
-- Mouse: 3 rows (10, 15, 20 @ 25.50) = 1,147.50
-- Keyboard: 1 row (8 @ 75.00) = 600.00
-- Monitor: 1 row (5 @ 299.99) = 1,499.95
-"""
-        (self.workspace_dir / "README.md").write_text(readme)
+        # Copy all files from the data_processing fixture
+        copy_fixture_dir("data_processing", self.workspace_dir)
 
     def get_initial_prompt(self) -> str:
         """Get the initial prompt."""

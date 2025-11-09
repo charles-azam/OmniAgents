@@ -9,6 +9,7 @@ from pathlib import Path
 import subprocess
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
 
 
 class SearchReplaceTask(BenchmarkTask):
@@ -39,94 +40,8 @@ Run `python -m pytest` to verify the tests pass.""",
 
     def setup(self) -> None:
         """Set up the workspace with files containing the function."""
-        # Create main module
-        main_code = '''"""Main module with calculate_total function."""
-
-def calculate_total(items: list[float]) -> float:
-    """Calculate the total sum of items."""
-    return sum(items)
-
-
-def process_order(prices: list[float]) -> dict[str, float]:
-    """Process an order and return summary."""
-    total = calculate_total(prices)
-    tax = total * 0.1
-    return {
-        "subtotal": total,
-        "tax": tax,
-        "total": total + tax
-    }
-'''
-
-        # Create utils module
-        utils_code = '''"""Utility functions."""
-from .main import calculate_total
-
-
-def get_average(items: list[float]) -> float:
-    """Get average of items."""
-    total = calculate_total(items)
-    return total / len(items) if items else 0.0
-
-
-def format_total(items: list[float]) -> str:
-    """Format total as string."""
-    total = calculate_total(items)
-    return f"${total:.2f}"
-'''
-
-        # Create tests
-        test_code = '''"""Tests for the codebase."""
-import pytest
-from src.main import calculate_total, process_order
-from src.utils import get_average, format_total
-
-
-def test_calculate_total():
-    """Test calculate_total function."""
-    assert calculate_total([1.0, 2.0, 3.0]) == 6.0
-    assert calculate_total([]) == 0.0
-
-
-def test_process_order():
-    """Test process_order function."""
-    result = process_order([10.0, 20.0])
-    assert result["subtotal"] == 30.0
-    assert result["tax"] == 3.0
-    assert result["total"] == 33.0
-
-
-def test_get_average():
-    """Test get_average function."""
-    assert get_average([1.0, 2.0, 3.0]) == 2.0
-    assert get_average([]) == 0.0
-
-
-def test_format_total():
-    """Test format_total function."""
-    assert format_total([10.5, 20.3]) == "$30.80"
-'''
-
-        # Create directory structure
-        src_dir = self.workspace_dir / "src"
-        src_dir.mkdir(parents=True, exist_ok=True)
-        tests_dir = self.workspace_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-
-        # Write files
-        (src_dir / "__init__.py").write_text("")
-        (src_dir / "main.py").write_text(main_code)
-        (src_dir / "utils.py").write_text(utils_code)
-        (tests_dir / "__init__.py").write_text("")
-        (tests_dir / "test_main.py").write_text(test_code)
-
-        # Create pytest.ini
-        pytest_ini = """[pytest]
-python_files = test_*.py
-python_functions = test_*
-testpaths = tests
-"""
-        (self.workspace_dir / "pytest.ini").write_text(pytest_ini)
+        # Copy all files from the search_replace fixture
+        copy_fixture_dir("search_replace", self.workspace_dir)
 
     def get_initial_prompt(self) -> str:
         """Get the initial prompt."""

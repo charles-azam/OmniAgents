@@ -11,6 +11,7 @@ import subprocess
 import json
 
 from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
 
 
 class FastAPIServerTask(BenchmarkTask):
@@ -54,54 +55,8 @@ Make sure to follow best practices and include proper imports.""",
 
     def setup(self) -> None:
         """Set up the workspace with basic structure."""
-        # Create directory structure
-        app_dir = self.workspace_dir / "app"
-        app_dir.mkdir(parents=True, exist_ok=True)
-        tests_dir = self.workspace_dir / "tests"
-        tests_dir.mkdir(parents=True, exist_ok=True)
-
-        # Create __init__.py files
-        (app_dir / "__init__.py").write_text("")
-        (tests_dir / "__init__.py").write_text("")
-
-        # Create basic pyproject.toml for uv
-        pyproject_toml = '''[project]
-name = "fastapi-hello"
-version = "0.1.0"
-description = "Simple FastAPI hello world server"
-requires-python = ">=3.10"
-dependencies = []
-
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
-'''
-        (self.workspace_dir / "pyproject.toml").write_text(pyproject_toml)
-
-        # Create pytest.ini
-        pytest_ini = """[pytest]
-python_files = test_*.py
-python_functions = test_*
-testpaths = tests
-"""
-        (self.workspace_dir / "pytest.ini").write_text(pytest_ini)
-
-        # Create README with instructions (agent might read this)
-        readme = """# FastAPI Hello Server
-
-Create a simple FastAPI server with a /hello endpoint.
-
-## Requirements
-- FastAPI for the web framework
-- pytest for testing
-- httpx for test client (required by TestClient)
-
-## Running Tests
-```bash
-python -m pytest -v
-```
-"""
-        (self.workspace_dir / "README.md").write_text(readme)
+        # Copy all files from the fastapi_server fixture
+        copy_fixture_dir("fastapi_server", self.workspace_dir)
 
     def get_initial_prompt(self) -> str:
         """Get the initial prompt."""
