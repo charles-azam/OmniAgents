@@ -12,82 +12,74 @@ Compare AI coding agents across frameworks (smolagents, Pydantic-AI, LangChain) 
 
 ## Quick Start
 
-### Running a Single Task
+### Using Task Fixtures
+
+The benchmark tasks are built on clean, file-based fixtures:
 
 ```python
-from pathlib import Path
 import tempfile
-from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
+from pathlib import Path
 from prompttodraft.benchmark.tasks.tasks import FastAPIServerTask
-from prompttodraft.benchmark.tasks.reporting.report_generator import save_report
-from prompttodraft.benchmark.tasks.metrics import AggregateResults
 
-# Create workspace and task
+# Create a task
 with tempfile.TemporaryDirectory() as tmpdir:
     workspace = Path(tmpdir) / "workspace"
     workspace.mkdir()
 
     task = FastAPIServerTask(workspace_dir=workspace)
-    runner = BenchmarkRunner(model_id="Qwen/Qwen2.5-72B-Instruct")
 
-    # Run benchmark
-    result = runner.run_task(
-        task=task,
-        framework="smolagents",
-        environment="local",
-        verbose=True
-    )
+    # Set up the task workspace
+    task.setup()
 
-    # Generate HTML report
-    aggregate = AggregateResults.from_results(
-        results=[result],
-        framework="smolagents",
-        environment="local",
-        model="Qwen/Qwen2.5-72B-Instruct"
-    )
+    # Get the task configuration
+    config = task.get_task_config()
+    print(f"Task: {config.task_name}")
+    print(f"Difficulty: {config.difficulty}")
+    print(f"Max iterations: {config.max_iterations}")
 
-    save_report(aggregate, "report.html", format="html")
+    # Get the prompt to give to your AI agent
+    prompt = task.get_initial_prompt()
+    print(f"\nPrompt:\n{prompt}")
+
+    # After your agent completes the task, evaluate it
+    evaluation = task.evaluate()
+    print(f"\nSuccess: {evaluation.success}")
+    print(f"Correctness: {evaluation.correctness_score}")
 ```
 
-### Running All Tasks
+### Integrating with Your Agent
+
+To run benchmarks with your AI agent, you'll need to:
+
+1. **Set up the task** - Creates the workspace with fixture files
+2. **Get the prompt** - Pass this to your AI agent
+3. **Run your agent** - Let it work in the task workspace
+4. **Evaluate** - Check if the solution is correct
+
+Example integration:
 
 ```python
-import tempfile
-from pathlib import Path
-from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
-from prompttodraft.benchmark.tasks.tasks import (
-    FastAPIServerTask,
-    SearchReplaceTask,
-    TestGenerationTask,
-    DataProcessingTask,
-    CLIToolTask,
-    BugFixTask,
+from prompttodraft.benchmark.tasks.tasks import BugFixTask
+from your_agent import run_agent  # Your agent implementation
+
+workspace = Path("./benchmark_workspace")
+workspace.mkdir(exist_ok=True)
+
+# Set up task
+task = BugFixTask(workspace_dir=workspace)
+task.setup()
+
+# Run your agent
+result = run_agent(
+    prompt=task.get_initial_prompt(),
+    workspace=workspace,
+    max_steps=task.task_config.max_iterations
 )
 
-# Create tasks
-tasks = []
-for task_class in [
-    FastAPIServerTask,
-    SearchReplaceTask,
-    TestGenerationTask,
-    DataProcessingTask,
-    CLIToolTask,
-    BugFixTask,
-]:
-    workspace = Path(tempfile.mkdtemp())
-    tasks.append(task_class(workspace_dir=workspace))
-
-# Run benchmark suite
-runner = BenchmarkRunner(model_id="Qwen/Qwen2.5-72B-Instruct")
-results = runner.run_suite(
-    tasks=tasks,
-    framework="smolagents",
-    environment="local",
-    verbose=True
-)
-
-print(f"\nCompleted {len(results)} tasks")
-print(f"Success rate: {sum(r.success for r in results)}/{len(results)}")
+# Evaluate
+evaluation = task.evaluate()
+print(f"Success: {evaluation.success}")
+print(f"Errors: {evaluation.errors}")
 ```
 
 ## Available Tasks
@@ -176,59 +168,40 @@ class MyTask(BenchmarkTask):
         pass
 ```
 
-## Running Multiple Tasks
+## Working with Multiple Tasks
+
+You can iterate through multiple tasks to test your agent:
 
 ```python
-from prompttodraft.benchmark.tasks.runner import BenchmarkRunner
-
-tasks = [
-    SearchReplaceTask(workspace_dir=workspace1),
-    BugHuntTask(workspace_dir=workspace2),
-    # ...
-]
-
-runner = BenchmarkRunner()
-results = runner.run_suite(
-    tasks=tasks,
-    framework="smolagents",
-    environment="local",
-    verbose=True
+from prompttodraft.benchmark.tasks.tasks import (
+    SearchReplaceTask,
+    BugFixTask,
+    TestGenerationTask,
 )
+import tempfile
+from pathlib import Path
 
-# Generate aggregate report
-aggregate = AggregateResults.from_results(
-    results=results,
-    framework="smolagents",
-    environment="local",
-    model="Qwen/Qwen2.5-72B-Instruct"
-)
-```
+task_classes = [SearchReplaceTask, BugFixTask, TestGenerationTask]
 
-## Comparing Frameworks
+for task_class in task_classes:
+    with tempfile.TemporaryDirectory() as tmpdir:
+        workspace = Path(tmpdir) / "workspace"
+        workspace.mkdir()
 
-```python
-frameworks = ["smolagents", "pydantic-ai", "langchain"]
-all_results = {}
+        task = task_class(workspace_dir=workspace)
+        task.setup()
 
-for framework in frameworks:
-    results = []
-    for task_class in [Task1, Task2, Task3]:
-        task = task_class(workspace_dir=create_workspace())
-        result = runner.run_task(task, framework=framework)
-        results.append(result)
+        print(f"\n{'='*60}")
+        print(f"Task: {task.task_config.task_name}")
+        print(f"{'='*60}")
 
-    all_results[framework] = AggregateResults.from_results(
-        results=results,
-        framework=framework,
-        environment="local",
-        model="gpt-4"
-    )
+        # Run your agent here
+        # your_agent.run(task.get_initial_prompt(), workspace)
 
-# Compare results
-for framework, aggregate in all_results.items():
-    print(f"{framework}: {aggregate.task_success_rate:.0%} success, "
-          f"${aggregate.avg_cost:.3f} per task, "
-          f"{aggregate.avg_execution_time:.1f}s average")
+        # Evaluate
+        evaluation = task.evaluate()
+        print(f"Would succeed: {evaluation.success}")
+        print(f"Correctness: {evaluation.correctness_score:.1%}")
 ```
 
 ## Report Generation
