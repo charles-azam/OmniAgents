@@ -6,8 +6,8 @@ This tool lists the names of files and subdirectories within a specified directo
 from pathlib import Path
 from fnmatch import fnmatch
 
-from prompttodraft.agent.core.base_tool import CoreTool
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.base_tool import CoreTool
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.agent.outputs.models import (
     FileInfo,

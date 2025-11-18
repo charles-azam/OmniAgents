@@ -50,7 +50,7 @@ class ReadFileTool:
 ## Usage in CLI
 
 ```python
-from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.tools.read_file_tool import ReadFileTool
 
 tool = ReadFileTool(backend=backend)
 result = tool.execute(absolute_path="/path/to/file.py")

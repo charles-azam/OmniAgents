@@ -28,7 +28,7 @@ See `core/gemini_cli_tool.md` for complete Gemini CLI specifications.
 ```python
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
-from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.tools.read_file_tool import ReadFileTool
 
 # Create backend
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -191,8 +191,8 @@ agent/
 1. **Create tool file** in `core/`:
 
 ```python
-from prompttodraft.agent.core.base_tool import CoreTool
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.base_tool import CoreTool
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.outputs.models import TextOutputModel
 
 class MyTool(CoreTool):
@@ -225,7 +225,7 @@ To integrate a new AI framework:
 2. **Wrap each of the 10 core tools** in framework-specific format:
 
 ```python
-from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.tools.read_file_tool import ReadFileTool
 
 class MyFrameworkReadFileTool:
     """Framework-specific wrapper for ReadFileTool"""

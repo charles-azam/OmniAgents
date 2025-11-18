@@ -647,7 +647,7 @@ ok if you look at this code,
 
 The tools must follow this structure, with the execute function and the metadata class so that they could be converted to smolagents, openai, pydantic-ai, autogen, etc. tools: 
 
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
 from prompttodraft.agent.outputs.models import (
     FileInfo,

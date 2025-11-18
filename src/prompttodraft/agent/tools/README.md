@@ -34,8 +34,8 @@ All tools follow a consistent design:
 ### Tool Structure Example
 
 ```python
-from prompttodraft.agent.core.base_tool import CoreTool
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.base_tool import CoreTool
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
 from prompttodraft.agent.outputs.models import ToolOutputModel, TextOutputModel
 
@@ -89,7 +89,7 @@ See [`../outputs/README.md`](../outputs/README.md) for details.
 ```python
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
-from prompttodraft.agent.core.read_file_tool import ReadFileTool
+from prompttodraft.agent.tools.read_file_tool import ReadFileTool
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
@@ -112,8 +112,8 @@ These tools are based on Gemini CLI specifications. See `gemini_cli_tool.md` for
 1. **Create tool class** inheriting from `CoreTool`:
 
 ```python
-from prompttodraft.agent.core.base_tool import CoreTool
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.base_tool import CoreTool
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.outputs.models import TextOutputModel
 
 class MyTool(CoreTool):

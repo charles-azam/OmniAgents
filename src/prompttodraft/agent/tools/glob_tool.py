@@ -5,8 +5,8 @@ This tool finds files matching specific glob patterns.
 """
 from pathlib import Path
 
-from prompttodraft.agent.core.base_tool import CoreTool
-from prompttodraft.agent.core.metadata import ToolMetadata
+from prompttodraft.agent.tools.base_tool import CoreTool
+from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
 from prompttodraft.agent.outputs.models import (
     FileInfo,
