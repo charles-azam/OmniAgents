@@ -19,7 +19,7 @@ The benchmark tasks are built on clean, file-based fixtures:
 ```python
 import tempfile
 from pathlib import Path
-from prompttodraft.benchmark.tasks.tasks import FastAPIServerTask
+from prompttodraft.benchmark.tasks import FastAPIServerTask
 
 # Create a task
 with tempfile.TemporaryDirectory() as tmpdir:
@@ -59,7 +59,7 @@ To run benchmarks with your AI agent, you'll need to:
 Example integration:
 
 ```python
-from prompttodraft.benchmark.tasks.tasks import BugFixTask
+from prompttodraft.benchmark.tasks import BugFixTask
 from your_agent import run_agent  # Your agent implementation
 
 workspace = Path("./benchmark_workspace")
@@ -125,7 +125,7 @@ print(f"Errors: {evaluation.errors}")
 Subclass `BenchmarkTask` and implement required methods:
 
 ```python
-from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
 
 class MyTask(BenchmarkTask):
     def get_task_config(self) -> TaskSetup:
@@ -173,7 +173,7 @@ class MyTask(BenchmarkTask):
 You can iterate through multiple tasks to test your agent:
 
 ```python
-from prompttodraft.benchmark.tasks.tasks import (
+from prompttodraft.benchmark.tasks import (
     SearchReplaceTask,
     BugFixTask,
     TestGenerationTask,
@@ -209,7 +209,7 @@ for task_class in task_classes:
 ### HTML Reports
 
 ```python
-from prompttodraft.benchmark.tasks.reporting.report_generator import save_report
+from prompttodraft.benchmark.reporting.report_generator import save_report
 
 save_report(aggregate_results, "report.html", format="html")
 ```
@@ -223,7 +223,7 @@ Generates a report with:
 ### Markdown Reports
 
 ```python
-from prompttodraft.benchmark.tasks.reporting.report_generator import generate_markdown_report
+from prompttodraft.benchmark.reporting.report_generator import generate_markdown_report
 
 markdown = generate_markdown_report(aggregate_results)
 print(markdown)

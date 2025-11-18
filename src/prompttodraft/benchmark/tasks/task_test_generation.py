@@ -9,8 +9,8 @@ from pathlib import Path
 import subprocess
 import re
 
-from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
-from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
+from prompttodraft.benchmark.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.fixture_utils import copy_fixture_dir
 
 
 class TestGenerationTask(BenchmarkTask):

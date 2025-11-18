@@ -3,7 +3,7 @@ import tempfile
 from pathlib import Path
 import pytest
 
-from prompttodraft.benchmark.tasks.tasks import (
+from prompttodraft.benchmark.tasks import (
     SearchReplaceTask,
     FastAPIServerTask,
     TestGenerationTask,

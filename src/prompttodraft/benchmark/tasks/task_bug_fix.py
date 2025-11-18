@@ -8,8 +8,8 @@ Exercises: read_file, search_file_content, replace, run_shell_command
 from pathlib import Path
 import subprocess
 
-from prompttodraft.benchmark.tasks.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
-from prompttodraft.benchmark.tasks.fixture_utils import copy_fixture_dir
+from prompttodraft.benchmark.base_task import BenchmarkTask, TaskSetup, TaskEvaluation
+from prompttodraft.benchmark.fixture_utils import copy_fixture_dir
 
 
 class BugFixTask(BenchmarkTask):
