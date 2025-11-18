@@ -3,8 +3,7 @@ Example usage of the SmolAgentAgent.
 
 This demonstrates how to use the smolagent agent with different backends.
 """
-import logging
-from prompttodraft.agent.smolagent_agent import SmolAgentAgent
+from prompttodraft.agent.agents.smolagent_agent import SmolAgentAgent
 from prompttodraft.agent.backends.local_backend import LocalBackend
 from prompttodraft.agent.backends.state_manager import GitStateManager
 
