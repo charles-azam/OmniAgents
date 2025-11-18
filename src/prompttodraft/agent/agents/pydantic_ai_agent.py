@@ -12,7 +12,7 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from openai import AsyncOpenAI
 
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
-from prompttodraft.agent.system_prompt import get_system_prompt
+from prompttodraft.agent.prompts.system_prompt import get_system_prompt
 from prompttodraft.agent.tools.write_file_tool import WriteFileTool
 from prompttodraft.agent.tools.read_file_tool import ReadFileTool
 from prompttodraft.agent.tools.list_directory_tool import ListDirectoryTool
