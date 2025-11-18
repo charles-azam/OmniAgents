@@ -6,7 +6,7 @@ with different DISPLAY_MODE environment variable values.
 """
 import os
 
-from prompttodraft.agent.outputs.outputs import (
+from prompttodraft.outputs.outputs import (
     TextOutputModel,
     CodeOutputModel,
     FileInfo,
