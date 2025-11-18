@@ -5,7 +5,7 @@ All tool outputs inherit from `ToolOutputModel` and handle their own display log
 ## Quick Start
 
 ```python
-from prompttodraft.agent.outputs.models import TextOutputModel
+from prompttodraft.agent.outputs.outputs import TextOutputModel
 
 # Create an output
 output = TextOutputModel(content="Hello, world!")

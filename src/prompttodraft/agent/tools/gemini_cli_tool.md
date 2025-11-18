@@ -649,7 +649,7 @@ The tools must follow this structure, with the execute function and the metadata
 
 from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
-from prompttodraft.agent.outputs.models import (
+from prompttodraft.agent.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
     TextOutputModel,

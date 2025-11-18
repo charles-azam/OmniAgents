@@ -47,7 +47,7 @@ from prompttodraft.agent.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.agent.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.agent.tools.uv_tool import UVTool
 
-from prompttodraft.agent.outputs.models import (
+from prompttodraft.agent.outputs.outputs import (
     FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,

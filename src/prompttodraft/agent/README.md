@@ -193,7 +193,7 @@ agent/
 ```python
 from prompttodraft.agent.tools.base_tool import CoreTool
 from prompttodraft.agent.tools.metadata import ToolMetadata
-from prompttodraft.agent.outputs.models import TextOutputModel
+from prompttodraft.agent.outputs.outputs import TextOutputModel
 
 class MyTool(CoreTool):
     metadata = ToolMetadata(

@@ -37,7 +37,7 @@ All tools follow a consistent design:
 from prompttodraft.agent.tools.base_tool import CoreTool
 from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
-from prompttodraft.agent.outputs.models import ToolOutputModel, TextOutputModel
+from prompttodraft.agent.outputs.outputs import ToolOutputModel, TextOutputModel
 
 class ExampleTool(CoreTool):
     # Metadata for framework adapters
@@ -114,7 +114,7 @@ These tools are based on Gemini CLI specifications. See `gemini_cli_tool.md` for
 ```python
 from prompttodraft.agent.tools.base_tool import CoreTool
 from prompttodraft.agent.tools.metadata import ToolMetadata
-from prompttodraft.agent.outputs.models import TextOutputModel
+from prompttodraft.agent.outputs.outputs import TextOutputModel
 
 class MyTool(CoreTool):
     metadata = ToolMetadata(

@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 
 from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend
-from prompttodraft.agent.outputs.models import ToolOutputModel
+from prompttodraft.agent.outputs.outputs import ToolOutputModel
 
 
 class CoreTool(ABC):

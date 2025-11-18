@@ -9,7 +9,7 @@ from fnmatch import fnmatch
 from prompttodraft.agent.tools.base_tool import CoreTool
 from prompttodraft.agent.tools.metadata import ToolMetadata
 from prompttodraft.agent.backends.execution_backend import ExecutionBackend, FileType
-from prompttodraft.agent.outputs.models import (
+from prompttodraft.agent.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
     ErrorOutputModel,
