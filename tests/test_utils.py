@@ -5,51 +5,13 @@ Tests the initialize_project function with different backends (local, docker, e2
 """
 import pytest
 
+from conftest import cleanup_test_environment
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
 from prompttodraft.backends.state_manager import GCSStateManager
 from prompttodraft.utils import initialize_project
-
-
-def cleanup_backend(backend: ExecutionBackend) -> None:
-    """Clean up backend storage and containers."""
-    from prompttodraft import storage_utils
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
-    import shutil
-
-    # 1. Clean bucket files
-    bucket = storage_utils.get_bucket()
-    prefix = f"{backend.project_id}/"
-    for blob in bucket.list_blobs(prefix=prefix):
-        try:
-            blob.delete()
-        except Exception:
-            # Ignore errors if blob already deleted (eventual consistency)
-            pass
-
-    # 2. Clean local working directory (backend-specific paths)
-    if isinstance(backend, LocalBackend):
-        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-    elif isinstance(backend, DockerBackend):
-        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-    else:  # E2BBackend
-        working_dir_path = GCP_DATA_PATH / backend.project_id
-    if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
-
-    # 3. Clean Docker container if exists
-    if isinstance(backend, DockerBackend):
-        import docker
-        try:
-            client = docker.from_env()
-            container_name = f"prompttodraft-{backend.project_id}"
-            container = client.containers.get(container_name)
-            container.stop()
-            container.remove()
-        except:
-            pass
 
 
 def run_initialize_project_test(backend: ExecutionBackend):
@@ -60,7 +22,7 @@ def run_initialize_project_test(backend: ExecutionBackend):
         backend: An initialized ExecutionBackend instance (local, docker, or e2b)
     """
     # === FRESH START CLEANUP ===
-    cleanup_backend(backend=backend)
+    cleanup_test_environment(backend=backend)
 
     try:
         # Start backend
@@ -116,7 +78,7 @@ def run_initialize_project_test(backend: ExecutionBackend):
             backend.shutdown()
         except:
             pass
-        cleanup_backend(backend=backend)
+        cleanup_test_environment(backend=backend)
 
 
 def test_initialize_project_local_backend():

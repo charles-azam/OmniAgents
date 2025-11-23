@@ -26,6 +26,7 @@ import os
 from pathlib import Path
 import pytest
 
+from conftest import cleanup_test_environment
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
@@ -54,38 +55,6 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-def cleanup_backend(backend: ExecutionBackend) -> None:
-    """Clean up backend storage and containers before/after tests."""
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
-    import shutil
-
-    # Clean persistent storage (Git/GCS/None) via state manager
-    # The state manager's cleanup() handles storage-specific cleanup
-    backend.state_manager.cleanup(project_id=backend.project_id)
-
-    # Clean local data directory (backend-specific paths)
-    if isinstance(backend, LocalBackend):
-        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-    elif isinstance(backend, DockerBackend):
-        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-    else:  # E2BBackend
-        working_dir_path = GCP_DATA_PATH / backend.project_id
-    if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
-
-    # Clean Docker container if applicable
-    if isinstance(backend, DockerBackend):
-        import docker
-        client = docker.from_env()
-        container_name = f"prompttodraft-{backend.project_id}"
-        try:
-            container = client.containers.get(container_name)
-            container.stop()
-            container.remove()
-        except:
-            pass
-
-
 def run_tools_e2e_test(backend: ExecutionBackend):
     """
     E2E test for all 10 tools with any backend implementation.
@@ -97,7 +66,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
     os.environ["DISPLAY_MODE"] = "console"
 
     # Clean environment for fresh start
-    cleanup_backend(backend=backend)
+    cleanup_test_environment(backend=backend)
 
     try:
         # Start backend
@@ -394,7 +363,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
     finally:
         backend.shutdown()
-        cleanup_backend(backend=backend)
+        cleanup_test_environment(backend=backend)
 
 
 def test_tools_local_backend():
@@ -434,7 +403,7 @@ def test_tools_local_backend_with_gcs_storage():
 def test_git_storage_persistence():
     """Test that Git storage properly persists and restores state."""
     backend = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
-    cleanup_backend(backend=backend)
+    cleanup_test_environment(backend=backend)
 
     try:
         # Start backend and create some files
@@ -460,14 +429,14 @@ def test_git_storage_persistence():
         backend2.shutdown()
 
     finally:
-        cleanup_backend(backend=backend)
+        cleanup_test_environment(backend=backend)
 
 
 @pytest.mark.storage
 def test_gcs_storage_persistence():
     """Test that GCS storage properly persists and restores state."""
     backend = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
-    cleanup_backend(backend=backend)
+    cleanup_test_environment(backend=backend)
 
     try:
         # Start backend and create some files
@@ -493,7 +462,7 @@ def test_gcs_storage_persistence():
         backend2.shutdown()
 
     finally:
-        cleanup_backend(backend=backend)
+        cleanup_test_environment(backend=backend)
 
 
 if __name__ == "__main__":

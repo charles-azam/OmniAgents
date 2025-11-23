@@ -87,7 +87,36 @@ class ExecutionBackend(ABC):
         Cleanup the backend environment.
         """
         self.state_manager.cleanup(project_id=self.project_id)
-        
+
+    def clean(self) -> None:
+        """
+        Remove all files from working directory and save a clean snapshot.
+
+        This creates a clean state while preserving the project's storage location:
+        - For Git: Removes all files and creates a commit called "clean"
+        - For GCS: Removes all files and saves a snapshot
+
+        Unlike cleanup(), this does not destroy the branch or bucket prefix.
+        """
+        # Get working directory
+        working_dir = Path(self.get_working_directory())
+
+        # List all files and directories (non-recursive at root level)
+        items = self.list_directory(path=working_dir, recursive=False)
+
+        # Delete all items except .git directory (needed for Git storage)
+        for item in items:
+            if item.name == '.git':
+                continue
+
+            if item.is_dir:
+                self.delete_directory(path=item.path)
+            else:
+                self.delete_file(path=item.path)
+
+        # Save the clean state
+        self.state_manager.save_snapshot(backend=self, message="clean")
+
 
     @abstractmethod
     def shutdown(self) -> None:

@@ -3,6 +3,7 @@ from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
+from conftest import cleanup_test_environment
 from pathlib import Path
 import pytest
 import os
@@ -38,43 +39,11 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
     from prompttodraft import storage_utils
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
-    import shutil
+    from prompttodraft.common import GCP_DATA_PATH
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment for debugging/reloading
-
-    # 1. Clean bucket files from previous runs
-    bucket = storage_utils.get_bucket()
-    prefix = f"{backend.project_id}/"
-    for blob in bucket.list_blobs(prefix=prefix):
-        try:
-            blob.delete()
-        except Exception:
-            # Ignore errors if blob already deleted (eventual consistency)
-            pass
-
-    # 2. Clean Docker container if exists (for DockerBackend)
-    if isinstance(backend, DockerBackend):
-        import docker
-        try:
-            client = docker.from_env()
-            container_name = f"prompttodraft-{backend.project_id}"
-            container = client.containers.get(container_name)
-            container.stop()
-            container.remove()
-        except:
-            pass  # Container doesn't exist or already cleaned
-
-    # 3. Clean local working directory (backend-specific paths)
-    if isinstance(backend, LocalBackend):
-        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-    elif isinstance(backend, DockerBackend):
-        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-    else:  # E2BBackend
-        working_dir_path = GCP_DATA_PATH / backend.project_id
-    if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
+    cleanup_test_environment(backend=backend)
 
     try:
         # Pre-populate bucket with test files to verify load_from_bucket works
@@ -347,32 +316,13 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert backend.get_status() == BackendStatus.STOPPED
 
     finally:
-        # Cleanup: shutdown first (syncs files), then delete local directory
+        # Cleanup: shutdown first (syncs files), then clean environment
         try:
             backend.shutdown()
         except:
             pass  # May fail if already shutdown
 
-        working_dir = backend.get_working_directory()
-        try:
-            backend.delete_directory(path=working_dir)
-        except:
-            pass  # May fail if directory doesn't exist
-
-        # Cleanup bucket files and GCP staging
-        from prompttodraft import storage_utils
-        from prompttodraft.common import GCP_DATA_PATH
-        import shutil
-
-        bucket = storage_utils.get_bucket()
-        prefix = f"{backend.project_id}/"
-        for blob in bucket.list_blobs(prefix=prefix):
-            blob.delete()
-
-        # Clean GCP staging directory
-        gcp_staging_path = GCP_DATA_PATH / backend.project_id
-        if gcp_staging_path.exists():
-            shutil.rmtree(gcp_staging_path)
+        cleanup_test_environment(backend=backend)
 
 
 def test_local_backend_e2e():
@@ -469,37 +419,15 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
     Args:
         backend: An initialized ExecutionBackend instance with StorageType.GIT
     """
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
-    import shutil
     import subprocess
+    from prompttodraft.backends.state_manager import GitStateManager
 
     # === FRESH START CLEANUP ===
-    # Clean Git branch if exists
-    from prompttodraft.backends.state_manager import GitStateManager
+    # Clean everything to ensure fresh test environment
+    cleanup_test_environment(backend=backend)
+
+    # Get git manager for setting up test data
     git_manager = GitStateManager()
-    git_manager.cleanup(project_id=backend.project_id)
-
-    # Clean Docker container if exists (for DockerBackend)
-    if isinstance(backend, DockerBackend):
-        import docker
-        try:
-            client = docker.from_env()
-            container_name = f"prompttodraft-{backend.project_id}"
-            container = client.containers.get(container_name)
-            container.stop()
-            container.remove()
-        except:
-            pass
-
-    # Clean local working directory
-    if isinstance(backend, LocalBackend):
-        working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-    elif isinstance(backend, DockerBackend):
-        working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-    else:  # E2BBackend
-        working_dir_path = GCP_DATA_PATH / backend.project_id
-    if working_dir_path.exists():
-        shutil.rmtree(working_dir_path)
 
     try:
         # Pre-populate Git branch with test files to verify load works
@@ -602,36 +530,13 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         assert len(final_snapshots) >= 2, "Should have multiple commits"
 
     finally:
-        # Cleanup
+        # Cleanup: shutdown first, then clean environment
         try:
             backend.shutdown()
         except:
             pass
 
-        # Delete git branch
-        git_manager.cleanup(project_id=backend.project_id)
-
-        # Clean local directory
-        if isinstance(backend, LocalBackend):
-            working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-        elif isinstance(backend, DockerBackend):
-            working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-        else:
-            working_dir_path = GCP_DATA_PATH / backend.project_id
-        if working_dir_path.exists():
-            shutil.rmtree(working_dir_path)
-
-        # Clean Docker container
-        if isinstance(backend, DockerBackend):
-            import docker
-            try:
-                client = docker.from_env()
-                container_name = f"prompttodraft-{backend.project_id}"
-                container = client.containers.get(container_name)
-                container.stop()
-                container.remove()
-            except:
-                pass
+        cleanup_test_environment(backend=backend)
 
 def test_local_backend_git_storage():
     """Test LocalBackend with Git storage."""

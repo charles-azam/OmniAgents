@@ -5,12 +5,11 @@ This module tests Git-based state persistence, including first-start scenarios
 where no remote branch exists yet.
 """
 import os
-import shutil
 from pathlib import Path
 
 import pytest
 
-from prompttodraft.common import DOCKER_BACKEND_PATH, GCP_DATA_PATH, LOCAL_BACKEND_PATH
+from conftest import cleanup_test_environment
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
@@ -54,32 +53,7 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
 
     try:
         # === ENSURE CLEAN STATE ===
-        # Delete branch if it exists
-        git_manager.cleanup(project_id=backend.project_id)
-
-        # Clean local working directory
-        if isinstance(backend, LocalBackend):
-            working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-        elif isinstance(backend, DockerBackend):
-            working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-        else:  # E2BBackend
-            working_dir_path = GCP_DATA_PATH / backend.project_id
-
-        if working_dir_path.exists():
-            shutil.rmtree(working_dir_path)
-
-        # Clean Docker container if exists (for DockerBackend)
-        if isinstance(backend, DockerBackend):
-            import docker
-
-            try:
-                client = docker.from_env()
-                container_name = f"prompttodraft-{backend.project_id}"
-                container = client.containers.get(container_name)
-                container.stop()
-                container.remove()
-            except:
-                pass
+        cleanup_test_environment(backend=backend)
 
         # Verify no snapshots exist
         snapshots = git_manager.list_snapshots(project_id=backend.project_id)
@@ -144,38 +118,13 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
         print("✓ Git storage first-start test passed")
 
     finally:
-        # Cleanup
+        # Cleanup: shutdown first, then clean environment
         try:
             backend.shutdown()
         except:
             pass
 
-        # Delete git branch
-        git_manager.cleanup(project_id=backend.project_id)
-
-        # Clean local directory
-        if isinstance(backend, LocalBackend):
-            working_dir_path = LOCAL_BACKEND_PATH / backend.project_id
-        elif isinstance(backend, DockerBackend):
-            working_dir_path = DOCKER_BACKEND_PATH / backend.project_id
-        else:
-            working_dir_path = GCP_DATA_PATH / backend.project_id
-
-        if working_dir_path.exists():
-            shutil.rmtree(working_dir_path)
-
-        # Clean Docker container
-        if isinstance(backend, DockerBackend):
-            import docker
-
-            try:
-                client = docker.from_env()
-                container_name = f"prompttodraft-{backend.project_id}"
-                container = client.containers.get(container_name)
-                container.stop()
-                container.remove()
-            except:
-                pass
+        cleanup_test_environment(backend=backend)
 
 
 def test_local_backend_git_first_start():
