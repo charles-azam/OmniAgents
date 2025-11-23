@@ -61,8 +61,8 @@ uv sync
 ### Basic Usage
 
 ```python
-from prompttodraft.agent.backends.local_backend import LocalBackend
-from prompttodraft.agent.backends.state_manager import GitStateManager
+from prompttodraft.backends.local_backend import LocalBackend
+from prompttodraft.backends.state_manager import GitStateManager
 
 # Create backend with Git storage
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -82,9 +82,9 @@ backend.shutdown()
 ### Using with AI Agents
 
 ```python
-from prompttodraft.agent.smolagent_agent import SmolAgentAgent
-from prompttodraft.agent.backends.local_backend import LocalBackend
-from prompttodraft.agent.backends.state_manager import GitStateManager
+from prompttodraft.smolagent_agent import SmolAgentAgent
+from prompttodraft.backends.local_backend import LocalBackend
+from prompttodraft.backends.state_manager import GitStateManager
 
 # Create backend
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -112,7 +112,7 @@ result = agent.run("Create a FastAPI server with a /hello endpoint")
 ### Docker Backend
 
 ```python
-from prompttodraft.agent.backends.docker_backend import DockerBackend
+from prompttodraft.backends.docker_backend import DockerBackend
 
 backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates container
@@ -123,7 +123,7 @@ backend.shutdown()  # Stops container
 ### E2B Backend
 
 ```python
-from prompttodraft.agent.backends.e2b_backend import E2BBackend
+from prompttodraft.backends.e2b_backend import E2BBackend
 
 backend = E2BBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates sandbox
@@ -136,7 +136,7 @@ backend.shutdown()  # Destroys sandbox
 ### Git Storage (Default)
 
 ```python
-from prompttodraft.agent.backends.state_manager import GitStateManager
+from prompttodraft.backends.state_manager import GitStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ```
@@ -148,7 +148,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ### Google Cloud Storage
 
 ```python
-from prompttodraft.agent.backends.state_manager import GCSStateManager
+from prompttodraft.backends.state_manager import GCSStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ```
@@ -160,7 +160,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ### No Persistence
 
 ```python
-from prompttodraft.agent.backends.state_manager import NoOpStateManager
+from prompttodraft.backends.state_manager import NoOpStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
