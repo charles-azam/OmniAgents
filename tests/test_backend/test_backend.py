@@ -320,10 +320,16 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         # Call clean()
         backend.clean()
 
-        # Verify files were removed (except .git for Git storage)
+        # Verify files were removed (except .git for Git storage and README.md marker)
         files_after_clean = backend.list_directory(path=working_dir, recursive=False)
-        non_git_files_after = [f for f in files_after_clean if f.name != '.git']
-        assert len(non_git_files_after) == 0, f"Expected 0 files after clean, found {len(non_git_files_after)}: {[f.name for f in non_git_files_after]}"
+        non_git_files_after = [f for f in files_after_clean if f.name not in ['.git', 'README.md']]
+        assert len(non_git_files_after) == 0, f"Expected only README.md after clean, found {len(non_git_files_after)}: {[f.name for f in non_git_files_after]}"
+
+        # Verify README.md exists and is empty
+        readme_path = f"{working_dir}/README.md"
+        assert backend.file_exists(path=readme_path) == FileType.FILE, "README.md should exist after clean()"
+        readme_content = backend.read_file(file_path=readme_path)
+        assert readme_content == "", f"README.md should be empty, got: {readme_content}"
 
         # Verify snapshot was created with message "clean"
         snapshots = backend.state_manager.list_snapshots(project_id=backend.project_id)
@@ -338,10 +344,15 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.shutdown()
         backend.start()
 
-        # Verify working directory is still empty after restart
+        # Verify working directory only has README.md after restart
         files_after_restart = backend.list_directory(path=working_dir, recursive=False)
-        non_git_files_after_restart = [f for f in files_after_restart if f.name != '.git']
-        assert len(non_git_files_after_restart) == 0, f"Expected empty directory after restart, found {len(non_git_files_after_restart)}: {[f.name for f in non_git_files_after_restart]}"
+        non_git_files_after_restart = [f for f in files_after_restart if f.name not in ['.git', 'README.md']]
+        assert len(non_git_files_after_restart) == 0, f"Expected only README.md after restart, found {len(non_git_files_after_restart)}: {[f.name for f in non_git_files_after_restart]}"
+
+        # Verify README.md still exists and is empty
+        assert backend.file_exists(path=readme_path) == FileType.FILE, "README.md should exist after restart"
+        readme_content_after = backend.read_file(file_path=readme_path)
+        assert readme_content_after == "", f"README.md should still be empty after restart, got: {readme_content_after}"
 
         # Test shutdown
         backend.shutdown()

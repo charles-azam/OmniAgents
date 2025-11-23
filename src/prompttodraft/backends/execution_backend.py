@@ -97,6 +97,10 @@ class ExecutionBackend(ABC):
         - For GCS: Removes all files and saves a snapshot
 
         Unlike cleanup(), this does not destroy the branch or bucket prefix.
+
+        After removing all files, creates an empty README.md to ensure the snapshot
+        is trackable (especially important for GCS storage which discovers snapshots
+        by looking at blob paths).
         """
         # Get working directory
         working_dir = Path(self.get_working_directory())
@@ -113,6 +117,12 @@ class ExecutionBackend(ABC):
                 self.delete_directory(path=item.path)
             else:
                 self.delete_file(path=item.path)
+
+        # Create empty README.md to ensure snapshot is trackable
+        # This is especially important for GCS storage which discovers snapshots
+        # by looking at blob paths - without at least one file, the snapshot
+        # timestamp won't be discoverable
+        self.write_file(file_path=working_dir / "README.md", content="")
 
         # Save the clean state
         self.state_manager.save_snapshot(backend=self, message="clean")
