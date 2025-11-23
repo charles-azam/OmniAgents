@@ -311,6 +311,38 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert backend.file_exists(path=move_dest) is None  # was deleted
         assert backend.file_exists(path=test_subdir) is None  # was deleted
 
+        # Test clean() method
+        # Verify we have files before clean
+        files_before_clean = backend.list_directory(path=working_dir, recursive=False)
+        non_git_files_before = [f for f in files_before_clean if f.name != '.git']
+        assert len(non_git_files_before) > 0, "Expected files before clean()"
+
+        # Call clean()
+        backend.clean()
+
+        # Verify files were removed (except .git for Git storage)
+        files_after_clean = backend.list_directory(path=working_dir, recursive=False)
+        non_git_files_after = [f for f in files_after_clean if f.name != '.git']
+        assert len(non_git_files_after) == 0, f"Expected 0 files after clean, found {len(non_git_files_after)}: {[f.name for f in non_git_files_after]}"
+
+        # Verify snapshot was created with message "clean"
+        snapshots = backend.state_manager.list_snapshots(project_id=backend.project_id)
+        assert len(snapshots) >= 1, "Expected at least one snapshot after clean()"
+
+        # For Git storage, verify the latest commit has message "clean"
+        if isinstance(backend.state_manager, GitStateManager):
+            latest_snapshot = snapshots[0]
+            assert latest_snapshot["message"] == "clean", f"Expected commit message 'clean', got '{latest_snapshot['message']}'"
+
+        # Shutdown and restart to verify clean state persists
+        backend.shutdown()
+        backend.start()
+
+        # Verify working directory is still empty after restart
+        files_after_restart = backend.list_directory(path=working_dir, recursive=False)
+        non_git_files_after_restart = [f for f in files_after_restart if f.name != '.git']
+        assert len(non_git_files_after_restart) == 0, f"Expected empty directory after restart, found {len(non_git_files_after_restart)}: {[f.name for f in non_git_files_after_restart]}"
+
         # Test shutdown
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
