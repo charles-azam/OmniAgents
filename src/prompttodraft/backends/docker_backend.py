@@ -3,8 +3,6 @@ Docker execution backend.
 
 This module implements the ExecutionBackend for Docker container execution.
 """
-from __future__ import annotations
-
 import os
 import shutil
 from pathlib import Path
@@ -20,7 +18,6 @@ from prompttodraft.backends.execution_backend import (
     CommandResult,
 )
 from prompttodraft.backends.state_manager import StateManager
-from prompttodraft.initializers.base import ProjectInitializer
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -31,22 +28,12 @@ CONTAINER_WORKSPACE = "/workspace"
 class DockerBackend(ExecutionBackend):
     """Docker execution backend."""
 
-    def __init__(
-        self,
-        project_id: str,
-        state_manager: StateManager,
-        initializer: ProjectInitializer | None = None
-    ):
-        super().__init__(state_manager=state_manager, initializer=initializer)
+    def __init__(self, project_id: str, state_manager: StateManager):
+        super().__init__(state_manager=state_manager)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._container: Container | None = None
         self._client = docker.from_env()
-
-        # Handle circular dependency: if no initializer provided, create default PythonInitializer
-        if self.initializer is None:
-            from prompttodraft.initializers.python_initializer import PythonInitializer
-            self.initializer = PythonInitializer(backend=self)
 
     @property
     def project_id(self) -> str:
@@ -79,10 +66,6 @@ class DockerBackend(ExecutionBackend):
             self._status = BackendStatus.RUNNING
             # Load latest state from state manager
             self.state_manager.load_latest(backend=self)
-
-            # Initialize project if not already initialized
-            if not self.initializer.is_initialized():
-                self.initializer.initialize()
             return
 
         # No container exists, create new one
@@ -120,10 +103,6 @@ class DockerBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
         self.state_manager.load_latest(backend=self)
-
-        # Initialize project if not already initialized
-        if not self.initializer.is_initialized():
-            self.initializer.initialize()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown

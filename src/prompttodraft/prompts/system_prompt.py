@@ -4,8 +4,6 @@ System prompt generation utilities for the agent.
 This module provides functions to generate dynamic system prompts
 with directory structure and git information.
 """
-from __future__ import annotations
-
 import datetime
 import platform
 from pathlib import Path
@@ -14,7 +12,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from prompttodraft.backends.execution_backend import ExecutionBackend
 
-def get_directory_structure(backend: ExecutionBackend, start_path: str, ignore_patterns: list[str] | None = None) -> str:
+
+def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore_patterns: list[str] | None = None) -> str:
     """
     Generate a nested directory structure as a string using backend operations.
 
@@ -90,7 +89,7 @@ def get_directory_structure(backend: ExecutionBackend, start_path: str, ignore_p
     return "".join([structure] + [f"{line}\n" for line in dir_structure])
 
 
-def is_git_repo(backend: ExecutionBackend) -> bool:
+def is_git_repo(backend: "ExecutionBackend") -> bool:
     """
     Check if the working directory is a git repository.
 
@@ -104,7 +103,7 @@ def is_git_repo(backend: ExecutionBackend) -> bool:
     return result.exit_code == 0 and result.output.strip() == "true"
 
 
-def get_git_status(backend: ExecutionBackend) -> str:
+def get_git_status(backend: "ExecutionBackend") -> str:
     """
     Get git status information for the context using backend.
 
@@ -150,7 +149,7 @@ Recent commits:
     return git_status_text
 
 
-def load_memory(backend: ExecutionBackend) -> str:
+def load_memory(backend: "ExecutionBackend") -> str:
     """
     Load memory from .gemini/GEMINI.md if it exists.
 
@@ -170,7 +169,7 @@ def load_memory(backend: ExecutionBackend) -> str:
     return ""
 
 
-def get_system_prompt(backend: ExecutionBackend, model_id: str) -> str:
+def get_system_prompt(backend: "ExecutionBackend", model_id: str) -> str:
     """
     Generate the system prompt with dynamic values filled in.
 

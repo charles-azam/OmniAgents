@@ -4,8 +4,6 @@ Abstract execution backend interface.
 This module defines the interface for execution backends (local, docker, e2b).
 All backends must implement these primitive operations.
 """
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -52,29 +50,17 @@ class CommandResult:
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
-    def __init__(
-        self,
-        state_manager: StateManager,
-        initializer: ProjectInitializer | None = None
-    ) -> None:
+    def __init__(self, state_manager: StateManager) -> None:
         """
-        Create a backend instance with a state manager and optional initializer.
+        Create a backend instance with a state manager.
 
         Args:
             state_manager: StateManager instance for state persistence
                 - GitStateManager(): Use GitHub branches
                 - GCSStateManager(): Use Google Cloud Storage buckets
                 - NoOpStateManager(): No state persistence
-            initializer: ProjectInitializer instance for project setup (optional)
-                - PythonInitializer(): Initialize Python projects with uv
-                - TypeScriptInitializer(): Initialize TypeScript projects with npm
-                - NoOpInitializer(): Skip initialization
-                - None: Will default to PythonInitializer after backend construction
         """
-        from prompttodraft.initializers.base import ProjectInitializer
-
         self.state_manager = state_manager
-        self.initializer = initializer
 
     @property
     @abstractmethod
@@ -193,10 +179,6 @@ class ExecutionBackend(ABC):
         """
         Execute a uv command, ensuring uv is installed first.
 
-        Note: For new projects, uv should be installed via PythonInitializer during
-        project initialization. This method provides a fallback installation for
-        backwards compatibility and convenience.
-
         Args:
             uv_command: The uv command to execute (e.g., "run script.py", "add requests", "sync")
             timeout: Optional timeout in milliseconds
@@ -211,8 +193,7 @@ class ExecutionBackend(ABC):
         )
 
         if uv_check.exit_code != 0:
-            # Install uv as fallback
-            # Note: PythonInitializer should handle this during project initialization
+            # Install uv
             install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
             install_result = self.execute_command(
                 command=install_command,
