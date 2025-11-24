@@ -308,7 +308,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         uv_tool = UVTool(backend=backend)
 
         # Initialize project first (creates pyproject.toml)
-        from prompttodraft.utils import initialize_project
+        from conftest import initialize_project
         init_result = initialize_project(backend=backend)
         assert init_result["success"] is True
 

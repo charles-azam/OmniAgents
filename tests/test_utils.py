@@ -5,13 +5,12 @@ Tests the initialize_project function with different backends (local, docker, e2
 """
 import pytest
 
-from conftest import cleanup_test_environment
+from conftest import cleanup_test_environment, initialize_project
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
 from prompttodraft.backends.state_manager import GCSStateManager
-from prompttodraft.utils import initialize_project
 
 
 def run_initialize_project_test(backend: ExecutionBackend):
@@ -30,42 +29,44 @@ def run_initialize_project_test(backend: ExecutionBackend):
         assert backend.get_status() == BackendStatus.RUNNING
         working_dir = backend.get_working_directory()
 
-        # TEST 1: First run - should run uv init and uv sync
+        # TEST: Initialize project
         print("\n" + "="*80)
-        print("TEST 1: First run - should initialize project")
+        print("TEST: Initialize project")
         print("="*80)
 
         result = initialize_project(backend=backend)
 
         assert result["success"] is True
-        assert result["first_run"] is True
         assert result["directory"] == working_dir
-        assert "uv init" in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
 
-        # Verify pyproject.toml was created
+        # Verify project files were created
         pyproject_path = f"{working_dir}/pyproject.toml"
         assert backend.file_exists(path=pyproject_path)
 
-        # Read pyproject.toml to verify it has content
+        readme_path = f"{working_dir}/README.md"
+        assert backend.file_exists(path=readme_path)
+
+        gitignore_path = f"{working_dir}/.gitignore"
+        assert backend.file_exists(path=gitignore_path)
+
+        # Verify pyproject.toml has content
         content = backend.read_file(file_path=pyproject_path)
         assert len(content) > 0
         assert "[project]" in content or "name" in content
 
-        # TEST 2: Second run - should only run uv sync
+        # Verify gitignore has Python patterns
+        gitignore_content = backend.read_file(file_path=gitignore_path)
+        assert ".venv/" in gitignore_content
+        assert "__pycache__/" in gitignore_content
+
+        # TEST: Running initialize again should be idempotent
         print("\n" + "="*80)
-        print("TEST 2: Second run - should only sync")
+        print("TEST: Idempotent initialization")
         print("="*80)
 
         result = initialize_project(backend=backend)
-
         assert result["success"] is True
-        assert result["first_run"] is False
         assert result["directory"] == working_dir
-        assert "uv init" not in result["message"] or "Running 'uv init'..." not in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
 
         print("\n" + "="*80)
         print("✅ ALL INITIALIZATION TESTS PASSED!")
