@@ -2,7 +2,7 @@ from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
+from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager, DVCStateManager
 from conftest import cleanup_test_environment
 from pathlib import Path
 import pytest
@@ -603,11 +603,191 @@ def test_e2b_backend_git_storage():
     run_backend_git_e2e_test(backend=backend)
 
 
+def run_backend_dvc_e2e_test(backend: ExecutionBackend):
+    """
+    E2E test for ExecutionBackend with DVC storage.
+
+    Tests that state is properly saved/loaded using DVC + Git with GCS backend.
+    Large files should go to GCS via DVC, small files to Git.
+
+    Args:
+        backend: An initialized ExecutionBackend instance with DVCStateManager
+    """
+    import subprocess
+    from prompttodraft.backends.state_manager import DVCStateManager
+
+    # === FRESH START CLEANUP ===
+    cleanup_test_environment(backend=backend)
+
+    # Get DVC manager for setting up test data
+    dvc_manager = backend.state_manager
+    assert isinstance(dvc_manager, DVCStateManager)
+
+    try:
+        # Pre-populate Git branch with test files to verify load works
+        branch_name = dvc_manager._get_branch_name(project_id=backend.project_id)
+        auth_url = dvc_manager._get_authenticated_url()
+
+        # Create temp directory with initial files (including a large file)
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            tmp_path = Path(tmp_dir)
+
+            # Initialize git repo
+            subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "remote", "add", "origin", auth_url], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "config", "user.email", "test@test.com"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "checkout", "-b", branch_name], cwd=tmp_path, check=True, capture_output=True)
+
+            # Initialize DVC
+            subprocess.run(["dvc", "init"], cwd=tmp_path, check=True, capture_output=True)
+
+            # Configure GCS remote
+            if dvc_manager.gcs_bucket:
+                remote_url = f"gs://{dvc_manager.gcs_bucket}/dvc-cache"
+                subprocess.run(["dvc", "remote", "add", "-d", "storage", remote_url], cwd=tmp_path, check=True, capture_output=True)
+
+            # Create test files
+            (tmp_path / "preloaded.py").write_text("# This file was preloaded from git")
+            (tmp_path / "config.json").write_text('{"preloaded": true}')
+            (tmp_path / ".gitignore").write_text(".venv/\n__pycache__/\n*.pyc\n")
+
+            # Create a "large" file that should be DVC-tracked (use .png extension)
+            large_file = tmp_path / "large_image.png"
+            large_file.write_bytes(b"fake png data" * 100)  # Small but treated as large by pattern
+
+            # Add large file to DVC
+            subprocess.run(["dvc", "add", "large_image.png"], cwd=tmp_path, check=True, capture_output=True)
+
+            # Commit and push
+            subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "commit", "-m", "Initial preloaded state with DVC"], cwd=tmp_path, check=True, capture_output=True)
+            subprocess.run(["git", "push", "origin", branch_name, "--force"], cwd=tmp_path, check=True, capture_output=True)
+
+            # Push DVC files
+            subprocess.run(["dvc", "push"], cwd=tmp_path, check=True, capture_output=True)
+
+        # Test status before start
+        assert backend.get_status() == BackendStatus.UNINITIALIZED
+
+        # Test start (should load preloaded files from git + DVC)
+        backend.start()
+        assert backend.get_status() == BackendStatus.RUNNING
+
+        # Get working directory
+        working_dir = backend.get_working_directory()
+        assert working_dir is not None
+
+        # Verify preloaded files were loaded from git
+        assert backend.file_exists(path=f"{working_dir}/preloaded.py") == FileType.FILE
+        assert backend.file_exists(path=f"{working_dir}/config.json") == FileType.FILE
+        preloaded_content = backend.read_file(file_path=f"{working_dir}/preloaded.py")
+        assert preloaded_content == "# This file was preloaded from git"
+
+        # Verify DVC-tracked file was loaded from GCS
+        assert backend.file_exists(path=f"{working_dir}/large_image.png") == FileType.FILE
+        large_content = backend.read_file(file_path=f"{working_dir}/large_image.png")
+        assert large_content == "fake png data" * 100
+
+        # Clean up preloaded files
+        backend.delete_file(path=f"{working_dir}/preloaded.py")
+        backend.delete_file(path=f"{working_dir}/config.json")
+
+        # Test write_file
+        test_file = f"{working_dir}/test.txt"
+        backend.write_file(file_path=test_file, content="Hello DVC World")
+
+        # Create a new large file that should be DVC-tracked
+        new_large_file = f"{working_dir}/data.csv"
+        backend.write_file(file_path=new_large_file, content="col1,col2\n" + "a,b\n" * 1000)
+
+        # Test sync/load with shutdown/start cycle
+        sync_test_file = f"{working_dir}/sync_test.py"
+        backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
+
+        # Test shutdown (should commit and push to git + DVC)
+        backend.shutdown()
+        assert backend.get_status() == BackendStatus.STOPPED
+
+        # Verify files were synced to git
+        snapshots = dvc_manager.list_snapshots(project_id=backend.project_id)
+        assert len(snapshots) >= 1, "No commits found on git branch"
+
+        # Start again and verify files were loaded
+        backend.start()
+        assert backend.get_status() == BackendStatus.RUNNING
+
+        # Verify files were loaded back
+        assert backend.file_exists(path=test_file) == FileType.FILE
+        loaded_content = backend.read_file(file_path=test_file)
+        assert loaded_content == "Hello DVC World"
+
+        assert backend.file_exists(path=sync_test_file) == FileType.FILE
+        sync_loaded_content = backend.read_file(file_path=sync_test_file)
+        assert sync_loaded_content == "# File created before shutdown"
+
+        # Verify large file was loaded
+        assert backend.file_exists(path=new_large_file) == FileType.FILE
+        csv_content = backend.read_file(file_path=new_large_file)
+        assert "col1,col2" in csv_content
+
+        # Test that deleted files don't come back
+        backend.delete_file(path=sync_test_file)
+        backend.shutdown()
+        backend.start()
+
+        # sync_test.py should not exist after reload
+        assert backend.file_exists(path=sync_test_file) is None
+
+        # Test final state
+        backend.write_file(file_path=test_file, content="Final DVC state")
+        backend.shutdown()
+
+        # Verify final commit exists
+        final_snapshots = dvc_manager.list_snapshots(project_id=backend.project_id)
+        assert len(final_snapshots) >= 2, "Should have multiple commits"
+
+    finally:
+        # Cleanup
+        try:
+            backend.shutdown()
+        except:
+            pass
+
+        cleanup_test_environment(backend=backend)
+
+
+def test_local_backend_dvc_storage():
+    """Test LocalBackend with DVC storage."""
+    project_id = get_project_id(base_name="test_backend_dvc_local")
+    backend = LocalBackend(project_id=project_id, state_manager=DVCStateManager())
+    run_backend_dvc_e2e_test(backend=backend)
+
+
+def test_docker_backend_dvc_storage():
+    """Test DockerBackend with DVC storage."""
+    project_id = get_project_id(base_name="test_backend_dvc_docker")
+    backend = DockerBackend(project_id=project_id, state_manager=DVCStateManager())
+    run_backend_dvc_e2e_test(backend=backend)
+
+
+@pytest.mark.e2b
+def test_e2b_backend_dvc_storage():
+    """Test E2BBackend with DVC storage."""
+    project_id = get_project_id(base_name="test_backend_dvc_e2b")
+    backend = E2BBackend(project_id=project_id, state_manager=DVCStateManager())
+    run_backend_dvc_e2e_test(backend=backend)
+
+
 if __name__ == "__main__":
     # test_local_backend_e2e()
     # test_docker_backend_e2e()
     # test_docker_backend_container_reuse()
     # test_e2b_backend_e2e()
     # test_local_backend_git_storage()
-    test_docker_backend_git_storage()
-    test_e2b_backend_git_storage()
+    # test_docker_backend_git_storage()
+    # test_e2b_backend_git_storage()
+    # test_local_backend_dvc_storage()
+    test_docker_backend_dvc_storage()
+    # test_e2b_backend_dvc_storage()
