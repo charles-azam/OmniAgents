@@ -83,6 +83,15 @@ class ExecutionBackend(ABC):
         """Get the project ID for this backend instance."""
         pass
 
+    def _run_initialization(self) -> None:
+        """
+        Run project initialization if not already initialized.
+
+        This method should be called by backend implementations at the end of their start() method.
+        """
+        if not self.initializer.is_initialized():
+            self.initializer.initialize()
+
     @abstractmethod
     def start(self) -> None:
         """
@@ -92,8 +101,11 @@ class ExecutionBackend(ABC):
         - Creates project directory/container/sandbox if needed
         - Loads files from bucket if available
         - Sets status to RUNNING
+        - Runs initialization if not already initialized
 
         Can be called after initialization or after shutdown to restart.
+
+        Implementations should call self._run_initialization() at the end.
         """
         pass
     

@@ -50,6 +50,8 @@ class LocalBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
         self.state_manager.load_latest(backend=self)
+        # Run initialization if needed
+        self._run_initialization()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown

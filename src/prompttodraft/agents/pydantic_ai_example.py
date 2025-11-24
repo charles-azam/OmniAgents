@@ -31,12 +31,8 @@ def main(reset_history: bool = True) -> None:
     initializer.backend = backend
     initializer.working_dir = backend.get_working_directory()
 
-    # Start the backend (loads from git if exists)
+    # Start the backend (loads from git if exists and initializes if needed)
     backend.start()
-
-    # Initialize the project if not already initialized
-    if not initializer.is_initialized():
-        initializer.initialize()
 
     # Create the agent
     # Note: The backend is passed here but will be injected into tools
