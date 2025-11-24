@@ -4,16 +4,18 @@ State management for execution backends.
 This module defines abstract and concrete state managers for persisting
 backend state to different storage backends (GCS, GitHub, or none).
 """
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from pathlib import Path
 from datetime import datetime, timezone
-from typing import TYPE_CHECKING
 from enum import Enum
 import os
 
 from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft import storage_utils
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from prompttodraft.backends.execution_backend import ExecutionBackend
 
@@ -31,7 +33,7 @@ class StateManager(ABC):
     """Abstract interface for project state persistence."""
 
     @abstractmethod
-    def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
+    def save_snapshot(self, backend: ExecutionBackend, message: str = "") -> str:
         """
         Save current backend working directory state.
 
@@ -45,7 +47,7 @@ class StateManager(ABC):
         pass
 
     @abstractmethod
-    def load_latest(self, backend: "ExecutionBackend") -> bool:
+    def load_latest(self, backend: ExecutionBackend) -> bool:
         """
         Load latest snapshot into backend working directory.
 
@@ -84,7 +86,7 @@ class StateManager(ABC):
 class GCSStateManager(StateManager):
     """Persist state to Google Cloud Storage buckets (original implementation)."""
 
-    def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
+    def save_snapshot(self, backend: ExecutionBackend, message: str = "") -> str:
         """
         Sync all files from working directory to bucket with timestamp.
 
@@ -123,7 +125,7 @@ class GCSStateManager(StateManager):
 
         return timestamp
 
-    def load_latest(self, backend: "ExecutionBackend") -> bool:
+    def load_latest(self, backend: ExecutionBackend) -> bool:
         """
         Load all files from the latest snapshot in bucket into the working directory.
 
@@ -259,23 +261,27 @@ class GitStateManager(StateManager):
             return self.repo_url.replace("https://", f"https://oauth2:{self.github_token}@")
         return self.repo_url
 
-    def _ensure_gitignore(self, backend: "ExecutionBackend") -> None:
-        """Ensure .gitignore exists in working directory."""
+    def _ensure_gitignore(self, backend: ExecutionBackend) -> None:
+        """
+        Ensure .gitignore exists in working directory.
+
+        Note: This method only creates a minimal .gitignore if one doesn't exist.
+        Language-specific gitignore patterns should be managed by ProjectInitializer classes.
+        """
         working_dir = backend.get_working_directory()
         gitignore_path = f"{working_dir}/.gitignore"
 
         if not backend.file_exists(path=gitignore_path):
-            backend.write_file(
-                file_path=gitignore_path,
-                content=".venv/\n__pycache__/\n*.pyc\n.pytest_cache/\n.cache/\nnode_modules/\n.git/\n"
-            )
+            # Create minimal gitignore with only .git directory
+            # Language-specific patterns should be added by initializers
+            backend.write_file(file_path=gitignore_path, content=".git/\n")
 
-    def _is_git_initialized(self, backend: "ExecutionBackend") -> bool:
+    def _is_git_initialized(self, backend: ExecutionBackend) -> bool:
         """Check if git is initialized in working directory."""
         result = backend.execute_command(command="git status")
         return result.exit_code == 0
 
-    def _ensure_git_initialized(self, backend: "ExecutionBackend", branch_name: str) -> bool:
+    def _ensure_git_initialized(self, backend: ExecutionBackend, branch_name: str) -> bool:
         """
         Ensure git is initialized with proper configuration and branch exists locally.
 
@@ -331,7 +337,7 @@ class GitStateManager(StateManager):
         fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
         return fetch_result.exit_code == 0
 
-    def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
+    def save_snapshot(self, backend: ExecutionBackend, message: str = "") -> str:
         """
         Save working directory to Git branch.
 
@@ -373,7 +379,7 @@ class GitStateManager(StateManager):
         sha_result = backend.execute_command(command="git rev-parse HEAD")
         return sha_result.output.strip()
 
-    def load_latest(self, backend: "ExecutionBackend") -> bool:
+    def load_latest(self, backend: ExecutionBackend) -> bool:
         """
         Load latest snapshot from Git branch.
 
@@ -455,11 +461,11 @@ class GitStateManager(StateManager):
 class NoOpStateManager(StateManager):
     """State manager that does nothing (for storage=None)."""
 
-    def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
+    def save_snapshot(self, backend: ExecutionBackend, message: str = "") -> str:
         """No-op save."""
         return ""
 
-    def load_latest(self, backend: "ExecutionBackend") -> bool:
+    def load_latest(self, backend: ExecutionBackend) -> bool:
         """No-op load."""
         return False
 
