@@ -14,7 +14,10 @@ import os
 
 from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft import storage_utils
-from prompttodraft.backends.execution_backend import ExecutionBackend
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from prompttodraft.backends.execution_backend import ExecutionBackend
 
 
 class StorageType(Enum):
