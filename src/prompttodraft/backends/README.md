@@ -9,7 +9,7 @@ Execution backends provide primitive operations (execute commands, read/write fi
 | **Environment** | Host machine | Docker container | Cloud sandbox |
 | **Isolation** | None | Container | Full sandbox |
 | **Startup time** | Instant | ~2-5s | ~5-10s |
-| **State persistence** | Git/GCS/None | Git/GCS/None | Git/GCS/None |
+| **State persistence** | Git/GCS/DVC/None | Git/GCS/DVC/None | Git/GCS/DVC/None |
 | **Dependencies** | None | Docker daemon | E2B API key |
 | **Best for** | Development | Isolated testing | Production |
 
@@ -142,6 +142,33 @@ backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 - Timestamped snapshots (e.g., `project_id/20250108_143022_123456/`)
 - Enterprise-grade, handles large files
 - Requires GCP credentials
+
+#### DVC Storage (Git + GCS for Large Files)
+
+```python
+from prompttodraft.backends.state_manager import DVCStateManager
+
+backend = LocalBackend(project_id="my-project", state_manager=DVCStateManager())
+```
+
+- Uses DVC (Data Version Control) + Git with GCS backend
+- Small files and code go to Git (version controlled)
+- Large files (CAD, media, data) go to GCS via DVC
+- Best of both worlds: version control + large file support
+- Requires both GitHub token and GCS bucket
+- Configurable patterns for which files use DVC (default: `*.step`, `*.stl`, `*.png`, `*.csv`, etc.)
+
+**Environment variables:**
+- `PROMPTTODRAFT_GITHUB_STATE_REPO`: GitHub repo (default: `charlesazam/prompttodraft-states`)
+- `PROMPTTODRAFT_GITHUB_API_KEY`: GitHub token
+- `BUCKET_PROMPT_TO_DRAFT`: GCS bucket for DVC cache
+
+**Custom patterns:**
+```python
+# Only track specific large files with DVC
+dvc_manager = DVCStateManager(dvc_patterns=["*.step", "*.stl", "data/*.parquet"])
+backend = LocalBackend(project_id="my-project", state_manager=dvc_manager)
+```
 
 #### No Persistence
 

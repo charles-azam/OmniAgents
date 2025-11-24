@@ -29,6 +29,7 @@ dependencies = [
     "loguru>=0.7.3",
     "docker>=7.1.0",
     "pygithub>=2.5.0",
+    "dvc[gs]>=3.0.0",
 ]
 
 [project.scripts]
