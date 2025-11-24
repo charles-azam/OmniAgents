@@ -6,6 +6,7 @@ This demonstrates how to use the pydantic_ai agent with different backends.
 from prompttodraft.agents.pydantic_ai_agent import PydanticAIAgent
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.initializers.python_initializer import PythonInitializer
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -16,13 +17,26 @@ def main(reset_history: bool = True) -> None:
     # Create a backend with git storage
     project_id = "example-project-pydantic-ai"
     state_manager = GitStateManager()
+
+    # Create initializer (backend will be set after backend creation)
+    initializer = PythonInitializer()
+
     backend = DockerBackend(
         project_id=project_id,
         state_manager=state_manager,
+        initializer=initializer,
     )
+
+    # Set backend reference in initializer (resolves circular dependency)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
 
     # Start the backend (loads from git if exists)
     backend.start()
+
+    # Initialize the project if not already initialized
+    if not initializer.is_initialized():
+        initializer.initialize()
 
     # Create the agent
     # Note: The backend is passed here but will be injected into tools

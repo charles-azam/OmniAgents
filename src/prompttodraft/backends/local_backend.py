@@ -30,16 +30,11 @@ class LocalBackend(ExecutionBackend):
         self,
         project_id: str,
         state_manager: StateManager,
-        initializer: ProjectInitializer | None = None
+        initializer: ProjectInitializer
     ):
         super().__init__(state_manager=state_manager, initializer=initializer)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
-
-        # Handle circular dependency: if no initializer provided, create default PythonInitializer
-        if self.initializer is None:
-            from prompttodraft.initializers.python_initializer import PythonInitializer
-            self.initializer = PythonInitializer(backend=self)
 
     @property
     def project_id(self) -> str:
@@ -55,10 +50,6 @@ class LocalBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
         self.state_manager.load_latest(backend=self)
-
-        # Initialize project if not already initialized
-        if not self.initializer.is_initialized():
-            self.initializer.initialize()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown

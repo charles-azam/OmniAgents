@@ -14,15 +14,16 @@ class ProjectInitializer(ABC):
     Each language implementation handles README.md, .gitignore, and tooling setup.
     """
 
-    def __init__(self, backend: ExecutionBackend):
+    def __init__(self, backend: ExecutionBackend | None = None):
         """
         Initialize the project initializer.
 
         Args:
-            backend: The execution backend to use for file operations
+            backend: The execution backend to use for file operations.
+                    Can be None initially if set later via attribute assignment.
         """
         self.backend = backend
-        self.working_dir = backend.get_working_directory()
+        self.working_dir = backend.get_working_directory() if backend else ""
 
     @abstractmethod
     def is_initialized(self) -> bool:

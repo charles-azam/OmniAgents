@@ -11,6 +11,7 @@ from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
 from prompttodraft.backends.state_manager import GCSStateManager
+from prompttodraft.initializers.python_initializer import PythonInitializer
 
 
 def run_initialize_project_test(backend: ExecutionBackend):
@@ -84,20 +85,29 @@ def run_initialize_project_test(backend: ExecutionBackend):
 
 def test_initialize_project_local_backend():
     """Test initialize_project with LocalBackend."""
-    backend = LocalBackend(project_id="test_init_local", state_manager=GCSStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_init_local", state_manager=GCSStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_initialize_project_test(backend=backend)
 
 
 def test_initialize_project_docker_backend():
     """Test initialize_project with DockerBackend."""
-    backend = DockerBackend(project_id="test_init_docker", state_manager=GCSStateManager())
+    initializer = PythonInitializer()
+    backend = DockerBackend(project_id="test_init_docker", state_manager=GCSStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_initialize_project_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_initialize_project_e2b_backend():
     """Test initialize_project with E2BBackend."""
-    backend = E2BBackend(project_id="test_init_e2b", state_manager=GCSStateManager())
+    initializer = PythonInitializer()
+    backend = E2BBackend(project_id="test_init_e2b", state_manager=GCSStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_initialize_project_test(backend=backend)
 
 

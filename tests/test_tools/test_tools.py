@@ -36,6 +36,7 @@ from prompttodraft.backends.state_manager import (
     GitStateManager,
     GCSStateManager,
 )
+from prompttodraft.initializers.python_initializer import PythonInitializer
 
 from prompttodraft.tools.list_directory_tool import ListDirectoryTool
 from prompttodraft.tools.read_file_tool import ReadFileTool
@@ -368,41 +369,59 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
 def test_tools_local_backend():
     """Test all tools with LocalBackend."""
-    backend = LocalBackend(project_id="test_tools_local", state_manager=NoOpStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_tools_local", state_manager=NoOpStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_tools_e2e_test(backend=backend)
 
 
 def test_tools_docker_backend():
     """Test all tools with DockerBackend."""
-    backend = DockerBackend(project_id="test_tools_docker", state_manager=NoOpStateManager())
+    initializer = PythonInitializer()
+    backend = DockerBackend(project_id="test_tools_docker", state_manager=NoOpStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_tools_e2b_backend():
     """Test all tools with E2BBackend."""
-    backend = E2BBackend(project_id="test_tools_e2b", state_manager=NoOpStateManager())
+    initializer = PythonInitializer()
+    backend = E2BBackend(project_id="test_tools_e2b", state_manager=NoOpStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_tools_local_backend_with_git_storage():
     """Test all tools with LocalBackend and Git storage."""
-    backend = LocalBackend(project_id="test_tools_local_git", state_manager=GitStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_tools_local_git", state_manager=GitStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_tools_local_backend_with_gcs_storage():
     """Test all tools with LocalBackend and GCS storage."""
-    backend = LocalBackend(project_id="test_tools_local_gcs", state_manager=GCSStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_tools_local_gcs", state_manager=GCSStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_tools_e2e_test(backend=backend)
 
 
 @pytest.mark.storage
 def test_git_storage_persistence():
     """Test that Git storage properly persists and restores state."""
-    backend = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     cleanup_test_environment(backend=backend)
 
     try:
@@ -417,7 +436,10 @@ def test_git_storage_persistence():
         backend.shutdown()
 
         # Create a new backend with same project_id and state manager
-        backend2 = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager())
+        initializer2 = PythonInitializer()
+        backend2 = LocalBackend(project_id="test_git_persistence", state_manager=GitStateManager(), initializer=initializer2)
+        initializer2.backend = backend2
+        initializer2.working_dir = backend2.get_working_directory()
         backend2.start()
 
         # Verify file was restored
@@ -435,7 +457,10 @@ def test_git_storage_persistence():
 @pytest.mark.storage
 def test_gcs_storage_persistence():
     """Test that GCS storage properly persists and restores state."""
-    backend = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     cleanup_test_environment(backend=backend)
 
     try:
@@ -450,7 +475,10 @@ def test_gcs_storage_persistence():
         backend.shutdown()
 
         # Create a new backend with same project_id and state manager
-        backend2 = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager())
+        initializer2 = PythonInitializer()
+        backend2 = LocalBackend(project_id="test_gcs_persistence", state_manager=GCSStateManager(), initializer=initializer2)
+        initializer2.backend = backend2
+        initializer2.working_dir = backend2.get_working_directory()
         backend2.start()
 
         # Verify file was restored
