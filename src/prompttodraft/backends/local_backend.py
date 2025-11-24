@@ -3,6 +3,8 @@ Local execution backend.
 
 This module implements the ExecutionBackend for local execution.
 """
+from __future__ import annotations
+
 import subprocess
 import shutil
 from pathlib import Path
@@ -16,6 +18,7 @@ from prompttodraft.backends.execution_backend import (
 )
 from prompttodraft.backends.state_manager import StateManager
 from prompttodraft.common import LOCAL_BACKEND_PATH
+from prompttodraft.initializers.base import ProjectInitializer
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 
@@ -23,10 +26,20 @@ DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 class LocalBackend(ExecutionBackend):
     """Local execution backend."""
 
-    def __init__(self, project_id: str, state_manager: StateManager):
-        super().__init__(state_manager=state_manager)
+    def __init__(
+        self,
+        project_id: str,
+        state_manager: StateManager,
+        initializer: ProjectInitializer | None = None
+    ):
+        super().__init__(state_manager=state_manager, initializer=initializer)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
+
+        # Handle circular dependency: if no initializer provided, create default PythonInitializer
+        if self.initializer is None:
+            from prompttodraft.initializers.python_initializer import PythonInitializer
+            self.initializer = PythonInitializer(backend=self)
 
     @property
     def project_id(self) -> str:
@@ -42,6 +55,10 @@ class LocalBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
         self.state_manager.load_latest(backend=self)
+
+        # Initialize project if not already initialized
+        if not self.initializer.is_initialized():
+            self.initializer.initialize()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown

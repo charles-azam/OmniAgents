@@ -10,6 +10,16 @@ class PythonInitializer(ProjectInitializer):
     Handles README.md, .gitignore, uv installation, and project setup.
     """
 
+    def is_initialized(self) -> bool:
+        """
+        Check if Python project is initialized.
+
+        Returns:
+            True if pyproject.toml exists, False otherwise
+        """
+        pyproject_path = f"{self.working_dir}/pyproject.toml"
+        return self.backend.file_exists(path=pyproject_path) is not None
+
     def initialize(self) -> None:
         """
         Initialize Python project.

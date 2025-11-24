@@ -4,6 +4,8 @@ Abstract execution backend interface.
 This module defines the interface for execution backends (local, docker, e2b).
 All backends must implement these primitive operations.
 """
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
@@ -50,17 +52,29 @@ class CommandResult:
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
-    def __init__(self, state_manager: StateManager) -> None:
+    def __init__(
+        self,
+        state_manager: StateManager,
+        initializer: ProjectInitializer | None = None
+    ) -> None:
         """
-        Create a backend instance with a state manager.
+        Create a backend instance with a state manager and optional initializer.
 
         Args:
             state_manager: StateManager instance for state persistence
                 - GitStateManager(): Use GitHub branches
                 - GCSStateManager(): Use Google Cloud Storage buckets
                 - NoOpStateManager(): No state persistence
+            initializer: ProjectInitializer instance for project setup (optional)
+                - PythonInitializer(): Initialize Python projects with uv
+                - TypeScriptInitializer(): Initialize TypeScript projects with npm
+                - NoOpInitializer(): Skip initialization
+                - None: Will default to PythonInitializer after backend construction
         """
+        from prompttodraft.initializers.base import ProjectInitializer
+
         self.state_manager = state_manager
+        self.initializer = initializer
 
     @property
     @abstractmethod

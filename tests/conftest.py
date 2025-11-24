@@ -4,10 +4,14 @@ Shared pytest fixtures and utilities for all tests.
 This module contains common test utilities that are automatically
 available to all test files in the tests directory.
 """
+from __future__ import annotations
+
 from pathlib import Path
 
+from prompttodraft.backends.execution_backend import ExecutionBackend
 
-def initialize_project(backend: "ExecutionBackend") -> dict[str, bool | str]:
+
+def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
     """
     Initialize a Python project for testing purposes.
 
@@ -41,7 +45,7 @@ def initialize_project(backend: "ExecutionBackend") -> dict[str, bool | str]:
     }
 
 
-def cleanup_test_environment(backend: "ExecutionBackend") -> None:
+def cleanup_test_environment(backend: ExecutionBackend) -> None:
     """
     Clean all test artifacts for a backend instance.
 

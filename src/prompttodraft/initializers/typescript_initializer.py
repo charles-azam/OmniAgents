@@ -10,6 +10,16 @@ class TypeScriptInitializer(ProjectInitializer):
     Handles README.md, .gitignore, npm setup, and TypeScript configuration.
     """
 
+    def is_initialized(self) -> bool:
+        """
+        Check if TypeScript project is initialized.
+
+        Returns:
+            True if package.json exists, False otherwise
+        """
+        package_json_path = f"{self.working_dir}/package.json"
+        return self.backend.file_exists(path=package_json_path) is not None
+
     def initialize(self) -> None:
         """
         Initialize TypeScript project.
