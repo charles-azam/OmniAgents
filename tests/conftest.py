@@ -7,6 +7,40 @@ available to all test files in the tests directory.
 from pathlib import Path
 
 
+def initialize_project(backend: "ExecutionBackend") -> dict[str, bool | str]:
+    """
+    Initialize a Python project for testing purposes.
+
+    Ensures README.md, .gitignore exist, uv is installed, pyproject.toml exists,
+    and dependencies are synchronized.
+
+    Args:
+        backend: The execution backend to use for running commands
+
+    Returns:
+        Dictionary with initialization results:
+        - directory: str path to the initialized directory
+        - success: bool indicating if initialization succeeded
+        - message: str with status message
+
+    Raises:
+        RuntimeError: If initialization fails
+    """
+    from prompttodraft.initializers.python_initializer import PythonInitializer
+
+    working_dir = backend.get_working_directory()
+
+    # Use PythonInitializer to handle initialization
+    initializer = PythonInitializer(backend=backend)
+    initializer.initialize()
+
+    return {
+        "directory": working_dir,
+        "success": True,
+        "message": "✓ Project initialized successfully",
+    }
+
+
 def cleanup_test_environment(backend: "ExecutionBackend") -> None:
     """
     Clean all test artifacts for a backend instance.

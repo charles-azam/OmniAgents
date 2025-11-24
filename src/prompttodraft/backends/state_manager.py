@@ -260,15 +260,19 @@ class GitStateManager(StateManager):
         return self.repo_url
 
     def _ensure_gitignore(self, backend: "ExecutionBackend") -> None:
-        """Ensure .gitignore exists in working directory."""
+        """
+        Ensure .gitignore exists in working directory.
+
+        Note: This method only creates a minimal .gitignore if one doesn't exist.
+        Language-specific gitignore patterns should be managed by ProjectInitializer classes.
+        """
         working_dir = backend.get_working_directory()
         gitignore_path = f"{working_dir}/.gitignore"
 
         if not backend.file_exists(path=gitignore_path):
-            backend.write_file(
-                file_path=gitignore_path,
-                content=".venv/\n__pycache__/\n*.pyc\n.pytest_cache/\n.cache/\nnode_modules/\n.git/\n"
-            )
+            # Create minimal gitignore with only .git directory
+            # Language-specific patterns should be added by initializers
+            backend.write_file(file_path=gitignore_path, content=".git/\n")
 
     def _is_git_initialized(self, backend: "ExecutionBackend") -> bool:
         """Check if git is initialized in working directory."""

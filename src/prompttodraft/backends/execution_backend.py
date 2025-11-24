@@ -179,6 +179,10 @@ class ExecutionBackend(ABC):
         """
         Execute a uv command, ensuring uv is installed first.
 
+        Note: For new projects, uv should be installed via PythonInitializer during
+        project initialization. This method provides a fallback installation for
+        backwards compatibility and convenience.
+
         Args:
             uv_command: The uv command to execute (e.g., "run script.py", "add requests", "sync")
             timeout: Optional timeout in milliseconds
@@ -193,7 +197,8 @@ class ExecutionBackend(ABC):
         )
 
         if uv_check.exit_code != 0:
-            # Install uv
+            # Install uv as fallback
+            # Note: PythonInitializer should handle this during project initialization
             install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
             install_result = self.execute_command(
                 command=install_command,
