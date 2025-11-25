@@ -323,3 +323,79 @@ That's it. No changes to Backend, StateManager, or Agent.
 | **Agent** | AI coding | Backend (uses tools) |
 
 The Backend is the hub. Everything else is pluggable.
+
+# Openai suggestion
+  Initializers (decouple from Python/uv)
+
+  - Create an Initializer plugin system so repo bootstrapping isn’t hardwired to Python/uv:
+      - Base: initializers/BaseInitializer with name, detect(), scaffold(), post_init(), recommended_tools().
+      - Built-ins: PythonUvInitializer, NodePnpmInitializer, RustCargoInitializer, EmptyInitializer.
+      - Registry + selection: auto-detect or prompt once; persist choice in prompttodraft.yaml.
+      - Tools gating: the initializer exposes contextual tools (e.g., uv only when the Python one is selected).
+  - Migrate current logic from src/prompttodraft/utils.py:1 into the Python initializer, leaving a thin backward-compatible wrapper marked
+  deprecated.
+  - Add a CLI helper: ptd init shows choices, runs scaffold, commits first snapshot. Assumes a git repo is present (as you noted).
+  - Benefits: opinionated but flexible, cleanly supports non-Python projects, and sheds “hard-coded uv” feel.
+
+  LangChain example API (simplify)
+
+  - Provide a tiny “one-liner” compose API and a context manager so examples are minimal and readable:
+      - Add AgentConfig and build_agent(config) with sane defaults (backend, storage, model, provider).
+      - Add BackendSession context manager to handle start()/shutdown() predictably.
+      - Optional helper run_task(task, framework='langchain', config=...) for pure one-liners.
+  - Example rewrite (conceptual):
+      - Current: src/prompttodraft/agents/langchain_example.py:1
+      - Proposed:
+          - Create a config → build agent → run inside a session → print result.
+          - Tools auto-selected from initializer; model/provider string simplified into model="openai:gpt-5-mini".
+  - Bonus: Generate LC tools programmatically from CoreTool.metadata to remove the manual wrappers in src/prompttodraft/agents/
+  langchain_agent.py:1. Less boilerplate, less drift.
+
+  Untangle StateManager and Backend
+
+  - Today: backends accept a StateManager; StateManager calls back into the backend to run commands/read files. This is a working but “figurative
+  circular” dependency.
+  - Recommended direction: introduce a separate orchestration layer so the backend doesn’t need to know about state at all.
+      - Option A (cleanest): ProjectSession orchestrator
+          - ProjectSession(backend, state_store):
+              - Before work: state_store.load(host_path, project_id)
+              - After work: state_store.save(host_path, project_id)
+          - Backends become purely execution environments; StateStore is purely persistence. No mutual dependency.
+      - Option B (incremental): StateStore interface operating on a path
+          - Replace StateManager.save_snapshot(backend) with StateStore.save(path, project_id) and StateStore.load(path, project_id).
+          - Backends expose get_host_working_directory() (Docker already has _get_host_working_directory()). StateStore uses host filesystem and
+  runs git on host (or GitPython), avoiding running VCS inside Docker/E2B.
+      - Migration path:
+          - Add StateStore and ProjectSession while keeping StateManager as a thin adapter so nothing breaks.
+          - Gradually switch call sites to the new orchestrator.
+  - Result: no conceptual circularity, clearer responsibilities, easier testing.
+
+  Concrete, staged plan
+
+  - Stage 1: Initializers
+      - Add src/prompttodraft/initializers/ with BaseInitializer + PythonUvInitializer (migrate utils.initialize_project() here and deprecate the
+  old one).
+      - Add registry + prompttodraft.yaml support and a small ptd init CLI.
+      - In agents, select tools via the initializer’s recommended_tools(). Only include uv when relevant.
+  - Stage 2: Example API
+      - Add AgentConfig and build_agent() with defaults.
+      - Add BackendSession context manager to centralize start/shutdown.
+      - Update src/prompttodraft/agents/langchain_example.py:1 to the new API.
+  - Stage 3: State orchestration
+      - Introduce StateStore (Git/GCS/NoOp) using host paths; add ProjectSession.
+      - Keep StateManager as a shim for compatibility and mark deprecated.
+      - Add get_host_working_directory() to ExecutionBackend (Docker already has a private helper).
+  - Stage 4: Tool adapters
+  - New (later): src/prompttodraft/state_store.py, src/prompttodraft/project_session.py
+  - Update (later): src/prompttodraft/backends/execution_backend.py:1 to expose get_host_working_directory(); remove state_manager over time.
+
+  Decisions to confirm
+
+  - Initializers you want bundled now: Python+uv, Node+pnpm, Rust+cargo, Empty?
+  - For Git storage, okay to run git on the host (simpler) vs inside Docker/E2B (current behavior)?
+  - Preferred example API style:
+      - Minimal one-liner helper (run_task(...))
+      - Or explicit AgentConfig + BackendSession (still concise but more explicit)
+
+  If you like this direction, I can scaffold Stage 1 (initializer plugin + PythonUv initializer + deprecate initialize_project) and Stage 2
+  (simplified example and builder) in a focused PR, without breaking existing behavior.
