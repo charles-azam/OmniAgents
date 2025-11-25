@@ -4,12 +4,18 @@ Abstract execution backend interface.
 This module defines the interface for execution backends (local, docker, e2b).
 All backends must implement these primitive operations.
 """
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from prompttodraft.backends.state_manager import StateManager
+
+if TYPE_CHECKING:
+    from prompttodraft.initializers.base import ProjectInitializer
 
 
 class BackendStatus(Enum):
@@ -50,23 +56,41 @@ class CommandResult:
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
-    def __init__(self, state_manager: StateManager) -> None:
+    def __init__(
+        self,
+        state_manager: StateManager,
+        initializer: ProjectInitializer
+    ) -> None:
         """
-        Create a backend instance with a state manager.
+        Create a backend instance with a state manager and initializer.
 
         Args:
             state_manager: StateManager instance for state persistence
                 - GitStateManager(): Use GitHub branches
                 - GCSStateManager(): Use Google Cloud Storage buckets
                 - NoOpStateManager(): No state persistence
+            initializer: ProjectInitializer instance for project setup
+                - PythonInitializer(): Initialize Python projects with uv
+                - TypeScriptInitializer(): Initialize TypeScript projects with npm
+                - NoOpInitializer(): Skip initialization
         """
         self.state_manager = state_manager
+        self.initializer = initializer
 
     @property
     @abstractmethod
     def project_id(self) -> str:
         """Get the project ID for this backend instance."""
         pass
+
+    def _run_initialization(self) -> None:
+        """
+        Run project initialization if not already initialized.
+
+        This method should be called by backend implementations at the end of their start() method.
+        """
+        if not self.initializer.is_initialized():
+            self.initializer.initialize()
 
     @abstractmethod
     def start(self) -> None:
@@ -77,8 +101,11 @@ class ExecutionBackend(ABC):
         - Creates project directory/container/sandbox if needed
         - Loads files from bucket if available
         - Sets status to RUNNING
+        - Runs initialization if not already initialized
 
         Can be called after initialization or after shutdown to restart.
+
+        Implementations should call self._run_initialization() at the end.
         """
         pass
     
@@ -179,6 +206,10 @@ class ExecutionBackend(ABC):
         """
         Execute a uv command, ensuring uv is installed first.
 
+        Note: For new projects, uv should be installed via PythonInitializer during
+        project initialization. This method provides a fallback installation for
+        backwards compatibility and convenience.
+
         Args:
             uv_command: The uv command to execute (e.g., "run script.py", "add requests", "sync")
             timeout: Optional timeout in milliseconds
@@ -193,7 +224,8 @@ class ExecutionBackend(ABC):
         )
 
         if uv_check.exit_code != 0:
-            # Install uv
+            # Install uv as fallback
+            # Note: PythonInitializer should handle this during project initialization
             install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
             install_result = self.execute_command(
                 command=install_command,

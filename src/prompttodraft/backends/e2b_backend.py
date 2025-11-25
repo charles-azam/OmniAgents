@@ -3,6 +3,8 @@ E2B execution backend.
 
 This module implements the ExecutionBackend for E2B sandbox execution.
 """
+from __future__ import annotations
+
 from pathlib import Path
 
 from e2b_code_interpreter import Sandbox
@@ -18,6 +20,7 @@ from prompttodraft.backends.execution_backend import (
     CommandResult,
 )
 from prompttodraft.backends.state_manager import StateManager
+from prompttodraft.initializers.base import ProjectInitializer
 from prompttodraft.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
@@ -28,8 +31,13 @@ SANDBOX_WORKING_DIR = "/tmp/workspace"  # Working directory inside E2B sandbox
 class E2BBackend(ExecutionBackend):
     """E2B execution backend."""
 
-    def __init__(self, project_id: str, state_manager: StateManager):
-        super().__init__(state_manager=state_manager)
+    def __init__(
+        self,
+        project_id: str,
+        state_manager: StateManager,
+        initializer: ProjectInitializer
+    ):
+        super().__init__(state_manager=state_manager, initializer=initializer)
         self._project_id = project_id
         self._status = BackendStatus.UNINITIALIZED
         self._sandbox: Sandbox | None = None
@@ -60,6 +68,8 @@ class E2BBackend(ExecutionBackend):
 
         # Load existing files from state manager if any
         self.state_manager.load_latest(backend=self)
+        # Run initialization if needed
+        self._run_initialization()
 
     def shutdown(self) -> None:
         # Sync files via state manager and kill sandbox

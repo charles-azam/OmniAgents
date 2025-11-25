@@ -15,6 +15,7 @@ from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.initializers.python_initializer import PythonInitializer
 
 
 def get_project_id(base_name: str) -> str:
@@ -130,14 +131,20 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
 def test_local_backend_git_first_start():
     """Test LocalBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_local")
-    backend = LocalBackend(project_id=project_id, state_manager=GitStateManager())
+    initializer = PythonInitializer()
+    backend = LocalBackend(project_id=project_id, state_manager=GitStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_backend_git_first_start_test(backend=backend)
 
 
 def test_docker_backend_git_first_start():
     """Test DockerBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_docker")
-    backend = DockerBackend(project_id=project_id, state_manager=GitStateManager())
+    initializer = PythonInitializer()
+    backend = DockerBackend(project_id=project_id, state_manager=GitStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_backend_git_first_start_test(backend=backend)
 
 
@@ -145,7 +152,10 @@ def test_docker_backend_git_first_start():
 def test_e2b_backend_git_first_start():
     """Test E2BBackend Git storage first-start."""
     project_id = get_project_id(base_name="test_git_first_start_e2b")
-    backend = E2BBackend(project_id=project_id, state_manager=GitStateManager())
+    initializer = PythonInitializer()
+    backend = E2BBackend(project_id=project_id, state_manager=GitStateManager(), initializer=initializer)
+    initializer.backend = backend
+    initializer.working_dir = backend.get_working_directory()
     run_backend_git_first_start_test(backend=backend)
 
 if __name__ == "__main__":
