@@ -24,7 +24,6 @@ from prompttodraft.initializers.base import ProjectInitializer
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
-DOCKER_IMAGE = "ghcr.io/astral-sh/uv:debian"
 CONTAINER_WORKSPACE = "/workspace"
 
 
@@ -79,28 +78,33 @@ class DockerBackend(ExecutionBackend):
             return
 
         # No container exists, create new one
+        # Get Docker configuration from initializer
+        docker_image = self.initializer.get_docker_image()
+        docker_env_vars = self.initializer.get_docker_env_vars()
+
+        # Replace placeholder values in environment variables
+        resolved_env_vars = {
+            key: value.replace("/workspace", CONTAINER_WORKSPACE)
+            for key, value in docker_env_vars.items()
+        }
+
         # Pull image if not present
         try:
-            self._client.images.get(DOCKER_IMAGE)
+            self._client.images.get(docker_image)
         except docker.errors.ImageNotFound:
-            self._client.images.pull(DOCKER_IMAGE)
+            self._client.images.pull(docker_image)
 
         # On Linux, run container as host user to avoid permission issues
         # On macOS/Windows, Docker Desktop handles user mapping automatically
         container_kwargs = {
-            "image": DOCKER_IMAGE,
+            "image": docker_image,
             "name": self._container_name,
             "command": "sleep infinity",  # Keep container running
             "volumes": {str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
             "working_dir": CONTAINER_WORKSPACE,
             "detach": True,
             "remove": False,
-            "environment": {
-                "HOME": CONTAINER_WORKSPACE,
-                "UV_CACHE_DIR": f"{CONTAINER_WORKSPACE}/.cache/uv",
-                "UV_TOOL_DIR": f"{CONTAINER_WORKSPACE}/.local/bin",
-                "UV_PYTHON_INSTALL_DIR": f"{CONTAINER_WORKSPACE}/.local/share/uv/python",
-            },
+            "environment": resolved_env_vars,
         }
 
         # Only set user on Linux to match host user (avoids root-owned files)

@@ -10,6 +10,32 @@ class TypeScriptInitializer(ProjectInitializer):
     Handles README.md, .gitignore, npm setup, and TypeScript configuration.
     """
 
+    @property
+    def language_name(self) -> str:
+        """Get the language name."""
+        return "TypeScript"
+
+    def get_docker_image(self) -> str:
+        """Get the Docker image for TypeScript projects."""
+        return "node:20-slim"
+
+    def get_docker_env_vars(self) -> dict[str, str]:
+        """Get Docker environment variables for Node/npm."""
+        return {
+            "NPM_CONFIG_CACHE": "/workspace/.npm",
+            "NODE_PATH": "/workspace/node_modules",
+        }
+
+    def get_package_manager_commands(self) -> dict[str, str]:
+        """Get npm package manager command patterns."""
+        return {
+            "run": "npm run {script}",
+            "install": "npm install {package}",
+            "uninstall": "npm uninstall {package}",
+            "test": "npm test -- {path}",
+            "build": "npm run build",
+        }
+
     def is_initialized(self) -> bool:
         """
         Check if TypeScript project is initialized.

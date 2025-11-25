@@ -10,6 +10,35 @@ class PythonInitializer(ProjectInitializer):
     Handles README.md, .gitignore, uv installation, and project setup.
     """
 
+    @property
+    def language_name(self) -> str:
+        """Get the language name."""
+        return "Python"
+
+    def get_docker_image(self) -> str:
+        """Get the Docker image for Python projects."""
+        return "ghcr.io/astral-sh/uv:debian"
+
+    def get_docker_env_vars(self) -> dict[str, str]:
+        """Get Docker environment variables for Python/UV."""
+        return {
+            "HOME": "/workspace",
+            "UV_CACHE_DIR": "/workspace/.cache/uv",
+            "UV_TOOL_DIR": "/workspace/.local/bin",
+            "UV_PYTHON_INSTALL_DIR": "/workspace/.local/share/uv/python",
+        }
+
+    def get_package_manager_commands(self) -> dict[str, str]:
+        """Get UV package manager command patterns."""
+        return {
+            "run": 'export PATH="$HOME/.local/bin:$PATH" && uv run {script}',
+            "add": 'export PATH="$HOME/.local/bin:$PATH" && uv add {package}',
+            "remove": 'export PATH="$HOME/.local/bin:$PATH" && uv remove {package}',
+            "sync": 'export PATH="$HOME/.local/bin:$PATH" && uv sync',
+            "test": 'export PATH="$HOME/.local/bin:$PATH" && uv run pytest {path}',
+            "install": 'export PATH="$HOME/.local/bin:$PATH" && uv add {package}',
+        }
+
     def is_initialized(self) -> bool:
         """
         Check if Python project is initialized.

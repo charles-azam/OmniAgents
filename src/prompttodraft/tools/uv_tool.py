@@ -54,9 +54,12 @@ class UVTool(CoreTool):
         Returns:
             TextOutputModel with command output
         """
-        # Execute the uv command using the backend's execute_uv method
-        result = self.backend.execute_uv(
-            uv_command=command,
+        # Build the full uv command with PATH set
+        full_command = f'export PATH="$HOME/.local/bin:$PATH" && uv {command}'
+
+        # Execute the command
+        result = self.backend.execute_command(
+            command=full_command,
             timeout=300000,  # 5 minutes default for potentially long operations
         )
 
