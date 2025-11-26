@@ -83,12 +83,12 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         test_file = f"{working_dir}/test.py"
 
         # Create new file
-        result = write_tool.execute(file_path=test_file, content="def hello():\n    print('world')\n")
+        result = write_tool.execute(inputs=WriteFileTool.InputModel(file_path=test_file, content="def hello():\n    print('world')\n"))
         assert isinstance(result, TextOutputModel)
         assert "created" in result.content.lower() or "wrote" in result.content.lower()
 
         # Overwrite existing file
-        result = write_tool.execute(file_path=test_file, content="def hello():\n    print('updated')\n")
+        result = write_tool.execute(inputs=WriteFileTool.InputModel(file_path=test_file, content="def hello():\n    print('updated')\n"))
         assert isinstance(result, TextOutputModel)
         assert "overwrote" in result.content.lower()
 
@@ -100,20 +100,20 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         read_tool = ReadFileTool(backend=backend)
 
         # Read text file
-        result = read_tool.execute(path=test_file)
+        result = read_tool.execute(inputs=ReadFileTool.InputModel(path=test_file))
         assert isinstance(result, TextOutputModel)
         assert "def hello()" in result.content and "updated" in result.content
 
         # Read with offset and limit
         large_file = f"{working_dir}/large.txt"
         backend.write_file(file_path=large_file, content="".join([f"Line {i}\n" for i in range(1, 101)]))
-        result = read_tool.execute(path=large_file, offset=10, limit=5)
+        result = read_tool.execute(inputs=ReadFileTool.InputModel(path=large_file, offset=10, limit=5))
         assert isinstance(result, TextOutputModel)
         assert "Line 11" in result.content and "Line 15" in result.content
         assert "truncated" in result.content.lower()
 
         # Read non-existent file
-        result = read_tool.execute(path=f"{working_dir}/nonexistent.txt")
+        result = read_tool.execute(inputs=ReadFileTool.InputModel(path=f"{working_dir}/nonexistent.txt"))
         assert isinstance(result, ErrorOutputModel)
         assert "not exist" in result.error.lower()
 
@@ -131,7 +131,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
             backend.write_file(file_path=f"{working_dir}/{file_name}", content=content)
 
         # Basic listing
-        result = list_dir_tool.execute(path=working_dir, respect_git_ignore=False)
+        result = list_dir_tool.execute(inputs=ListDirectoryTool.InputModel(path=working_dir, respect_git_ignore=False))
         assert isinstance(result, FileListOutputModel)
         assert result.total_count >= 5
 
@@ -146,14 +146,14 @@ def run_tools_e2e_test(backend: ExecutionBackend):
                 break
 
         # Listing with ignore patterns
-        result = list_dir_tool.execute(path=working_dir, ignore=["*.txt", ".*"], respect_git_ignore=False)
+        result = list_dir_tool.execute(inputs=ListDirectoryTool.InputModel(path=working_dir, ignore=["*.txt", ".*"], respect_git_ignore=False))
         assert isinstance(result, FileListOutputModel)
         file_names = [f.name for f in result.files]
         assert all(name not in file_names for name in ["file2.txt", "large.txt", ".hidden"])
         assert "file1.py" in file_names
 
         # Non-existent directory
-        result = list_dir_tool.execute(path=f"{working_dir}/nonexistent")
+        result = list_dir_tool.execute(inputs=ListDirectoryTool.InputModel(path=f"{working_dir}/nonexistent"))
         assert isinstance(result, ErrorOutputModel)
 
         # TEST 4: glob
@@ -164,13 +164,13 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         glob_tool = GlobTool(backend=backend)
 
         # Find Python files
-        result = glob_tool.execute(pattern="*.py", path=working_dir, respect_git_ignore=False)
+        result = glob_tool.execute(inputs=GlobTool.InputModel(pattern="*.py", path=working_dir, respect_git_ignore=False))
         assert isinstance(result, FileListOutputModel)
         assert result.total_count >= 2
         assert all(f.name.endswith(".py") for f in result.files)
 
         # Recursive glob
-        result = glob_tool.execute(pattern="**/*.py", path=working_dir, respect_git_ignore=False)
+        result = glob_tool.execute(inputs=GlobTool.InputModel(pattern="**/*.py", path=working_dir, respect_git_ignore=False))
         assert isinstance(result, FileListOutputModel)
         assert result.total_count >= 3
 
@@ -182,17 +182,17 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         search_tool = SearchFileContentTool(backend=backend)
 
         # Search for pattern
-        result = search_tool.execute(pattern="def hello", path=working_dir)
+        result = search_tool.execute(inputs=SearchFileContentTool.InputModel(pattern="def hello", path=working_dir))
         assert isinstance(result, TextOutputModel)
         assert "def hello" in result.content
         assert "test.py" in result.content or "test" in result.content
 
         # Search with include filter
-        result = search_tool.execute(pattern="file", path=working_dir, include="*.py")
+        result = search_tool.execute(inputs=SearchFileContentTool.InputModel(pattern="file", path=working_dir, include="*.py"))
         assert isinstance(result, TextOutputModel)
 
         # No matches
-        result = search_tool.execute(pattern="nonexistent_pattern_xyz", path=working_dir)
+        result = search_tool.execute(inputs=SearchFileContentTool.InputModel(pattern="nonexistent_pattern_xyz", path=working_dir))
         assert isinstance(result, TextOutputModel)
         assert "0 matches" in result.content
 
@@ -209,30 +209,30 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         )
 
         # Single replacement
-        result = replace_tool.execute(
+        result = replace_tool.execute(inputs=ReplaceTool.InputModel(
             file_path=replace_file,
             old_string="def old_function():\n    return 'old'",
             new_string="def new_function():\n    return 'new'",
             expected_replacements=1
-        )
+        ))
         assert isinstance(result, TextOutputModel)
         assert "successfully" in result.content.lower()
         content = backend.read_file(file_path=replace_file)
         assert "new_function" in content and "old_function" not in content
 
         # No match
-        result = replace_tool.execute(
+        result = replace_tool.execute(inputs=ReplaceTool.InputModel(
             file_path=replace_file,
             old_string="nonexistent code",
             new_string="new code",
             expected_replacements=1
-        )
+        ))
         assert isinstance(result, ErrorOutputModel)
         assert "0 occurrences" in result.error
 
         # Create new file with empty old_string
         new_file = f"{working_dir}/created_by_replace.py"
-        result = replace_tool.execute(file_path=new_file, old_string="", new_string="# Created by replace tool\n")
+        result = replace_tool.execute(inputs=ReplaceTool.InputModel(file_path=new_file, old_string="", new_string="# Created by replace tool\n"))
         assert isinstance(result, TextOutputModel)
         assert "created" in result.content.lower()
         assert backend.file_exists(path=new_file)
@@ -245,22 +245,22 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         shell_tool = RunShellCommandTool(backend=backend)
 
         # Basic command
-        result = shell_tool.execute(command="echo 'Hello from shell'")
+        result = shell_tool.execute(inputs=RunShellCommandTool.InputModel(command="echo 'Hello from shell'"))
         assert isinstance(result, TextOutputModel)
         assert "Hello from shell" in result.content and "Exit Code: 0" in result.content
 
         # Command with description
-        result = shell_tool.execute(command="ls -la", description="List all files")
+        result = shell_tool.execute(inputs=RunShellCommandTool.InputModel(command="ls -la", description="List all files"))
         assert isinstance(result, TextOutputModel)
         assert "List all files" in result.content
 
         # Command in subdirectory
-        result = shell_tool.execute(command="pwd", directory="subdir")
+        result = shell_tool.execute(inputs=RunShellCommandTool.InputModel(command="pwd", directory="subdir"))
         assert isinstance(result, TextOutputModel)
         assert "subdir" in result.content
 
         # Non-zero exit code
-        result = shell_tool.execute(command="exit 1")
+        result = shell_tool.execute(inputs=RunShellCommandTool.InputModel(command="exit 1"))
         assert isinstance(result, TextOutputModel)
         assert "Exit Code: 1" in result.content and "warning" in result.content.lower()
 
@@ -272,16 +272,16 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         read_many_tool = ReadManyFilesTool(backend=backend)
 
         # Read multiple files
-        result = read_many_tool.execute(paths=["*.py"], useDefaultExcludes=False, respect_git_ignore=False)
+        result = read_many_tool.execute(inputs=ReadManyFilesTool.InputModel(paths=["*.py"], useDefaultExcludes=False, respect_git_ignore=False))
         assert isinstance(result, TextOutputModel)
         assert "---" in result.content and "End of content" in result.content
 
         # With exclude patterns
-        result = read_many_tool.execute(paths=["*"], exclude=["*.txt"], useDefaultExcludes=False, respect_git_ignore=False)
+        result = read_many_tool.execute(inputs=ReadManyFilesTool.InputModel(paths=["*"], exclude=["*.txt"], useDefaultExcludes=False, respect_git_ignore=False))
         assert isinstance(result, TextOutputModel)
 
         # With include patterns
-        result = read_many_tool.execute(paths=["*.py"], include=["*.txt"], useDefaultExcludes=False, respect_git_ignore=False)
+        result = read_many_tool.execute(inputs=ReadManyFilesTool.InputModel(paths=["*.py"], include=["*.txt"], useDefaultExcludes=False, respect_git_ignore=False))
         assert isinstance(result, TextOutputModel)
 
         # TEST 9: save_memory
@@ -292,11 +292,11 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         memory_tool = SaveMemoryTool(backend=backend)
 
         # Save memories
-        result = memory_tool.execute(fact="User prefers Python for coding")
+        result = memory_tool.execute(inputs=SaveMemoryTool.InputModel(fact="User prefers Python for coding"))
         assert isinstance(result, TextOutputModel)
         assert "saved" in result.content.lower()
 
-        result = memory_tool.execute(fact="Project name is prompttodraft")
+        result = memory_tool.execute(inputs=SaveMemoryTool.InputModel(fact="Project name is prompttodraft"))
         assert isinstance(result, TextOutputModel)
         assert "saved" in result.content.lower()
 
@@ -317,19 +317,19 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         backend.write_file(file_path=test_script, content="print('Hello from uv run!')\n")
 
         # Test uv run
-        result = uv_tool.execute(command="run test_script.py", description="Run Python script with uv")
+        result = uv_tool.execute(inputs=UVTool.InputModel(command="run test_script.py", description="Run Python script with uv"))
         assert isinstance(result, TextOutputModel)
         assert "Hello from uv run!" in result.content
         assert "Exit Code: 0" in result.content
         assert "Run Python script with uv" in result.content
 
         # Test uv sync (should work now that project is initialized)
-        result = uv_tool.execute(command="sync")
+        result = uv_tool.execute(inputs=UVTool.InputModel(command="sync"))
         assert isinstance(result, TextOutputModel)
         assert "Exit Code: 0" in result.content
 
         # Test uv add package
-        result = uv_tool.execute(command="add requests", description="Add requests package")
+        result = uv_tool.execute(inputs=UVTool.InputModel(command="add requests", description="Add requests package"))
         assert isinstance(result, TextOutputModel)
         # Exit code might be 0 or non-zero depending on environment, just check it ran
 
@@ -339,20 +339,20 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         print("="*80)
 
         workflow_file = f"{working_dir}/workflow.py"
-        write_tool.execute(file_path=workflow_file, content="def calculate(x):\n    return x * 2\n")
-        search_result = search_tool.execute(pattern="calculate", path=working_dir)
+        write_tool.execute(inputs=WriteFileTool.InputModel(file_path=workflow_file, content="def calculate(x):\n    return x * 2\n"))
+        search_result = search_tool.execute(inputs=SearchFileContentTool.InputModel(pattern="calculate", path=working_dir))
         assert "calculate" in search_result.content
 
-        replace_tool.execute(
+        replace_tool.execute(inputs=ReplaceTool.InputModel(
             file_path=workflow_file,
             old_string="def calculate(x):\n    return x * 2",
             new_string="def calculate(x):\n    return x * 3"
-        )
+        ))
 
-        read_result = read_tool.execute(path=workflow_file)
+        read_result = read_tool.execute(inputs=ReadFileTool.InputModel(path=workflow_file))
         assert "x * 3" in read_result.content
 
-        list_result = list_dir_tool.execute(path=working_dir, respect_git_ignore=False)
+        list_result = list_dir_tool.execute(inputs=ListDirectoryTool.InputModel(path=working_dir, respect_git_ignore=False))
         assert "workflow.py" in [f.name for f in list_result.files]
 
         print("\n" + "="*80)
@@ -411,7 +411,7 @@ def test_git_storage_persistence():
         working_dir = backend.get_working_directory()
 
         write_tool = WriteFileTool(backend=backend)
-        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+        write_tool.execute(inputs=WriteFileTool.InputModel(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n"))
 
         # Save to Git storage
         backend.shutdown()
@@ -422,7 +422,7 @@ def test_git_storage_persistence():
 
         # Verify file was restored
         read_tool = ReadFileTool(backend=backend2)
-        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        result = read_tool.execute(inputs=ReadFileTool.InputModel(path=f"{backend2.get_working_directory()}/persistent.py"))
         assert isinstance(result, TextOutputModel)
         assert "Persistent file" in result.content
 
@@ -444,7 +444,7 @@ def test_gcs_storage_persistence():
         working_dir = backend.get_working_directory()
 
         write_tool = WriteFileTool(backend=backend)
-        write_tool.execute(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n")
+        write_tool.execute(inputs=WriteFileTool.InputModel(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n"))
 
         # Save to GCS storage
         backend.shutdown()
@@ -455,7 +455,7 @@ def test_gcs_storage_persistence():
 
         # Verify file was restored
         read_tool = ReadFileTool(backend=backend2)
-        result = read_tool.execute(path=f"{backend2.get_working_directory()}/persistent.py")
+        result = read_tool.execute(inputs=ReadFileTool.InputModel(path=f"{backend2.get_working_directory()}/persistent.py"))
         assert isinstance(result, TextOutputModel)
         assert "Persistent file" in result.content
 
