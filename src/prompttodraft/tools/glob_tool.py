@@ -4,10 +4,9 @@ Glob tool implementation.
 This tool finds files matching specific glob patterns.
 """
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
@@ -23,33 +22,14 @@ class GlobTool(CoreTool):
     returning absolute paths sorted by modification time (newest first).
     """
 
-    metadata = ToolMetadata(
-        name="glob",
-        description="Efficiently finds files matching specific glob patterns (e.g., '**/*.py', 'docs/*.md'), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases.",
-        inputs={
-            "pattern": {
-                "type": "string",
-                "description": "The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').",
-                "nullable": False,
-            },
-            "path": {
-                "type": "string",
-                "description": "Optional: The absolute path to the directory to search within. If omitted, searches the root directory.",
-                "nullable": True,
-            },
-            "case_sensitive": {
-                "type": "boolean",
-                "description": "Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).",
-                "nullable": True,
-            },
-            "respect_git_ignore": {
-                "type": "boolean",
-                "description": "Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "glob"
+    description = "Efficiently finds files matching specific glob patterns (e.g., '**/*.py', 'docs/*.md'), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases."
+
+    class InputModel(BaseModel):
+        pattern: str = Field(description="The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').")
+        path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. If omitted, searches the root directory.")
+        case_sensitive: bool = Field(default=False, description="Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).")
+        respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.")
 
     def _is_git_repository(self, search_path: str) -> bool:
         """
@@ -120,40 +100,31 @@ class GlobTool(CoreTool):
         # For now, we'll just return all files since glob already matched them
         return file_paths
 
-    def execute(
-        self,
-        pattern: str,
-        path: str | None = None,
-        case_sensitive: bool = False,
-        respect_git_ignore: bool = True,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> ToolOutputModel:
         """
         Execute the glob tool.
 
         Args:
-            pattern: The glob pattern to match against
-            path: Optional directory to search within
-            case_sensitive: Whether the search should be case-sensitive
-            respect_git_ignore: Whether to respect .gitignore patterns
+            inputs: Validated input model with pattern, path, case_sensitive, and respect_git_ignore
 
         Returns:
             FileListOutputModel with matching files
         """
         # Get matched file paths
-        matched_paths = self.backend.glob_files(pattern=pattern, path=path)
+        matched_paths = self.backend.glob_files(pattern=inputs.pattern, path=inputs.path)
 
         # Determine search path for filtering
-        search_path = path if path else self.backend.get_working_directory()
+        search_path = inputs.path if inputs.path else self.backend.get_working_directory()
 
         # Apply case sensitivity filtering if needed
-        if case_sensitive:
+        if inputs.case_sensitive:
             matched_paths = self._apply_case_sensitivity(
                 file_paths=matched_paths,
-                case_sensitive=case_sensitive,
+                case_sensitive=inputs.case_sensitive,
             )
 
         # Apply gitignore filtering if requested
-        if respect_git_ignore and self._is_git_repository(search_path=search_path):
+        if inputs.respect_git_ignore and self._is_git_repository(search_path=search_path):
             matched_paths = self._filter_gitignored_files(
                 file_paths=matched_paths,
                 search_path=search_path,
@@ -188,8 +159,6 @@ class GlobTool(CoreTool):
 
         # Sort by modification time (newest first)
         file_infos.sort(key=lambda x: x.modified or 0, reverse=True)
-
-        search_path = path if path else self.backend.get_working_directory()
 
         return FileListOutputModel(
             files=file_infos,

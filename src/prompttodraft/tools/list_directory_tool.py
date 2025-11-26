@@ -3,12 +3,11 @@ List directory tool implementation.
 
 This tool lists the names of files and subdirectories within a specified directory path.
 """
-from pathlib import Path
 from fnmatch import fnmatch
+from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
@@ -25,29 +24,13 @@ class ListDirectoryTool(CoreTool):
     Can optionally ignore entries matching provided glob patterns.
     """
 
-    metadata = ToolMetadata(
-        name="list_directory",
-        description="Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns. Returns entries sorted with directories first, then alphabetically.",
-        inputs={
-            "path": {
-                "type": "string",
-                "description": "The absolute path to the directory to list (must be absolute, not relative).",
-                "nullable": False,
-            },
-            "ignore": {
-                "type": "array",
-                "description": "Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).",
-                "items": {"type": "string"},
-                "nullable": True,
-            },
-            "respect_git_ignore": {
-                "type": "boolean",
-                "description": "Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "list_directory"
+    description = "Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns. Returns entries sorted with directories first, then alphabetically."
+
+    class InputModel(BaseModel):
+        path: str = Field(description="The absolute path to the directory to list (must be absolute, not relative).")
+        ignore: list[str] | None = Field(default=None, description="Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).")
+        respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.")
 
     def _is_git_repository(self) -> bool:
         """
@@ -86,42 +69,35 @@ class ListDirectoryTool(CoreTool):
         except Exception:
             return False
 
-    def execute(
-        self,
-        path: str,
-        ignore: list[str] | None = None,
-        respect_git_ignore: bool = True,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> ToolOutputModel:
         """
         Execute the list_directory tool.
 
         Args:
-            path: The absolute path to the directory to list
-            ignore: Optional list of glob patterns to exclude
-            respect_git_ignore: Whether to respect .gitignore patterns
+            inputs: Validated input model with path, ignore, and respect_git_ignore
 
         Returns:
             FileListOutputModel with directory contents or ErrorOutputModel on failure
         """
         # Check if directory exists
-        file_type = self.backend.file_exists(path=path)
+        file_type = self.backend.file_exists(path=inputs.path)
         if file_type is None:
             return ErrorOutputModel(
-                error=f"Directory does not exist: {path}",
+                error=f"Directory does not exist: {inputs.path}",
                 error_type="DirectoryNotFoundError",
             )
 
         if file_type != FileType.DIRECTORY:
             return ErrorOutputModel(
-                error=f"Path is not a directory: {path}",
+                error=f"Path is not a directory: {inputs.path}",
                 error_type="NotADirectoryError",
             )
 
         # Check if we should respect gitignore
-        use_gitignore = respect_git_ignore and self._is_git_repository()
+        use_gitignore = inputs.respect_git_ignore and self._is_git_repository()
 
         # List directory contents
-        entries = self.backend.list_directory(path=path, recursive=False)
+        entries = self.backend.list_directory(path=inputs.path, recursive=False)
 
         # Apply gitignore filtering if enabled
         if use_gitignore:
@@ -132,11 +108,11 @@ class ListDirectoryTool(CoreTool):
             entries = filtered_entries
 
         # Apply ignore patterns if provided
-        if ignore:
+        if inputs.ignore:
             filtered_entries = []
             for entry in entries:
                 should_ignore = False
-                for pattern in ignore:
+                for pattern in inputs.ignore:
                     if fnmatch(entry.name, pattern):
                         should_ignore = True
                         break
@@ -161,6 +137,6 @@ class ListDirectoryTool(CoreTool):
 
         return FileListOutputModel(
             files=file_infos,
-            path=path,
+            path=inputs.path,
             total_count=len(file_infos),
         )

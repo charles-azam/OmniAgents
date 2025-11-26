@@ -4,12 +4,11 @@ Read file tool implementation.
 This tool reads and returns the content of a specified file.
 Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files.
 """
-import base64
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
@@ -31,28 +30,13 @@ class ReadFileTool(CoreTool):
     PDF_EXTENSIONS = {".pdf"}
     MEDIA_EXTENSIONS = IMAGE_EXTENSIONS | PDF_EXTENSIONS
 
-    metadata = ToolMetadata(
-        name="read_file",
-        description="Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit.",
-        inputs={
-            "path": {
-                "type": "string",
-                "description": "The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.",
-                "nullable": False,
-            },
-            "offset": {
-                "type": "number",
-                "description": "Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.",
-                "nullable": True,
-            },
-            "limit": {
-                "type": "number",
-                "description": "Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "read_file"
+    description = "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit."
+
+    class InputModel(BaseModel):
+        path: str = Field(description="The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.")
+        offset: int | None = Field(default=None, description="Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.")
+        limit: int | None = Field(default=None, description="Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).")
 
     def _get_mime_type(self, file_path: str) -> str:
         """
@@ -102,45 +86,38 @@ class ReadFileTool(CoreTool):
         """
         return "\x00" in content[:8192]  # Check first 8KB
 
-    def execute(
-        self,
-        path: str,
-        offset: int | None = None,
-        limit: int | None = None,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> ToolOutputModel:
         """
         Execute the read_file tool.
 
         Args:
-            path: The absolute path to the file to read
-            offset: For text files, the 0-based line number to start reading from
-            limit: For text files, the maximum number of lines to read
+            inputs: Validated input model with path, offset, and limit
 
         Returns:
             TextOutputModel with file content or ErrorOutputModel on failure
         """
         # Check if file exists
-        file_type = self.backend.file_exists(path=path)
+        file_type = self.backend.file_exists(path=inputs.path)
         if file_type is None:
             return ErrorOutputModel(
-                error=f"File does not exist: {path}",
+                error=f"File does not exist: {inputs.path}",
                 error_type="FileNotFoundError",
             )
 
         if file_type != FileType.FILE:
             return ErrorOutputModel(
-                error=f"Path is not a file: {path}",
+                error=f"Path is not a file: {inputs.path}",
                 error_type="NotAFileError",
             )
 
         # Check if this is a media file (image or PDF)
-        if self._is_media_file(file_path=path):
+        if self._is_media_file(file_path=inputs.path):
             # Get mime type
-            mime_type = self._get_mime_type(file_path=path)
+            mime_type = self._get_mime_type(file_path=inputs.path)
 
             # Use execute_command to read binary file and encode to base64
             result = self.backend.execute_command(
-                command=f'base64 "{path}"',
+                command=f'base64 "{inputs.path}"',
                 timeout=30000,
             )
 
@@ -154,7 +131,7 @@ class ReadFileTool(CoreTool):
 
             # Get file size
             size_result = self.backend.execute_command(
-                command=f'wc -c < "{path}"',
+                command=f'wc -c < "{inputs.path}"',
                 timeout=5000,
             )
             size_bytes = None
@@ -165,28 +142,28 @@ class ReadFileTool(CoreTool):
                     pass
 
             return MediaOutputModel(
-                filename=Path(path).name,
+                filename=Path(inputs.path).name,
                 mime_type=mime_type,
                 base64_data=base64_data,
                 size_bytes=size_bytes,
             )
 
         # Read text file
-        content = self.backend.read_file(file_path=path)
+        content = self.backend.read_file(file_path=inputs.path)
 
         # Check if it's a binary file
         if self._is_binary_file(content=content):
             return TextOutputModel(
-                content=f"Cannot display content of binary file: {path}",
+                content=f"Cannot display content of binary file: {inputs.path}",
             )
 
         # Handle line offset and limit for text files
-        if offset is not None or limit is not None:
+        if inputs.offset is not None or inputs.limit is not None:
             lines = content.splitlines()
             total_lines = len(lines)
 
-            start = offset if offset is not None else 0
-            end = start + limit if limit is not None else len(lines)
+            start = inputs.offset if inputs.offset is not None else 0
+            end = start + inputs.limit if inputs.limit is not None else len(lines)
 
             # Validate offset
             if start >= total_lines:

@@ -4,10 +4,9 @@ Run shell command tool implementation.
 This tool executes shell commands in the execution environment.
 """
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
@@ -22,59 +21,37 @@ class RunShellCommandTool(CoreTool):
     information about the execution including stdout, stderr, and exit code.
     """
 
-    metadata = ToolMetadata(
-        name="run_shell_command",
-        description="Executes a shell command in the execution environment. Use this to interact with the underlying system, run scripts, or perform command-line operations. Returns detailed information about the execution including stdout, stderr, exit code, and any errors. Commands are executed with bash -c on Unix-like systems.",
-        inputs={
-            "command": {
-                "type": "string",
-                "description": "The exact shell command to execute.",
-                "nullable": False,
-            },
-            "description": {
-                "type": "string",
-                "description": "Optional: A brief description of the command's purpose, which will be shown to the user.",
-                "nullable": True,
-            },
-            "directory": {
-                "type": "string",
-                "description": "Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "run_shell_command"
+    description = "Executes a shell command in the execution environment. Use this to interact with the underlying system, run scripts, or perform command-line operations. Returns detailed information about the execution including stdout, stderr, exit code, and any errors. Commands are executed with bash -c on Unix-like systems."
 
-    def execute(
-        self,
-        command: str,
-        description: str | None = None,
-        directory: str | None = None,
-    ) -> ToolOutputModel:
+    class InputModel(BaseModel):
+        command: str = Field(description="The exact shell command to execute.")
+        description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
+        directory: str | None = Field(default=None, description="Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.")
+
+    def execute(self, inputs: InputModel) -> ToolOutputModel:
         """
         Execute the run_shell_command tool.
 
         Args:
-            command: The exact shell command to execute
-            description: Optional description of the command's purpose
-            directory: Optional directory to execute the command in
+            inputs: Validated input model with command, description, and directory
 
         Returns:
-            TextOutputModel with command output or ErrorOutputModel on failure
+            TextOutputModel with command output
         """
         # Determine execution directory
         working_dir = self.backend.get_working_directory()
         exec_dir = working_dir
 
-        if directory:
+        if inputs.directory:
             # Convert relative directory to absolute
-            exec_dir = str(Path(working_dir) / directory)
+            exec_dir = str(Path(working_dir) / inputs.directory)
 
         # Build the full command with directory change if needed
-        if directory:
-            full_command = f'cd "{exec_dir}" && {command}'
+        if inputs.directory:
+            full_command = f'cd "{exec_dir}" && {inputs.command}'
         else:
-            full_command = command
+            full_command = inputs.command
 
         # Execute command
         result = self.backend.execute_command(
@@ -85,10 +62,10 @@ class RunShellCommandTool(CoreTool):
         # Format output
         output_lines = []
 
-        if description:
-            output_lines.append(f"Description: {description}")
+        if inputs.description:
+            output_lines.append(f"Description: {inputs.description}")
 
-        output_lines.append(f"Command: {command}")
+        output_lines.append(f"Command: {inputs.command}")
         output_lines.append(f"Directory: {exec_dir}")
         output_lines.append("")
 
@@ -106,5 +83,5 @@ class RunShellCommandTool(CoreTool):
 
         return TextOutputModel(
             content="\n".join(output_lines),
-            metadata={"exit_code": result.exit_code, "command": command},
+            metadata={"exit_code": result.exit_code, "command": inputs.command},
         )

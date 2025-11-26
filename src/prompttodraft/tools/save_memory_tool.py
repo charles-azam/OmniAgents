@@ -4,13 +4,11 @@ Save memory tool implementation.
 This tool saves and recalls information across sessions by appending to a memory file.
 """
 from pathlib import Path
+from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend, FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
-    ErrorOutputModel,
     ToolOutputModel,
 )
 
@@ -23,18 +21,11 @@ class SaveMemoryTool(CoreTool):
     memory file. This allows the system to remember key details across sessions.
     """
 
-    metadata = ToolMetadata(
-        name="save_memory",
-        description="Saves and recalls information across sessions. Use this to direct the assistant to remember key details, enabling personalized and context-aware assistance in subsequent sessions. The tool appends the provided fact to a special memory file (GEMINI.md) located in the user's home directory (~/.gemini/). Once added, the facts are stored under a '## Gemini Added Memories' section and loaded as context in future sessions.",
-        inputs={
-            "fact": {
-                "type": "string",
-                "description": "The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').",
-                "nullable": False,
-            },
-        },
-        output_type="string",
-    )
+    name = "save_memory"
+    description = "Saves and recalls information across sessions. Use this to direct the assistant to remember key details, enabling personalized and context-aware assistance in subsequent sessions. The tool appends the provided fact to a special memory file (GEMINI.md) located in the user's home directory (~/.gemini/). Once added, the facts are stored under a '## Gemini Added Memories' section and loaded as context in future sessions."
+
+    class InputModel(BaseModel):
+        fact: str = Field(description="The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').")
 
     # Default memory file location (in user's home directory)
     MEMORY_FILE_DIR = ".gemini"
@@ -68,15 +59,15 @@ class SaveMemoryTool(CoreTool):
         home_dir = home_result.output.strip()
         return str(Path(home_dir) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
 
-    def execute(self, fact: str) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> ToolOutputModel:
         """
         Execute the save_memory tool.
 
         Args:
-            fact: The specific fact or piece of information to remember
+            inputs: Validated input model with fact
 
         Returns:
-            TextOutputModel with success message or ErrorOutputModel on failure
+            TextOutputModel with success message
         """
         memory_file_path = self._get_memory_file_path()
 
@@ -92,10 +83,10 @@ class SaveMemoryTool(CoreTool):
 
         if file_exists is None:
             # Create new memory file with header
-            initial_content = f"# Gemini Memory File\n\n{self.MEMORY_SECTION_HEADER}\n\n- {fact}\n"
+            initial_content = f"# Gemini Memory File\n\n{self.MEMORY_SECTION_HEADER}\n\n- {inputs.fact}\n"
             self.backend.write_file(file_path=memory_file_path, content=initial_content)
             return TextOutputModel(
-                content=f"Memory saved: '{fact}' (created new memory file at {memory_file_path})",
+                content=f"Memory saved: '{inputs.fact}' (created new memory file at {memory_file_path})",
             )
 
         # File exists, read current content
@@ -105,14 +96,14 @@ class SaveMemoryTool(CoreTool):
         if self.MEMORY_SECTION_HEADER in content:
             # Append to existing section
             # Find the section and append after it
-            new_content = content.rstrip() + f"\n- {fact}\n"
+            new_content = content.rstrip() + f"\n- {inputs.fact}\n"
         else:
             # Add the section header and fact
-            new_content = content.rstrip() + f"\n\n{self.MEMORY_SECTION_HEADER}\n\n- {fact}\n"
+            new_content = content.rstrip() + f"\n\n{self.MEMORY_SECTION_HEADER}\n\n- {inputs.fact}\n"
 
         # Write updated content
         self.backend.write_file(file_path=memory_file_path, content=new_content)
 
         return TextOutputModel(
-            content=f"Memory saved: '{fact}' (appended to {memory_file_path})",
+            content=f"Memory saved: '{inputs.fact}' (appended to {memory_file_path})",
         )

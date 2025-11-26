@@ -4,6 +4,8 @@ Automatic adapter generation for AI frameworks.
 This module provides functions to automatically generate framework-specific
 tool wrappers from core tools, eliminating manual boilerplate.
 
+Uses Pydantic's model_json_schema() for automatic schema generation.
+
 Supported frameworks:
 - smolagents: generate_smolagents_tools()
 - LangChain: generate_langchain_tools()
@@ -27,7 +29,6 @@ Usage:
 from typing import Callable
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
 
 
 # Type mapping from metadata types to Python types
@@ -119,21 +120,33 @@ def get_default_for_input(input_spec: dict):
     return ...
 
 
-def extract_parameter_info(metadata: ToolMetadata) -> list[tuple[str, type, object]]:
+def extract_parameter_info_from_schema(schema: dict) -> list[tuple[str, type, object]]:
     """
-    Extract parameter information from tool metadata.
+    Extract parameter information from Pydantic JSON Schema.
 
     Args:
-        metadata: Tool metadata with inputs specification.
+        schema: JSON Schema dict from model_json_schema()
 
     Returns:
         List of (name, type, default) tuples, sorted with required params first.
     """
     params = []
+    properties = schema.get("properties", {})
+    required_fields = set(schema.get("required", []))
 
-    for param_name, input_spec in metadata.inputs.items():
-        python_type = get_python_type_for_input(input_spec)
-        default = get_default_for_input(input_spec)
+    for param_name, prop_spec in properties.items():
+        python_type = get_python_type_for_input(prop_spec)
+
+        # Check if field has a default value
+        if "default" in prop_spec:
+            default = prop_spec["default"]
+        elif param_name not in required_fields:
+            # Optional field without explicit default
+            default = None
+        else:
+            # Required field
+            default = ...
+
         params.append((param_name, python_type, default))
 
     # Sort: required parameters (default=...) first, then optional ones
@@ -162,28 +175,38 @@ def generate_smolagents_tool(
     """
     from smolagents import Tool
 
-    # Create an instance to get metadata
+    # Create an instance
     core_tool = tool_class(backend=backend)
-    metadata = core_tool.metadata
+
+    # Get schema from Pydantic model
+    schema = tool_class.get_json_schema()
+    properties = schema.get("properties", {})
 
     # Build inputs dict for smolagents format
     smolagents_inputs = {}
-    for param_name, input_spec in metadata.inputs.items():
+    for param_name, prop_spec in properties.items():
         smolagents_input = {
-            "type": input_spec.get("type", "string"),
-            "description": input_spec.get("description", ""),
+            "type": prop_spec.get("type", "string"),
+            "description": prop_spec.get("description", ""),
         }
-        if input_spec.get("nullable", False):
+        # Handle anyOf (for optional types like str | None)
+        if "anyOf" in prop_spec:
             smolagents_input["nullable"] = True
-        if "items" in input_spec:
-            smolagents_input["items"] = input_spec["items"]
+            # Get the non-null type
+            for type_spec in prop_spec["anyOf"]:
+                if type_spec.get("type") != "null":
+                    smolagents_input["type"] = type_spec.get("type", "string")
+                    if "items" in type_spec:
+                        smolagents_input["items"] = type_spec["items"]
+                    break
+        if "items" in prop_spec:
+            smolagents_input["items"] = prop_spec["items"]
         smolagents_inputs[param_name] = smolagents_input
 
     # Extract parameter info for forward method signature
-    params = extract_parameter_info(metadata)
+    params = extract_parameter_info_from_schema(schema)
 
     # Build forward method signature dynamically
-    # smolagents requires exact parameter names matching inputs
     param_strs = []
     for param_name, param_type, default in params:
         type_str = _type_to_str(param_type)
@@ -198,10 +221,12 @@ def generate_smolagents_tool(
     param_names = [p[0] for p in params]
     kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
 
-    # Create the forward method code
+    # Create the forward method code that validates with Pydantic
     forward_code = f'''
 def forward(self, {params_str}) -> str:
-    result = self._core_tool.execute({kwargs_str})
+    # Validate inputs with Pydantic
+    validated_inputs = _input_model({kwargs_str})
+    result = _core_tool.execute(inputs=validated_inputs)
     return str(result)
 '''
 
@@ -212,23 +237,26 @@ def __init__(self):
 '''
 
     # Execute to create the methods
-    namespace = {"_core_tool": core_tool}
+    namespace = {
+        "_core_tool": core_tool,
+        "_input_model": tool_class.InputModel,
+    }
     exec(init_code, namespace)
     exec(forward_code, namespace)
 
     # Create the Tool subclass dynamically
     class_dict = {
-        "name": metadata.name,
-        "description": metadata.description,
+        "name": tool_class.name,
+        "description": tool_class.description,
         "inputs": smolagents_inputs,
-        "output_type": metadata.output_type,
+        "output_type": "string",
         "_core_tool": core_tool,
         "__init__": namespace["__init__"],
         "forward": namespace["forward"],
     }
 
     # Create the class
-    tool_class_name = f"{metadata.name.title().replace('_', '')}SmolagentsTool"
+    tool_class_name = f"{tool_class.name.title().replace('_', '')}SmolagentsTool"
     SmolagentsTool = type(tool_class_name, (Tool,), class_dict)
 
     return SmolagentsTool()
@@ -289,12 +317,14 @@ def generate_langchain_tool(
     """
     from langchain_core.tools import tool
 
-    # Create instance to get metadata
+    # Create instance
     core_tool = tool_class(backend=backend)
-    metadata = core_tool.metadata
+
+    # Get schema from Pydantic model
+    schema = tool_class.get_json_schema()
 
     # Extract parameter info
-    params = extract_parameter_info(metadata)
+    params = extract_parameter_info_from_schema(schema)
 
     # Build the function signature dynamically using exec
     # This is necessary to get proper type hints that LangChain can inspect
@@ -312,23 +342,28 @@ def generate_langchain_tool(
     param_names = [p[0] for p in params]
     kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
 
-    # Create the function code
+    # Create the function code that validates with Pydantic
     func_code = f'''
-def {metadata.name}({params_str}) -> str:
+def {tool_class.name}({params_str}) -> str:
     """
-    {metadata.description}
+    {tool_class.description}
     """
-    result = _core_tool.execute({kwargs_str})
+    # Validate inputs with Pydantic
+    validated_inputs = _input_model({kwargs_str})
+    result = _core_tool.execute(inputs=validated_inputs)
     return str(result)
 '''
 
-    # Execute in a namespace with access to core_tool
-    namespace = {"_core_tool": core_tool}
+    # Execute in a namespace with access to core_tool and input model
+    namespace = {
+        "_core_tool": core_tool,
+        "_input_model": tool_class.InputModel,
+    }
     exec(func_code, namespace)
 
     # Get the function and decorate it
-    func = namespace[metadata.name]
-    decorated_func = tool(description=metadata.description)(func)
+    func = namespace[tool_class.name]
+    decorated_func = tool(description=tool_class.description)(func)
 
     return decorated_func
 
@@ -390,15 +425,11 @@ def generate_pydantic_ai_tool(
     """
     from pydantic_ai import Tool, RunContext
 
-    # Create a dummy instance to get metadata
-    class _DummyBackend:
-        pass
-
-    dummy_tool = tool_class(backend=_DummyBackend())  # type: ignore
-    metadata = dummy_tool.metadata
+    # Get schema from Pydantic model
+    schema = tool_class.get_json_schema()
 
     # Extract parameter info
-    params = extract_parameter_info(metadata)
+    params = extract_parameter_info_from_schema(schema)
 
     # Build the function dynamically
     param_strs = ["ctx: RunContext"]
@@ -416,29 +447,32 @@ def generate_pydantic_ai_tool(
     kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
 
     func_code = f'''
-def {metadata.name}({params_str}) -> str:
+def {tool_class.name}({params_str}) -> str:
     """
-    {metadata.description}
+    {tool_class.description}
     """
     backend = getattr(ctx.deps, "{backend_attr}")
     core_tool = _tool_class(backend=backend)
-    result = core_tool.execute({kwargs_str})
+    # Validate inputs with Pydantic
+    validated_inputs = _input_model({kwargs_str})
+    result = core_tool.execute(inputs=validated_inputs)
     return str(result)
 '''
 
     namespace = {
         "_tool_class": tool_class,
+        "_input_model": tool_class.InputModel,
         "RunContext": RunContext,
     }
     exec(func_code, namespace)
 
-    func = namespace[metadata.name]
+    func = namespace[tool_class.name]
 
     return Tool(
         function=func,
         takes_ctx=True,
-        name=metadata.name,
-        description=metadata.description,
+        name=tool_class.name,
+        description=tool_class.description,
     )
 
 
