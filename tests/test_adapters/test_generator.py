@@ -14,10 +14,9 @@ from prompttodraft.adapters.generator import (
     generate_pydantic_ai_tools,
     get_all_core_tool_classes,
     get_python_type_for_input,
-    extract_parameter_info,
+    extract_parameter_info_from_schema,
     _type_to_str,
 )
-from prompttodraft.tools.metadata import ToolMetadata
 from prompttodraft.backends.execution_backend import ExecutionBackend
 
 
@@ -83,19 +82,16 @@ def test_get_python_type_for_input_array():
     assert result == list[str]
 
 
-def test_extract_parameter_info():
-    """Test parameter extraction from tool metadata."""
-    metadata = ToolMetadata(
-        name="test_tool",
-        description="A test tool",
-        inputs={
-            "required_param": {"type": "string", "description": "Required"},
-            "optional_param": {"type": "number", "nullable": True, "description": "Optional"},
-        },
-        output_type="string",
-    )
+def test_extract_parameter_info_from_schema():
+    """Test parameter extraction from Pydantic JSON schema."""
+    from pydantic import BaseModel, Field
 
-    params = extract_parameter_info(metadata)
+    class TestInputModel(BaseModel):
+        required_param: str = Field(description="Required")
+        optional_param: int | None = Field(default=None, description="Optional")
+
+    schema = TestInputModel.model_json_schema()
+    params = extract_parameter_info_from_schema(schema)
 
     # Required params should come first
     assert len(params) == 2
@@ -313,14 +309,14 @@ def test_smolagents_preserves_metadata(mock_backend: MagicMock):
     )
 
     tool = tools[0]
-    original_metadata = WriteFileTool.metadata
 
-    assert tool.name == original_metadata.name
-    assert tool.description == original_metadata.description
-    assert tool.output_type == original_metadata.output_type
+    assert tool.name == WriteFileTool.name
+    assert tool.description == WriteFileTool.description
+    assert tool.output_type == "string"
 
-    # Check inputs match
-    for input_name in original_metadata.inputs:
+    # Check inputs match from schema
+    schema = WriteFileTool.get_json_schema()
+    for input_name in schema.get("properties", {}):
         assert input_name in tool.inputs
 
 
@@ -334,10 +330,9 @@ def test_langchain_preserves_metadata(mock_backend: MagicMock):
     )
 
     tool = tools[0]
-    original_metadata = WriteFileTool.metadata
 
-    assert tool.name == original_metadata.name
-    assert tool.description == original_metadata.description
+    assert tool.name == WriteFileTool.name
+    assert tool.description == WriteFileTool.description
 
 
 def test_pydantic_ai_preserves_metadata():
@@ -351,10 +346,9 @@ def test_pydantic_ai_preserves_metadata():
     )
 
     tool = tools[0]
-    original_metadata = WriteFileTool.metadata
 
-    assert tool.name == original_metadata.name
-    assert tool.description == original_metadata.description
+    assert tool.name == WriteFileTool.name
+    assert tool.description == WriteFileTool.description
 
 
 # =============================================================================

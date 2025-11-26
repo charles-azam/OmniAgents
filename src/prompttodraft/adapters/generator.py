@@ -183,6 +183,7 @@ def generate_smolagents_tool(
     properties = schema.get("properties", {})
 
     # Build inputs dict for smolagents format
+    required_fields = set(schema.get("required", []))
     smolagents_inputs = {}
     for param_name, prop_spec in properties.items():
         smolagents_input = {
@@ -199,6 +200,9 @@ def generate_smolagents_tool(
                     if "items" in type_spec:
                         smolagents_input["items"] = type_spec["items"]
                     break
+        # Mark as nullable if it has a default value or is not required
+        elif "default" in prop_spec or param_name not in required_fields:
+            smolagents_input["nullable"] = True
         if "items" in prop_spec:
             smolagents_input["items"] = prop_spec["items"]
         smolagents_inputs[param_name] = smolagents_input
