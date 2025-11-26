@@ -7,11 +7,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.outputs.outputs import (
-    FileInfo,
-    FileListOutputModel,
-    ToolOutputModel,
-)
 
 
 class GlobTool(CoreTool):
@@ -30,6 +25,20 @@ class GlobTool(CoreTool):
         path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. If omitted, searches the root directory.")
         case_sensitive: bool = Field(default=False, description="Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).")
         respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.")
+
+    class FileInfo(BaseModel):
+        name: str = Field(description="Name of the file")
+        path: str = Field(description="Absolute path to the file")
+        is_dir: bool = Field(description="Whether this is a directory")
+        size: str = Field(description="Size of the file (empty for directories)")
+        modified: int | None = Field(default=None, description="Modification time as Unix timestamp")
+
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the glob search was successful")
+        message: str = Field(description="Human-readable summary message")
+        path: str = Field(description="The directory path that was searched")
+        files: list[FileInfo] = Field(default_factory=list, description="List of files found, sorted by modification time (newest first)")
+        total_count: int = Field(description="Total number of files found")
 
     def _is_git_repository(self, search_path: str) -> bool:
         """
@@ -100,7 +109,7 @@ class GlobTool(CoreTool):
         # For now, we'll just return all files since glob already matched them
         return file_paths
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the glob tool.
 
@@ -108,7 +117,7 @@ class GlobTool(CoreTool):
             inputs: Validated input model with pattern, path, case_sensitive, and respect_git_ignore
 
         Returns:
-            FileListOutputModel with matching files
+            OutputModel with matching files
         """
         # Get matched file paths
         matched_paths = self.backend.glob_files(pattern=inputs.pattern, path=inputs.path)
@@ -148,7 +157,7 @@ class GlobTool(CoreTool):
                     mtime = 0
 
             file_infos.append(
-                FileInfo(
+                self.FileInfo(
                     name=Path(file_path).name,
                     path=file_path,
                     is_dir=False,
@@ -160,8 +169,10 @@ class GlobTool(CoreTool):
         # Sort by modification time (newest first)
         file_infos.sort(key=lambda x: x.modified or 0, reverse=True)
 
-        return FileListOutputModel(
-            files=file_infos,
+        return self.OutputModel(
+            success=True,
+            message=f"Found {len(file_infos)} files matching pattern '{inputs.pattern}' in {search_path}",
             path=search_path,
+            files=file_infos,
             total_count=len(file_infos),
         )

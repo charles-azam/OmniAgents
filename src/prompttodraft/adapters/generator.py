@@ -231,7 +231,13 @@ def forward(self, {params_str}) -> str:
     # Validate inputs with Pydantic
     validated_inputs = _input_model({kwargs_str})
     result = _core_tool.execute(inputs=validated_inputs)
-    return str(result)
+    # Convert output to string for LLM - use message field if available, otherwise JSON
+    if hasattr(result, 'message'):
+        return result.message
+    elif hasattr(result, 'content'):
+        return result.content
+    else:
+        return result.model_dump_json(indent=2)
 '''
 
     # Create __init__ method
@@ -355,7 +361,13 @@ def {tool_class.name}({params_str}) -> str:
     # Validate inputs with Pydantic
     validated_inputs = _input_model({kwargs_str})
     result = _core_tool.execute(inputs=validated_inputs)
-    return str(result)
+    # Convert output to string for LLM - use message field if available, otherwise JSON
+    if hasattr(result, 'message'):
+        return result.message
+    elif hasattr(result, 'content'):
+        return result.content
+    else:
+        return result.model_dump_json(indent=2)
 '''
 
     # Execute in a namespace with access to core_tool and input model
@@ -460,7 +472,13 @@ def {tool_class.name}({params_str}) -> str:
     # Validate inputs with Pydantic
     validated_inputs = _input_model({kwargs_str})
     result = core_tool.execute(inputs=validated_inputs)
-    return str(result)
+    # Convert output to string for LLM - use message field if available, otherwise JSON
+    if hasattr(result, 'message'):
+        return result.message
+    elif hasattr(result, 'content'):
+        return result.content
+    else:
+        return result.model_dump_json(indent=2)
 '''
 
     namespace = {

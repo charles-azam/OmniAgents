@@ -6,10 +6,6 @@ This tool executes uv commands in the execution environment, ensuring uv is inst
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
 
 
 class UVTool(CoreTool):
@@ -28,7 +24,15 @@ class UVTool(CoreTool):
         command: str = Field(description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.")
         description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the uv command executed successfully (exit code 0)")
+        message: str = Field(description="Human-readable summary of the command execution")
+        command: str = Field(description="The full uv command that was executed")
+        working_directory: str = Field(description="The directory where the command was executed")
+        output: str = Field(description="The formatted output including stdout/stderr from the command")
+        exit_code: int = Field(description="The exit code returned by the command")
+
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the uv tool.
 
@@ -36,7 +40,7 @@ class UVTool(CoreTool):
             inputs: Validated input model with command and description
 
         Returns:
-            TextOutputModel with command output
+            OutputModel with command execution details
         """
         # Execute the uv command using the backend's execute_uv method
         result = self.backend.execute_uv(
@@ -66,7 +70,19 @@ class UVTool(CoreTool):
             output_lines.append("")
             output_lines.append(f"Warning: Command exited with non-zero status code {result.exit_code}")
 
-        return TextOutputModel(
-            content="\n".join(output_lines),
-            metadata={"exit_code": result.exit_code, "command": f"uv {inputs.command}"},
+        # Determine success and message
+        success = result.exit_code == 0
+        full_command = f"uv {inputs.command}"
+        if success:
+            message = f"UV command executed successfully: {full_command}"
+        else:
+            message = f"UV command failed with exit code {result.exit_code}: {full_command}"
+
+        return self.OutputModel(
+            success=success,
+            message=message,
+            command=full_command,
+            working_directory=self.backend.get_working_directory(),
+            output="\n".join(output_lines),
+            exit_code=result.exit_code,
         )

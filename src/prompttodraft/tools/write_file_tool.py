@@ -6,11 +6,6 @@ This tool writes content to a specified file, creating it if it doesn't exist.
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
 
 
 class WriteFileTool(CoreTool):
@@ -28,16 +23,13 @@ class WriteFileTool(CoreTool):
         file_path: str = Field(description="The absolute path to the file to write to")
         content: str = Field(description="The content to write into the file")
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
-        """
-        Execute the write_file tool.
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the file was written successfully")
+        file_path: str = Field(description="The path to the file that was written")
+        message: str = Field(description="Human-readable success message")
+        is_new_file: bool = Field(description="Whether a new file was created (true) or an existing file was overwritten (false)")
 
-        Args:
-            inputs: Validated input model with file_path and content
-
-        Returns:
-            TextOutputModel with success message
-        """
+    def execute(self, inputs: InputModel) -> OutputModel:
         # Check if file already exists
         file_exists = self.backend.file_exists(path=inputs.file_path)
         is_new_file = file_exists is None
@@ -45,12 +37,15 @@ class WriteFileTool(CoreTool):
         # Write the file (backend handles directory creation)
         self.backend.write_file(file_path=inputs.file_path, content=inputs.content)
 
-        # Return success message
+        # Return structured output
         if is_new_file:
-            return TextOutputModel(
-                content=f"Successfully created and wrote to new file: {inputs.file_path}",
-            )
+            message = f"Successfully created and wrote to new file: {inputs.file_path}"
         else:
-            return TextOutputModel(
-                content=f"Successfully overwrote file: {inputs.file_path}",
-            )
+            message = f"Successfully overwrote file: {inputs.file_path}"
+
+        return self.OutputModel(
+            success=True,
+            file_path=inputs.file_path,
+            message=message,
+            is_new_file=is_new_file,
+        )

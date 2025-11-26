@@ -7,10 +7,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
 
 
 class SaveMemoryTool(CoreTool):
@@ -26,6 +22,13 @@ class SaveMemoryTool(CoreTool):
 
     class InputModel(BaseModel):
         fact: str = Field(description="The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').")
+
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the memory was saved successfully")
+        message: str = Field(description="Human-readable summary of the operation")
+        fact: str = Field(description="The fact that was saved")
+        memory_file_path: str = Field(description="Path to the memory file")
+        is_new_file: bool = Field(description="Whether a new memory file was created")
 
     # Default memory file location (in user's home directory)
     MEMORY_FILE_DIR = ".gemini"
@@ -59,7 +62,7 @@ class SaveMemoryTool(CoreTool):
         home_dir = home_result.output.strip()
         return str(Path(home_dir) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the save_memory tool.
 
@@ -67,7 +70,7 @@ class SaveMemoryTool(CoreTool):
             inputs: Validated input model with fact
 
         Returns:
-            TextOutputModel with success message
+            OutputModel with success details
         """
         memory_file_path = self._get_memory_file_path()
 
@@ -85,8 +88,12 @@ class SaveMemoryTool(CoreTool):
             # Create new memory file with header
             initial_content = f"# Gemini Memory File\n\n{self.MEMORY_SECTION_HEADER}\n\n- {inputs.fact}\n"
             self.backend.write_file(file_path=memory_file_path, content=initial_content)
-            return TextOutputModel(
-                content=f"Memory saved: '{inputs.fact}' (created new memory file at {memory_file_path})",
+            return self.OutputModel(
+                success=True,
+                message=f"Memory saved: '{inputs.fact}' (created new memory file)",
+                fact=inputs.fact,
+                memory_file_path=memory_file_path,
+                is_new_file=True,
             )
 
         # File exists, read current content
@@ -104,6 +111,10 @@ class SaveMemoryTool(CoreTool):
         # Write updated content
         self.backend.write_file(file_path=memory_file_path, content=new_content)
 
-        return TextOutputModel(
-            content=f"Memory saved: '{inputs.fact}' (appended to {memory_file_path})",
+        return self.OutputModel(
+            success=True,
+            message=f"Memory saved: '{inputs.fact}' (appended to memory file)",
+            fact=inputs.fact,
+            memory_file_path=memory_file_path,
+            is_new_file=False,
         )

@@ -8,10 +8,6 @@ from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
 from prompttodraft.backends.execution_backend import FileType
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
 
 
 class ReadManyFilesTool(CoreTool):
@@ -50,6 +46,13 @@ class ReadManyFilesTool(CoreTool):
         recursive: bool = Field(default=True, description="Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.")
         useDefaultExcludes: bool = Field(default=True, description="Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.")
         respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.")
+
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether files were read successfully")
+        message: str = Field(description="Human-readable summary of the operation")
+        content: str = Field(description="Concatenated content from all files, with separators")
+        files_read: int = Field(description="Number of files successfully read")
+        total_files_matched: int = Field(description="Total number of files matched by patterns")
 
     def _is_media_file(self, file_path: str) -> bool:
         """
@@ -131,7 +134,7 @@ class ReadManyFilesTool(CoreTool):
                 return True
         return False
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the read_many_files tool.
 
@@ -139,7 +142,7 @@ class ReadManyFilesTool(CoreTool):
             inputs: Validated input model
 
         Returns:
-            TextOutputModel with concatenated file contents
+            OutputModel with concatenated file contents
         """
         # Combine paths and include patterns
         all_patterns = list(inputs.paths)
@@ -182,10 +185,17 @@ class ReadManyFilesTool(CoreTool):
             ]
 
         if not filtered_files:
-            return TextOutputModel(content="No files matched the specified patterns.")
+            return self.OutputModel(
+                success=True,
+                message="No files matched the specified patterns",
+                content="No files matched the specified patterns.",
+                files_read=0,
+                total_files_matched=0,
+            )
 
         # Read and concatenate file contents
         output_parts = []
+        files_read_count = 0
 
         for file_path in filtered_files:
             # Check if file exists and is a file
@@ -209,6 +219,7 @@ class ReadManyFilesTool(CoreTool):
                     output_parts.append(f"[Media File: {Path(file_path).name}]")
                     output_parts.append(f"MIME Type: {mime_type}")
                     output_parts.append(f"Base64 Data: {result.output.strip()}")
+                    files_read_count += 1
                 else:
                     output_parts.append(f"[Error reading media file: {file_path}]")
             else:
@@ -220,12 +231,19 @@ class ReadManyFilesTool(CoreTool):
                     output_parts.append(f"[Skipped binary file: {file_path}]")
                 else:
                     output_parts.append(content)
+                    files_read_count += 1
 
             output_parts.append("")  # Empty line after each file
 
         output_parts.append("--- End of content ---")
 
-        return TextOutputModel(content="\n".join(output_parts))
+        return self.OutputModel(
+            success=True,
+            message=f"Successfully read {files_read_count} files from {len(filtered_files)} matched files",
+            content="\n".join(output_parts),
+            files_read=files_read_count,
+            total_files_matched=len(filtered_files),
+        )
 
     def _get_mime_type(self, file_path: str) -> str:
         """

@@ -6,11 +6,6 @@ This tool searches for a regular expression pattern within file contents.
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ErrorOutputModel,
-    ToolOutputModel,
-)
 
 
 class SearchFileContentTool(CoreTool):
@@ -29,7 +24,17 @@ class SearchFileContentTool(CoreTool):
         path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. Defaults to the current working directory.")
         include: str | None = Field(default=None, description="Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.")
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the search completed successfully")
+        message: str = Field(description="Human-readable summary of search results")
+        content: str = Field(description="Formatted search results with file paths, line numbers, and matching lines")
+        total_matches: int = Field(description="Total number of matches found")
+        files_with_matches: int = Field(description="Number of files containing matches")
+        pattern: str = Field(description="The search pattern used")
+        search_path: str = Field(description="The directory path that was searched")
+        error: str | None = Field(default=None, description="Error message if search failed")
+
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the search_file_content tool.
 
@@ -37,7 +42,7 @@ class SearchFileContentTool(CoreTool):
             inputs: Validated input model with pattern, path, and include
 
         Returns:
-            TextOutputModel with search results or ErrorOutputModel on failure
+            OutputModel with search results or error details
         """
         search_path = inputs.path if inputs.path else self.backend.get_working_directory()
 
@@ -74,15 +79,27 @@ class SearchFileContentTool(CoreTool):
 
         # grep returns exit code 1 when no matches found
         if result.exit_code != 0 and result.exit_code != 1:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message=f"Search failed: {result.output}",
+                content="",
+                total_matches=0,
+                files_with_matches=0,
+                pattern=inputs.pattern,
+                search_path=search_path,
                 error=f"Search failed: {result.output}",
-                error_type="SearchError",
             )
 
         if not result.output or result.exit_code == 1:
-            return TextOutputModel(
-                content=f'Found 0 matches for pattern "{inputs.pattern}" in path "{search_path}"'
-                + (f' (filter: "{inputs.include}")' if inputs.include else ""),
+            content = f'Found 0 matches for pattern "{inputs.pattern}" in path "{search_path}"' + (f' (filter: "{inputs.include}")' if inputs.include else "")
+            return self.OutputModel(
+                success=True,
+                message=f"No matches found for pattern '{inputs.pattern}'",
+                content=content,
+                total_matches=0,
+                files_with_matches=0,
+                pattern=inputs.pattern,
+                search_path=search_path,
             )
 
         # Parse grep output and format it
@@ -122,4 +139,12 @@ class SearchFileContentTool(CoreTool):
 
         output_lines.append("---")
 
-        return TextOutputModel(content="\n".join(output_lines))
+        return self.OutputModel(
+            success=True,
+            message=f"Found {total_matches} matches in {len(matches_by_file)} files for pattern '{inputs.pattern}'",
+            content="\n".join(output_lines),
+            total_matches=total_matches,
+            files_with_matches=len(matches_by_file),
+            pattern=inputs.pattern,
+            search_path=search_path,
+        )

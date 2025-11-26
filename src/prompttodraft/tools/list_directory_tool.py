@@ -8,12 +8,6 @@ from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
 from prompttodraft.backends.execution_backend import FileType
-from prompttodraft.outputs.outputs import (
-    FileInfo,
-    FileListOutputModel,
-    ErrorOutputModel,
-    ToolOutputModel,
-)
 
 
 class ListDirectoryTool(CoreTool):
@@ -31,6 +25,20 @@ class ListDirectoryTool(CoreTool):
         path: str = Field(description="The absolute path to the directory to list (must be absolute, not relative).")
         ignore: list[str] | None = Field(default=None, description="Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).")
         respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.")
+
+    class FileInfo(BaseModel):
+        name: str = Field(description="Name of the file or directory")
+        path: str = Field(description="Absolute path to the file or directory")
+        is_dir: bool = Field(description="Whether this is a directory")
+        size: str = Field(description="Size of the file (empty for directories)")
+
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the directory listing was successful")
+        message: str = Field(description="Human-readable summary message")
+        path: str = Field(description="The directory path that was listed")
+        files: list[FileInfo] = Field(default_factory=list, description="List of files and directories found")
+        total_count: int = Field(description="Total number of entries found")
+        error: str | None = Field(default=None, description="Error message if operation failed")
 
     def _is_git_repository(self) -> bool:
         """
@@ -69,7 +77,7 @@ class ListDirectoryTool(CoreTool):
         except Exception:
             return False
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the list_directory tool.
 
@@ -77,20 +85,28 @@ class ListDirectoryTool(CoreTool):
             inputs: Validated input model with path, ignore, and respect_git_ignore
 
         Returns:
-            FileListOutputModel with directory contents or ErrorOutputModel on failure
+            OutputModel with directory contents or error details
         """
         # Check if directory exists
         file_type = self.backend.file_exists(path=inputs.path)
         if file_type is None:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message=f"Directory does not exist: {inputs.path}",
+                path=inputs.path,
+                files=[],
+                total_count=0,
                 error=f"Directory does not exist: {inputs.path}",
-                error_type="DirectoryNotFoundError",
             )
 
         if file_type != FileType.DIRECTORY:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message=f"Path is not a directory: {inputs.path}",
+                path=inputs.path,
+                files=[],
+                total_count=0,
                 error=f"Path is not a directory: {inputs.path}",
-                error_type="NotADirectoryError",
             )
 
         # Check if we should respect gitignore
@@ -124,7 +140,7 @@ class ListDirectoryTool(CoreTool):
         file_infos = []
         for entry in entries:
             file_infos.append(
-                FileInfo(
+                self.FileInfo(
                     name=entry.name,
                     path=entry.path,
                     is_dir=entry.type == FileType.DIRECTORY,
@@ -135,8 +151,10 @@ class ListDirectoryTool(CoreTool):
         # Sort entries: directories first, then alphabetically
         file_infos.sort(key=lambda x: (not x.is_dir, x.name))
 
-        return FileListOutputModel(
-            files=file_infos,
+        return self.OutputModel(
+            success=True,
+            message=f"Successfully listed {len(file_infos)} entries in directory: {inputs.path}",
             path=inputs.path,
+            files=file_infos,
             total_count=len(file_infos),
         )

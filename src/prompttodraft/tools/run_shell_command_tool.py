@@ -7,10 +7,6 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
 
 
 class RunShellCommandTool(CoreTool):
@@ -29,7 +25,15 @@ class RunShellCommandTool(CoreTool):
         description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
         directory: str | None = Field(default=None, description="Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.")
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the command executed successfully (exit code 0)")
+        message: str = Field(description="Human-readable summary of the command execution")
+        command: str = Field(description="The command that was executed")
+        directory: str = Field(description="The directory where the command was executed")
+        output: str = Field(description="The stdout/stderr output from the command")
+        exit_code: int = Field(description="The exit code returned by the command")
+
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the run_shell_command tool.
 
@@ -37,7 +41,7 @@ class RunShellCommandTool(CoreTool):
             inputs: Validated input model with command, description, and directory
 
         Returns:
-            TextOutputModel with command output
+            OutputModel with command execution details
         """
         # Determine execution directory
         working_dir = self.backend.get_working_directory()
@@ -81,7 +85,18 @@ class RunShellCommandTool(CoreTool):
             output_lines.append("")
             output_lines.append(f"Warning: Command exited with non-zero status code {result.exit_code}")
 
-        return TextOutputModel(
-            content="\n".join(output_lines),
-            metadata={"exit_code": result.exit_code, "command": inputs.command},
+        # Determine success and message
+        success = result.exit_code == 0
+        if success:
+            message = f"Command executed successfully: {inputs.command}"
+        else:
+            message = f"Command failed with exit code {result.exit_code}: {inputs.command}"
+
+        return self.OutputModel(
+            success=success,
+            message=message,
+            command=inputs.command,
+            directory=exec_dir,
+            output="\n".join(output_lines),
+            exit_code=result.exit_code,
         )

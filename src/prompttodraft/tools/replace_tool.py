@@ -7,11 +7,6 @@ from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreTool
 from prompttodraft.backends.execution_backend import FileType
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ErrorOutputModel,
-    ToolOutputModel,
-)
 
 
 class ReplaceTool(CoreTool):
@@ -31,7 +26,15 @@ class ReplaceTool(CoreTool):
         new_string: str = Field(description="The exact literal text to replace old_string with.")
         expected_replacements: int = Field(default=1, description="Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.")
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    class OutputModel(BaseModel):
+        success: bool = Field(description="Whether the replacement was successful")
+        message: str = Field(description="Human-readable summary of the operation")
+        file_path: str = Field(description="The file path that was modified")
+        replacements_made: int = Field(description="Number of replacements made")
+        is_new_file: bool = Field(default=False, description="Whether a new file was created")
+        error: str | None = Field(default=None, description="Error message if operation failed")
+
+    def execute(self, inputs: InputModel) -> OutputModel:
         """
         Execute the replace tool.
 
@@ -39,34 +42,48 @@ class ReplaceTool(CoreTool):
             inputs: Validated input model with file_path, old_string, new_string, and expected_replacements
 
         Returns:
-            TextOutputModel with success message or ErrorOutputModel on failure
+            OutputModel with success or error details
         """
         # Handle empty old_string (create new file)
         if not inputs.old_string:
             file_exists = self.backend.file_exists(path=inputs.file_path)
             if file_exists is not None:
-                return ErrorOutputModel(
+                return self.OutputModel(
+                    success=False,
+                    message=f"Cannot create new file: {inputs.file_path} already exists",
+                    file_path=inputs.file_path,
+                    replacements_made=0,
+                    is_new_file=False,
                     error=f"Cannot create new file: {inputs.file_path} already exists",
-                    error_type="FileExistsError",
                 )
 
             self.backend.write_file(file_path=inputs.file_path, content=inputs.new_string)
-            return TextOutputModel(
-                content=f"Created new file: {inputs.file_path} with provided content.",
+            return self.OutputModel(
+                success=True,
+                message=f"Created new file: {inputs.file_path} with provided content",
+                file_path=inputs.file_path,
+                replacements_made=0,
+                is_new_file=True,
             )
 
         # Check if file exists
         file_type = self.backend.file_exists(path=inputs.file_path)
         if file_type is None:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message=f"File does not exist: {inputs.file_path}",
+                file_path=inputs.file_path,
+                replacements_made=0,
                 error=f"File does not exist: {inputs.file_path}",
-                error_type="FileNotFoundError",
             )
 
         if file_type != FileType.FILE:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message=f"Path is not a file: {inputs.file_path}",
+                file_path=inputs.file_path,
+                replacements_made=0,
                 error=f"Path is not a file: {inputs.file_path}",
-                error_type="NotAFileError",
             )
 
         # Read current content
@@ -77,21 +94,30 @@ class ReplaceTool(CoreTool):
 
         # Validate occurrences
         if occurrences == 0:
-            return ErrorOutputModel(
+            return self.OutputModel(
+                success=False,
+                message="Failed to edit: old_string was not found in the file",
+                file_path=inputs.file_path,
+                replacements_made=0,
                 error=f"Failed to edit, 0 occurrences found. The old_string was not found in the file.",
-                error_type="NoMatchError",
             )
 
         if occurrences != inputs.expected_replacements:
             if occurrences > inputs.expected_replacements:
-                return ErrorOutputModel(
+                return self.OutputModel(
+                    success=False,
+                    message=f"Failed to edit: expected {inputs.expected_replacements} occurrences but found {occurrences}",
+                    file_path=inputs.file_path,
+                    replacements_made=0,
                     error=f"Failed to edit, expected {inputs.expected_replacements} occurrences but found {occurrences}. The old_string matches multiple locations in the file. Please provide more context in old_string to make it unique (include at least 3 lines of surrounding context before and after).",
-                    error_type="AmbiguousMatchError",
                 )
             else:
-                return ErrorOutputModel(
+                return self.OutputModel(
+                    success=False,
+                    message=f"Failed to edit: expected {inputs.expected_replacements} occurrences but found {occurrences}",
+                    file_path=inputs.file_path,
+                    replacements_made=0,
                     error=f"Failed to edit, expected {inputs.expected_replacements} occurrences but found {occurrences}.",
-                    error_type="AmbiguousMatchError",
                 )
 
         # Perform replacement
@@ -100,6 +126,9 @@ class ReplaceTool(CoreTool):
         # Write modified content
         self.backend.write_file(file_path=inputs.file_path, content=new_content)
 
-        return TextOutputModel(
-            content=f"Successfully modified file: {inputs.file_path} ({inputs.expected_replacements} replacements).",
+        return self.OutputModel(
+            success=True,
+            message=f"Successfully modified file: {inputs.file_path} ({inputs.expected_replacements} replacements)",
+            file_path=inputs.file_path,
+            replacements_made=inputs.expected_replacements,
         )

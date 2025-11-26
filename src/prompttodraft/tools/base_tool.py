@@ -10,7 +10,6 @@ from typing import ClassVar
 from pydantic import BaseModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.outputs.outputs import ToolOutputModel
 
 
 class CoreTool(ABC):
@@ -21,6 +20,7 @@ class CoreTool(ABC):
     - name: Tool name (string)
     - description: Tool description (string)
     - InputModel: Pydantic model defining input parameters
+    - OutputModel: Pydantic model defining output structure
     - execute: Method to execute the tool
 
     This base class ensures consistency across all tools and enables
@@ -30,6 +30,7 @@ class CoreTool(ABC):
     name: ClassVar[str]
     description: ClassVar[str]
     InputModel: ClassVar[type[BaseModel]]
+    OutputModel: ClassVar[type[BaseModel]]
 
     def __init__(self, backend: ExecutionBackend):
         """
@@ -41,7 +42,7 @@ class CoreTool(ABC):
         self.backend = backend
 
     @abstractmethod
-    def execute(self, inputs: BaseModel) -> ToolOutputModel:
+    def execute(self, inputs: BaseModel) -> BaseModel:
         """
         Execute the tool with validated Pydantic inputs.
 
@@ -49,12 +50,12 @@ class CoreTool(ABC):
             inputs: Validated input model instance (type matches self.InputModel)
 
         Returns:
-            ToolOutputModel with the tool's output
+            Pydantic BaseModel with the tool's output (type matches self.OutputModel)
         """
         pass
 
     @classmethod
-    def get_json_schema(cls) -> dict:
+    def get_input_schema(cls) -> dict:
         """
         Get JSON Schema for this tool's inputs.
 
@@ -62,3 +63,23 @@ class CoreTool(ABC):
             JSON Schema dict generated from InputModel
         """
         return cls.InputModel.model_json_schema()
+
+    @classmethod
+    def get_output_schema(cls) -> dict:
+        """
+        Get JSON Schema for this tool's outputs.
+
+        Returns:
+            JSON Schema dict generated from OutputModel
+        """
+        return cls.OutputModel.model_json_schema()
+
+    @classmethod
+    def get_json_schema(cls) -> dict:
+        """
+        Get JSON Schema for this tool's inputs (for backward compatibility).
+
+        Returns:
+            JSON Schema dict generated from InputModel
+        """
+        return cls.get_input_schema()

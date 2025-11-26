@@ -84,13 +84,17 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
         # Create new file
         result = write_tool.execute(inputs=WriteFileTool.InputModel(file_path=test_file, content="def hello():\n    print('world')\n"))
-        assert isinstance(result, TextOutputModel)
-        assert "created" in result.content.lower() or "wrote" in result.content.lower()
+        assert isinstance(result, WriteFileTool.OutputModel)
+        assert result.success is True
+        assert result.is_new_file is True
+        assert "created" in result.message.lower() or "wrote" in result.message.lower()
 
         # Overwrite existing file
         result = write_tool.execute(inputs=WriteFileTool.InputModel(file_path=test_file, content="def hello():\n    print('updated')\n"))
-        assert isinstance(result, TextOutputModel)
-        assert "overwrote" in result.content.lower()
+        assert isinstance(result, WriteFileTool.OutputModel)
+        assert result.success is True
+        assert result.is_new_file is False
+        assert "overwrote" in result.message.lower()
 
         # TEST 2: read_file
         print("\n" + "="*80)
