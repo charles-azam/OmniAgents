@@ -27,7 +27,7 @@ def main() -> None:
     # Create the agent - tools are auto-generated from core tools
     agent = LangChainAgent(
         backend=backend,
-        model_id="gpt-4o-mini",  # or "gpt-4o", "gpt-4-turbo"
+        model_id="gpt-5-mini",
         provider="openai",
     )
 

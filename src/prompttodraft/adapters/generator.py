@@ -26,7 +26,6 @@ Usage:
     from prompttodraft.tools.write_file_tool import WriteFileTool
     tools = generate_langchain_tools(backend, tool_classes=[WriteFileTool])
 """
-from typing import Callable
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.base_tool import CoreTool
 
@@ -159,34 +158,23 @@ def extract_parameter_info_from_schema(schema: dict) -> list[tuple[str, type, ob
 # smolagents Adapter Generator
 # =============================================================================
 
-def generate_smolagents_tool(
-    tool_class: type[CoreTool],
-    backend: ExecutionBackend,
-):
+
+def _build_smolagents_inputs(schema: dict) -> dict[str, dict[str, str | bool]]:
     """
-    Generate a smolagents Tool class for a single core tool.
+    Build smolagents-compatible inputs dict from JSON Schema.
 
     Args:
-        tool_class: The CoreTool subclass to wrap.
-        backend: The execution backend instance.
+        schema: JSON Schema dict from Pydantic model_json_schema()
 
     Returns:
-        An instance of a dynamically created smolagents Tool class.
+        Dictionary in smolagents inputs format.
     """
-    from smolagents import Tool
-
-    # Create an instance
-    core_tool = tool_class(backend=backend)
-
-    # Get schema from Pydantic model
-    schema = tool_class.get_json_schema()
     properties = schema.get("properties", {})
-
-    # Build inputs dict for smolagents format
     required_fields = set(schema.get("required", []))
-    smolagents_inputs = {}
+    smolagents_inputs: dict[str, dict[str, str | bool]] = {}
+
     for param_name, prop_spec in properties.items():
-        smolagents_input = {
+        smolagents_input: dict[str, str | bool] = {
             "type": prop_spec.get("type", "string"),
             "description": prop_spec.get("description", ""),
         }
@@ -207,63 +195,130 @@ def generate_smolagents_tool(
             smolagents_input["items"] = prop_spec["items"]
         smolagents_inputs[param_name] = smolagents_input
 
-    # Extract parameter info for forward method signature
-    params = extract_parameter_info_from_schema(schema)
+    return smolagents_inputs
 
-    # Build forward method signature dynamically
-    param_strs = []
-    for param_name, param_type, default in params:
-        type_str = _type_to_str(param_type)
-        if default is ...:
-            param_strs.append(f"{param_name}: {type_str}")
-        elif default is None:
-            param_strs.append(f"{param_name}: {type_str} = None")
-        else:
-            param_strs.append(f"{param_name}: {type_str} = {repr(default)}")
 
-    params_str = ", ".join(param_strs)
-    param_names = [p[0] for p in params]
-    kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
+class SmolagentsToolAdapter:
+    """
+    Adapter that wraps a CoreTool to be compatible with smolagents Tool interface.
 
-    # Create the forward method code that validates with Pydantic
-    forward_code = f'''
-def forward(self, {params_str}) -> str:
-    # Validate inputs with Pydantic
-    validated_inputs = _input_model({kwargs_str})
-    result = _core_tool.execute(inputs=validated_inputs)
-    return str(result)
-'''
+    This class avoids using exec() by leveraging smolagents' skip_forward_signature_validation
+    feature, allowing forward() to accept **kwargs instead of explicit parameters.
 
-    # Create __init__ method
-    init_code = '''
-def __init__(self):
-    super(self.__class__, self).__init__()
-'''
+    Usage:
+        from prompttodraft.adapters.generator import SmolagentsToolAdapter
+        from prompttodraft.tools.write_file_tool import WriteFileTool
 
-    # Execute to create the methods
-    namespace = {
-        "_core_tool": core_tool,
-        "_input_model": tool_class.InputModel,
-    }
-    exec(init_code, namespace)
-    exec(forward_code, namespace)
+        tool = SmolagentsToolAdapter(
+            tool_class=WriteFileTool,
+            backend=backend,
+        )
+    """
 
-    # Create the Tool subclass dynamically
-    class_dict = {
-        "name": tool_class.name,
-        "description": tool_class.description,
-        "inputs": smolagents_inputs,
-        "output_type": "string",
-        "_core_tool": core_tool,
-        "__init__": namespace["__init__"],
-        "forward": namespace["forward"],
-    }
+    # Skip signature validation - allows forward(**kwargs) pattern
+    skip_forward_signature_validation = True
 
-    # Create the class
-    tool_class_name = f"{tool_class.name.title().replace('_', '')}SmolagentsTool"
-    SmolagentsTool = type(tool_class_name, (Tool,), class_dict)
+    def __init__(
+        self,
+        tool_class: type[CoreTool],
+        backend: ExecutionBackend,
+    ):
+        """
+        Initialize the smolagents tool adapter.
 
-    return SmolagentsTool()
+        Args:
+            tool_class: The CoreTool subclass to wrap.
+            backend: The execution backend instance.
+        """
+        self._tool_class = tool_class
+        self._core_tool = tool_class(backend=backend)
+        self._input_model = tool_class.InputModel
+
+        # Set smolagents required attributes
+        self.name = tool_class.name
+        self.description = tool_class.description
+        self.output_type = "string"
+
+        # Build inputs from schema
+        schema = tool_class.get_json_schema()
+        self.inputs = _build_smolagents_inputs(schema=schema)
+
+        self.is_initialized = True
+
+    def forward(self, **kwargs) -> str:
+        """
+        Execute the tool with the given keyword arguments.
+
+        Args:
+            **kwargs: Tool input parameters matching the InputModel fields.
+
+        Returns:
+            String representation of the tool output.
+        """
+        # Validate and create inputs using Pydantic model
+        validated_inputs = self._input_model(**kwargs)
+        result = self._core_tool.execute(inputs=validated_inputs)
+        return str(result)
+
+    def __call__(self, *args, **kwargs) -> str:
+        """
+        Call the tool, converting positional args to kwargs if needed.
+
+        Args:
+            *args: Positional arguments (converted to kwargs based on input order).
+            **kwargs: Keyword arguments for the tool.
+
+        Returns:
+            String representation of the tool output.
+        """
+        # Handle positional arguments by mapping to input names
+        if args:
+            input_names = list(self.inputs.keys())
+            for i, arg in enumerate(args):
+                if i < len(input_names):
+                    kwargs[input_names[i]] = arg
+        return self.forward(**kwargs)
+
+
+def generate_smolagents_tool(
+    tool_class: type[CoreTool],
+    backend: ExecutionBackend,
+):
+    """
+    Generate a smolagents-compatible tool for a single core tool.
+
+    Args:
+        tool_class: The CoreTool subclass to wrap.
+        backend: The execution backend instance.
+
+    Returns:
+        A SmolagentsToolAdapter instance that can be used with smolagents.
+    """
+    from smolagents import Tool
+
+    # Create the adapter
+    adapter = SmolagentsToolAdapter(
+        tool_class=tool_class,
+        backend=backend,
+    )
+
+    # Create a proper Tool subclass dynamically (without exec)
+    # that inherits from smolagents.Tool for full compatibility
+    class WrappedTool(Tool):
+        skip_forward_signature_validation = True
+
+        def __init__(self, _adapter: SmolagentsToolAdapter):
+            self._adapter = _adapter
+            self.name = _adapter.name
+            self.description = _adapter.description
+            self.inputs = _adapter.inputs
+            self.output_type = _adapter.output_type
+            self.is_initialized = True
+
+        def forward(self, **kwargs) -> str:
+            return self._adapter.forward(**kwargs)
+
+    return WrappedTool(_adapter=adapter)
 
 
 def generate_smolagents_tools(
@@ -305,71 +360,93 @@ def generate_smolagents_tools(
 # LangChain Adapter Generator
 # =============================================================================
 
+
+class LangChainToolAdapter:
+    """
+    Adapter that wraps a CoreTool to be compatible with LangChain's tool interface.
+
+    This class avoids using exec() by using LangChain's StructuredTool which
+    accepts a Pydantic model for args_schema directly.
+
+    Usage:
+        from prompttodraft.adapters.generator import LangChainToolAdapter
+        from prompttodraft.tools.write_file_tool import WriteFileTool
+
+        adapter = LangChainToolAdapter(
+            tool_class=WriteFileTool,
+            backend=backend,
+        )
+        langchain_tool = adapter.to_langchain_tool()
+    """
+
+    def __init__(
+        self,
+        tool_class: type[CoreTool],
+        backend: ExecutionBackend,
+    ):
+        """
+        Initialize the LangChain tool adapter.
+
+        Args:
+            tool_class: The CoreTool subclass to wrap.
+            backend: The execution backend instance.
+        """
+        self._tool_class = tool_class
+        self._core_tool = tool_class(backend=backend)
+        self._input_model = tool_class.InputModel
+        self.name = tool_class.name
+        self.description = tool_class.description
+
+    def _invoke(self, **kwargs) -> str:
+        """
+        Execute the tool with the given keyword arguments.
+
+        Args:
+            **kwargs: Tool input parameters matching the InputModel fields.
+
+        Returns:
+            String representation of the tool output.
+        """
+        validated_inputs = self._input_model(**kwargs)
+        result = self._core_tool.execute(inputs=validated_inputs)
+        return str(result)
+
+    def to_langchain_tool(self):
+        """
+        Create a LangChain StructuredTool from this adapter.
+
+        Returns:
+            A LangChain StructuredTool instance.
+        """
+        from langchain_core.tools import StructuredTool
+
+        return StructuredTool.from_function(
+            func=self._invoke,
+            name=self.name,
+            description=self.description,
+            args_schema=self._input_model,
+        )
+
+
 def generate_langchain_tool(
     tool_class: type[CoreTool],
     backend: ExecutionBackend,
-) -> Callable:
+):
     """
-    Generate a LangChain tool function for a single core tool.
+    Generate a LangChain tool for a single core tool.
 
     Args:
         tool_class: The CoreTool subclass to wrap.
         backend: The execution backend instance.
 
     Returns:
-        A LangChain-decorated tool function.
+        A LangChain StructuredTool instance.
     """
-    from langchain_core.tools import tool
-
-    # Create instance
-    core_tool = tool_class(backend=backend)
-
-    # Get schema from Pydantic model
-    schema = tool_class.get_json_schema()
-
-    # Extract parameter info
-    params = extract_parameter_info_from_schema(schema)
-
-    # Build the function signature dynamically using exec
-    # This is necessary to get proper type hints that LangChain can inspect
-    param_strs = []
-    for param_name, param_type, default in params:
-        type_str = _type_to_str(param_type)
-        if default is ...:
-            param_strs.append(f"{param_name}: {type_str}")
-        elif default is None:
-            param_strs.append(f"{param_name}: {type_str} = None")
-        else:
-            param_strs.append(f"{param_name}: {type_str} = {repr(default)}")
-
-    params_str = ", ".join(param_strs)
-    param_names = [p[0] for p in params]
-    kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
-
-    # Create the function code that validates with Pydantic
-    func_code = f'''
-def {tool_class.name}({params_str}) -> str:
-    """
-    {tool_class.description}
-    """
-    # Validate inputs with Pydantic
-    validated_inputs = _input_model({kwargs_str})
-    result = _core_tool.execute(inputs=validated_inputs)
-    return str(result)
-'''
-
-    # Execute in a namespace with access to core_tool and input model
-    namespace = {
-        "_core_tool": core_tool,
-        "_input_model": tool_class.InputModel,
-    }
-    exec(func_code, namespace)
-
-    # Get the function and decorate it
-    func = namespace[tool_class.name]
-    decorated_func = tool(description=tool_class.description)(func)
-
-    return decorated_func
+    adapter = LangChainToolAdapter(
+        tool_class=tool_class,
+        backend=backend,
+    )
+    return adapter.to_langchain_tool()
 
 
 def generate_langchain_tools(
@@ -411,9 +488,87 @@ def generate_langchain_tools(
 # Pydantic-AI Adapter Generator
 # =============================================================================
 
+
+class PydanticAIToolAdapter:
+    """
+    Adapter that wraps a CoreTool to be compatible with Pydantic-AI's tool interface.
+
+    This class avoids using exec() by creating a closure-based wrapper function.
+
+    Usage:
+        from prompttodraft.adapters.generator import PydanticAIToolAdapter
+        from prompttodraft.tools.write_file_tool import WriteFileTool
+
+        adapter = PydanticAIToolAdapter(
+            tool_class=WriteFileTool,
+            backend_attr="backend",
+        )
+        pydantic_ai_tool = adapter.to_pydantic_ai_tool()
+    """
+
+    def __init__(
+        self,
+        tool_class: type[CoreTool],
+        backend_attr: str = "backend",
+    ):
+        """
+        Initialize the Pydantic-AI tool adapter.
+
+        Args:
+            tool_class: The CoreTool subclass to wrap.
+            backend_attr: Attribute name on deps that holds the backend.
+        """
+        self._tool_class = tool_class
+        self._input_model = tool_class.InputModel
+        self._backend_attr = backend_attr
+        self.name = tool_class.name
+        self.description = tool_class.description
+
+    def _create_tool_function(self):
+        """
+        Create a tool function that accepts RunContext and **kwargs.
+
+        Returns:
+            A function compatible with Pydantic-AI Tool.
+        """
+        # Capture references in closure
+        tool_class = self._tool_class
+        input_model = self._input_model
+        backend_attr = self._backend_attr
+
+        def tool_function(ctx, **kwargs) -> str:
+            """Execute the tool with context and keyword arguments."""
+            backend = getattr(ctx.deps, backend_attr)
+            core_tool = tool_class(backend=backend)
+            validated_inputs = input_model(**kwargs)
+            result = core_tool.execute(inputs=validated_inputs)
+            return str(result)
+
+        # Set function metadata
+        tool_function.__name__ = self.name
+        tool_function.__doc__ = self.description
+
+        return tool_function
+
+    def to_pydantic_ai_tool(self):
+        """
+        Create a Pydantic-AI Tool from this adapter.
+
+        Returns:
+            A Pydantic-AI Tool instance.
+        """
+        from pydantic_ai import Tool
+
+        return Tool(
+            function=self._create_tool_function(),
+            takes_ctx=True,
+            name=self.name,
+            description=self.description,
+        )
+
+
 def generate_pydantic_ai_tool(
     tool_class: type[CoreTool],
-    deps_type: type,
     backend_attr: str = "backend",
 ):
     """
@@ -421,67 +576,19 @@ def generate_pydantic_ai_tool(
 
     Args:
         tool_class: The CoreTool subclass to wrap.
-        deps_type: The dependencies dataclass type (e.g., AgentDependencies).
         backend_attr: Attribute name on deps that holds the backend.
 
     Returns:
         A Pydantic-AI Tool instance.
     """
-    from pydantic_ai import Tool, RunContext
-
-    # Get schema from Pydantic model
-    schema = tool_class.get_json_schema()
-
-    # Extract parameter info
-    params = extract_parameter_info_from_schema(schema)
-
-    # Build the function dynamically
-    param_strs = ["ctx: RunContext"]
-    for param_name, param_type, default in params:
-        type_str = _type_to_str(param_type)
-        if default is ...:
-            param_strs.append(f"{param_name}: {type_str}")
-        elif default is None:
-            param_strs.append(f"{param_name}: {type_str} = None")
-        else:
-            param_strs.append(f"{param_name}: {type_str} = {repr(default)}")
-
-    params_str = ", ".join(param_strs)
-    param_names = [p[0] for p in params]
-    kwargs_str = ", ".join(f"{name}={name}" for name in param_names)
-
-    func_code = f'''
-def {tool_class.name}({params_str}) -> str:
-    """
-    {tool_class.description}
-    """
-    backend = getattr(ctx.deps, "{backend_attr}")
-    core_tool = _tool_class(backend=backend)
-    # Validate inputs with Pydantic
-    validated_inputs = _input_model({kwargs_str})
-    result = core_tool.execute(inputs=validated_inputs)
-    return str(result)
-'''
-
-    namespace = {
-        "_tool_class": tool_class,
-        "_input_model": tool_class.InputModel,
-        "RunContext": RunContext,
-    }
-    exec(func_code, namespace)
-
-    func = namespace[tool_class.name]
-
-    return Tool(
-        function=func,
-        takes_ctx=True,
-        name=tool_class.name,
-        description=tool_class.description,
+    adapter = PydanticAIToolAdapter(
+        tool_class=tool_class,
+        backend_attr=backend_attr,
     )
+    return adapter.to_pydantic_ai_tool()
 
 
 def generate_pydantic_ai_tools(
-    deps_type: type,
     backend_attr: str = "backend",
     tool_classes: list[type[CoreTool]] | None = None,
 ) -> list:
@@ -489,9 +596,7 @@ def generate_pydantic_ai_tools(
     Generate Pydantic-AI Tool instances for all core tools.
 
     Args:
-        deps_type: The dependencies dataclass type that will be passed via RunContext.
-                  Must have an attribute containing the ExecutionBackend.
-        backend_attr: Name of the attribute on deps_type that holds the backend.
+        backend_attr: Name of the attribute on deps that holds the backend.
                      Defaults to "backend".
         tool_classes: Optional list of specific tool classes to generate.
                      If None, generates all available tools.
@@ -508,10 +613,7 @@ def generate_pydantic_ai_tools(
         class AgentDependencies:
             backend: ExecutionBackend
 
-        tools = generate_pydantic_ai_tools(
-            deps_type=AgentDependencies,
-            backend_attr="backend",
-        )
+        tools = generate_pydantic_ai_tools(backend_attr="backend")
 
         # Use with Pydantic-AI agent:
         agent = Agent(model=model, deps_type=AgentDependencies, tools=tools)
@@ -522,7 +624,6 @@ def generate_pydantic_ai_tools(
     return [
         generate_pydantic_ai_tool(
             tool_class=tc,
-            deps_type=deps_type,
             backend_attr=backend_attr,
         )
         for tc in tool_classes

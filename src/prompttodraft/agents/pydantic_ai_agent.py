@@ -66,7 +66,7 @@ class PydanticAIAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model_id: str = "gpt-4o-mini",
+        model_id: str = "gpt-5-mini",
         provider: str = "openai",
         additional_tools: list | None = None,
     ) -> None:

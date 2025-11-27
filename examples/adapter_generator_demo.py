@@ -10,7 +10,7 @@ Key benefits:
 - Type-safe parameter handling
 - Consistent behavior across frameworks
 """
-from prompttodraft.adapters import (
+from prompttodraft.adapters.generator import (
     generate_smolagents_tools,
     generate_langchain_tools,
     generate_pydantic_ai_tools,
@@ -120,9 +120,16 @@ def show_available_tools():
         print(f"    → {tc.metadata.name}")
         print(f"    → {tc.metadata.description[:60]}...")
         print()
+        
+def test():
+    from prompttodraft.tools.write_file_tool import WriteFileTool
+    
+    write_file_tool = WriteFileTool(backend=None)
+    pass
 
 
 def main():
+    test()
     """Run all demos."""
     print("\n" + "#" * 60)
     print("#  PROMPTTODRAFT ADAPTER GENERATOR DEMO")
