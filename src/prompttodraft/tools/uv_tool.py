@@ -3,16 +3,22 @@ UV tool implementation.
 
 This tool executes uv commands in the execution environment, ensuring uv is installed first.
 """
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend
+from pydantic import BaseModel, Field
+
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )
 
 
-class UVTool(CoreTool):
+class UVInput(BaseModel):
+    """Input model for UVTool."""
+    command: str = Field(description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.")
+    description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
+
+
+class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
     """
     Framework-agnostic UV command execution tool.
 
@@ -21,52 +27,32 @@ class UVTool(CoreTool):
     installing packages, and running tests.
     """
 
-    metadata = ToolMetadata(
-        name="uv",
-        description="Executes uv package manager commands in the execution environment. Automatically ensures uv is installed before running commands. Use this to: run Python files (uv run script.py), install packages (uv add package-name), remove packages (uv remove package-name), sync dependencies (uv sync), run pytest (uv run pytest), or any other uv command. Returns detailed information about the execution including stdout, stderr, and exit code.",
-        inputs={
-            "command": {
-                "type": "string",
-                "description": "The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.",
-                "nullable": False,
-            },
-            "description": {
-                "type": "string",
-                "description": "Optional: A brief description of the command's purpose, which will be shown to the user.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "uv"
+    description = "Executes uv package manager commands in the execution environment. Automatically ensures uv is installed before running commands. Use this to: run Python files (uv run script.py), install packages (uv add package-name), remove packages (uv remove package-name), sync dependencies (uv sync), run pytest (uv run pytest), or any other uv command. Returns detailed information about the execution including stdout, stderr, and exit code."
 
-    def execute(
-        self,
-        command: str,
-        description: str | None = None,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: UVInput) -> TextOutputModel:
         """
         Execute the uv tool.
 
         Args:
-            command: The uv command to execute (without 'uv' prefix)
-            description: Optional description of the command's purpose
+            inputs: Validated input model with command and description
 
         Returns:
             TextOutputModel with command output
         """
         # Execute the uv command using the backend's execute_uv method
         result = self.backend.execute_uv(
-            uv_command=command,
+            uv_command=inputs.command,
             timeout=300000,  # 5 minutes default for potentially long operations
         )
 
         # Format output
         output_lines = []
 
-        if description:
-            output_lines.append(f"Description: {description}")
+        if inputs.description:
+            output_lines.append(f"Description: {inputs.description}")
 
-        output_lines.append(f"Command: uv {command}")
+        output_lines.append(f"Command: uv {inputs.command}")
         output_lines.append(f"Working Directory: {self.backend.get_working_directory()}")
         output_lines.append("")
 
@@ -84,5 +70,5 @@ class UVTool(CoreTool):
 
         return TextOutputModel(
             content="\n".join(output_lines),
-            metadata={"exit_code": result.exit_code, "command": f"uv {command}"},
+            metadata={"exit_code": result.exit_code, "command": f"uv {inputs.command}"},
         )

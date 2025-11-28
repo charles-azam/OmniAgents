@@ -4,18 +4,27 @@ Read many files tool implementation.
 This tool reads content from multiple files specified by paths or glob patterns.
 """
 from pathlib import Path
+from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.tools.base_tool import CoreBackendTool
+from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
-    ErrorOutputModel,
     ToolOutputModel,
 )
 
 
-class ReadManyFilesTool(CoreTool):
+class ReadManyFilesInput(BaseModel):
+    """Input model for ReadManyFilesTool."""
+    paths: list[str] = Field(description="An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png']). Note: A directory path such as '/docs' will return an empty result; use a pattern such as '/docs/*' or '/docs/*.md'.")
+    exclude: list[str] | None = Field(default=None, description="Optional: Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.")
+    include: list[str] | None = Field(default=None, description="Optional: Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files if they were broadly excluded, or ['images/*.jpg'] to include specific image types).")
+    recursive: bool = Field(default=True, description="Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.")
+    useDefaultExcludes: bool = Field(default=True, description="Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.")
+    respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.")
+
+
+class ReadManyFilesTool(CoreBackendTool[ReadManyFilesInput, TextOutputModel]):
     """
     Framework-agnostic multi-file reading tool.
 
@@ -41,46 +50,8 @@ class ReadManyFilesTool(CoreTool):
         ".DS_Store",
     ]
 
-    metadata = ToolMetadata(
-        name="read_many_files",
-        description="Reads content from multiple files specified by paths or glob patterns. The behavior depends on the provided files: for text files, concatenates their content into a single string; for image (PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, reads and returns them as base64-encoded data if explicitly requested by name or extension. Can be used to get an overview of a codebase, find where specific functionality is implemented, review documentation, or gather context from multiple configuration files.",
-        inputs={
-            "paths": {
-                "type": "array",
-                "description": "An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png']). Note: A directory path such as '/docs' will return an empty result; use a pattern such as '/docs/*' or '/docs/*.md'.",
-                "items": {"type": "string"},
-                "nullable": False,
-            },
-            "exclude": {
-                "type": "array",
-                "description": "Optional: Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.",
-                "items": {"type": "string"},
-                "nullable": True,
-            },
-            "include": {
-                "type": "array",
-                "description": "Optional: Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files if they were broadly excluded, or ['images/*.jpg'] to include specific image types).",
-                "items": {"type": "string"},
-                "nullable": True,
-            },
-            "recursive": {
-                "type": "boolean",
-                "description": "Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.",
-                "nullable": True,
-            },
-            "useDefaultExcludes": {
-                "type": "boolean",
-                "description": "Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.",
-                "nullable": True,
-            },
-            "respect_git_ignore": {
-                "type": "boolean",
-                "description": "Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "read_many_files"
+    description = "Reads content from multiple files specified by paths or glob patterns. The behavior depends on the provided files: for text files, concatenates their content into a single string; for image (PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, reads and returns them as base64-encoded data if explicitly requested by name or extension. Can be used to get an overview of a codebase, find where specific functionality is implemented, review documentation, or gather context from multiple configuration files."
 
     def _is_media_file(self, file_path: str) -> bool:
         """
@@ -162,40 +133,27 @@ class ReadManyFilesTool(CoreTool):
                 return True
         return False
 
-    def execute(
-        self,
-        paths: list[str],
-        exclude: list[str] | None = None,
-        include: list[str] | None = None,
-        recursive: bool = True,
-        useDefaultExcludes: bool = True,
-        respect_git_ignore: bool = True,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: ReadManyFilesInput) -> TextOutputModel:
         """
         Execute the read_many_files tool.
 
         Args:
-            paths: Array of glob patterns or paths
-            exclude: Optional glob patterns to exclude
-            include: Optional additional glob patterns to include
-            recursive: Whether to search recursively
-            useDefaultExcludes: Whether to apply default exclusion patterns
-            respect_git_ignore: Whether to respect .gitignore patterns
+            inputs: Validated input model
 
         Returns:
-            TextOutputModel with concatenated file contents or ErrorOutputModel on failure
+            TextOutputModel with concatenated file contents
         """
         # Combine paths and include patterns
-        all_patterns = list(paths)
-        if include:
-            all_patterns.extend(include)
+        all_patterns = list(inputs.paths)
+        if inputs.include:
+            all_patterns.extend(inputs.include)
 
         # Build exclude patterns
         exclude_patterns = []
-        if useDefaultExcludes:
+        if inputs.useDefaultExcludes:
             exclude_patterns.extend(self.DEFAULT_EXCLUDES)
-        if exclude:
-            exclude_patterns.extend(exclude)
+        if inputs.exclude:
+            exclude_patterns.extend(inputs.exclude)
 
         # Collect all matching files
         all_files = []
@@ -220,7 +178,7 @@ class ReadManyFilesTool(CoreTool):
         ]
 
         # Apply gitignore filtering if requested
-        if respect_git_ignore and self._is_git_repository():
+        if inputs.respect_git_ignore and self._is_git_repository():
             filtered_files = [
                 f for f in filtered_files if not self._should_ignore_by_git(file_path=f)
             ]

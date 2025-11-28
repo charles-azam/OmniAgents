@@ -3,19 +3,23 @@ Write file tool implementation.
 
 This tool writes content to a specified file, creating it if it doesn't exist.
 """
-from pathlib import Path
+from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend, FileType
+from prompttodraft.tools.base_tool import CoreBackendTool
+from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
-    ErrorOutputModel,
     ToolOutputModel,
 )
 
 
-class WriteFileTool(CoreTool):
+class WriteFileInput(BaseModel):
+    """Input model for WriteFileTool."""
+    file_path: str = Field(description="The absolute path to the file to write to")
+    content: str = Field(description="The content to write into the file")
+
+
+class WriteFileTool(CoreBackendTool[WriteFileInput, TextOutputModel]):
     """
     Framework-agnostic file writing tool.
 
@@ -23,52 +27,32 @@ class WriteFileTool(CoreTool):
     If the file doesn't exist, it (and any necessary parent directories) will be created.
     """
 
-    metadata = ToolMetadata(
-        name="write_file",
-        description="Writes content to a specified file. If the file exists, it will be overwritten. If the file doesn't exist, it (and any necessary parent directories) will be created.",
-        inputs={
-            "file_path": {
-                "type": "string",
-                "description": "The absolute path to the file to write to",
-                "nullable": False,
-            },
-            "content": {
-                "type": "string",
-                "description": "The content to write into the file",
-                "nullable": False,
-            },
-        },
-        output_type="string",
-    )
+    name = "write_file"
+    description = "Writes content to a specified file. If the file exists, it will be overwritten. If the file doesn't exist, it (and any necessary parent directories) will be created."
 
-    def execute(
-        self,
-        file_path: str,
-        content: str,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: WriteFileInput) -> TextOutputModel:
         """
         Execute the write_file tool.
 
         Args:
-            file_path: The absolute path to the file to write to
-            content: The content to write into the file
+            inputs: Validated input model with file_path and content
 
         Returns:
-            TextOutputModel with success message or ErrorOutputModel on failure
+            TextOutputModel with success message
         """
         # Check if file already exists
-        file_exists = self.backend.file_exists(path=file_path)
+        file_exists = self.backend.file_exists(path=inputs.file_path)
         is_new_file = file_exists is None
 
         # Write the file (backend handles directory creation)
-        self.backend.write_file(file_path=file_path, content=content)
+        self.backend.write_file(file_path=inputs.file_path, content=inputs.content)
 
         # Return success message
         if is_new_file:
             return TextOutputModel(
-                content=f"Successfully created and wrote to new file: {file_path}",
+                content=f"Successfully created and wrote to new file: {inputs.file_path}",
             )
         else:
             return TextOutputModel(
-                content=f"Successfully overwrote file: {file_path}",
+                content=f"Successfully overwrote file: {inputs.file_path}",
             )
