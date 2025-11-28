@@ -67,7 +67,7 @@ def test_get_input_schema():
 
 def test_tool_execution_with_correct_types():
     """Test that the tool executes correctly with proper types."""
-    backend = LocalBackend(project_id="test", state_manager=NoOpStateManager())
+    backend = LocalBackend(project_id="test_tool_execution_with_correct_types", state_manager=NoOpStateManager())
     backend.start()
 
     try:
@@ -84,28 +84,24 @@ def test_tool_execution_with_correct_types():
     finally:
         backend.shutdown()
 
+def test_generic_mandatory_parameters():
+        
+    with pytest.raises(TypeError, match="Too few arguments for"):
+        class FakeTool(CoreTool[TextOutputModel]):
+            """Fake tool for testing Generic typing."""
+            name = "fake_tool"
+            description = "A fake tool for testing"
+
+            def execute(self, inputs: FakeInput) -> TextOutputModel:
+                result = inputs.message * inputs.count
+                return TextOutputModel(content=result)
+
 
 
 
 if __name__ == "__main__":
-    print("Running base_tool.py tests...\n")
-
-    print("1. Testing get_input_model()...")
     test_get_input_model()
-    print("   ✓ Passed\n")
-
-    print("2. Testing get_output_model()...")
     test_get_output_model()
-    print("   ✓ Passed\n")
-
-    print("3. Testing get_input_schema()...")
     test_get_input_schema()
-    print("   ✓ Passed\n")
-
-    print("4. Testing tool execution with correct types...")
     test_tool_execution_with_correct_types()
-    print("   ✓ Passed\n")
-
-    print("="*60)
-    print("✅ All base_tool.py tests passed!")
-    print("="*60)
+    test_generic_mandatory_parameters()

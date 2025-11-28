@@ -49,6 +49,19 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
     name: ClassVar[str]
     description: ClassVar[str]
 
+    @abstractmethod
+    def execute(self, inputs: TInput) -> TOutput:
+        """
+        Execute the tool with validated Pydantic inputs.
+
+        Args:
+            inputs: Validated input model instance (type matches TInput from Generic parameters)
+
+        Returns:
+            ToolOutputModel instance (type matches TOutput from Generic parameters)
+        """
+        ...
+
     @classmethod
     def get_input_model(cls) -> type[BaseModel]:
         """
@@ -91,18 +104,6 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                         return args[1]
         raise TypeError(f"{cls.__name__} must specify Generic parameters: CoreTool[InputModel, OutputModel]")
 
-    @abstractmethod
-    def execute(self, inputs: TInput) -> TOutput:
-        """
-        Execute the tool with validated Pydantic inputs.
-
-        Args:
-            inputs: Validated input model instance (type matches TInput from Generic parameters)
-
-        Returns:
-            ToolOutputModel instance (type matches TOutput from Generic parameters)
-        """
-        ...
 
     @classmethod
     def get_input_schema(cls) -> dict:
