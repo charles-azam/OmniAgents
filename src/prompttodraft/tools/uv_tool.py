@@ -5,14 +5,20 @@ This tool executes uv commands in the execution environment, ensuring uv is inst
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )
 
 
-class UVTool(CoreTool):
+class UVInput(BaseModel):
+    """Input model for UVTool."""
+    command: str = Field(description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.")
+    description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
+
+
+class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
     """
     Framework-agnostic UV command execution tool.
 
@@ -24,11 +30,7 @@ class UVTool(CoreTool):
     name = "uv"
     description = "Executes uv package manager commands in the execution environment. Automatically ensures uv is installed before running commands. Use this to: run Python files (uv run script.py), install packages (uv add package-name), remove packages (uv remove package-name), sync dependencies (uv sync), run pytest (uv run pytest), or any other uv command. Returns detailed information about the execution including stdout, stderr, and exit code."
 
-    class InputModel(BaseModel):
-        command: str = Field(description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.")
-        description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
-
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: UVInput) -> TextOutputModel:
         """
         Execute the uv tool.
 

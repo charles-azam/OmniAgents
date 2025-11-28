@@ -5,7 +5,7 @@ This tool searches for a regular expression pattern within file contents.
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
@@ -13,7 +13,14 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class SearchFileContentTool(CoreTool):
+class SearchFileContentInput(BaseModel):
+    """Input model for SearchFileContentTool."""
+    pattern: str = Field(description="The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').")
+    path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. Defaults to the current working directory.")
+    include: str | None = Field(default=None, description="Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.")
+
+
+class SearchFileContentTool(CoreBackendTool[SearchFileContentInput, ToolOutputModel]):
     """
     Framework-agnostic file content search tool (grep functionality).
 
@@ -24,12 +31,7 @@ class SearchFileContentTool(CoreTool):
     name = "search_file_content"
     description = "Searches for a regular expression pattern within the content of files in a specified directory. Uses git grep if available in a Git repository for speed; otherwise, falls back to system grep. Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers."
 
-    class InputModel(BaseModel):
-        pattern: str = Field(description="The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').")
-        path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. Defaults to the current working directory.")
-        include: str | None = Field(default=None, description="Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.")
-
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: SearchFileContentInput) -> ToolOutputModel:
         """
         Execute the search_file_content tool.
 

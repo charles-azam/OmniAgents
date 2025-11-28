@@ -5,7 +5,7 @@ This tool replaces text within a file with precise, targeted changes.
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
@@ -14,7 +14,15 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class ReplaceTool(CoreTool):
+class ReplaceInput(BaseModel):
+    """Input model for ReplaceTool."""
+    file_path: str = Field(description="The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Relative paths are not supported.")
+    old_string: str = Field(description="The exact literal text to replace. This string must uniquely identify the single instance to change. It should include at least 3 lines of context before and after the target text, matching whitespace and indentation precisely. If old_string is empty, the tool attempts to create a new file at file_path with new_string as content.")
+    new_string: str = Field(description="The exact literal text to replace old_string with.")
+    expected_replacements: int = Field(default=1, description="Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.")
+
+
+class ReplaceTool(CoreBackendTool[ReplaceInput, ToolOutputModel]):
     """
     Framework-agnostic text replacement tool (edit functionality).
 
@@ -25,13 +33,7 @@ class ReplaceTool(CoreTool):
     name = "replace"
     description = "Replaces text within a file. By default, replaces a single occurrence, but can replace multiple occurrences when expected_replacements is specified. This tool is designed for precise, targeted changes and requires significant context around the old_string to ensure it modifies the correct location. CRITICAL: Include at least 3 lines of context before and after the target text, matching whitespace and indentation precisely."
 
-    class InputModel(BaseModel):
-        file_path: str = Field(description="The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Relative paths are not supported.")
-        old_string: str = Field(description="The exact literal text to replace. This string must uniquely identify the single instance to change. It should include at least 3 lines of context before and after the target text, matching whitespace and indentation precisely. If old_string is empty, the tool attempts to create a new file at file_path with new_string as content.")
-        new_string: str = Field(description="The exact literal text to replace old_string with.")
-        expected_replacements: int = Field(default=1, description="Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.")
-
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: ReplaceInput) -> ToolOutputModel:
         """
         Execute the replace tool.
 

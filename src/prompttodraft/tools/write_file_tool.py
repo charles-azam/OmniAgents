@@ -5,7 +5,7 @@ This tool writes content to a specified file, creating it if it doesn't exist.
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
@@ -13,7 +13,13 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class WriteFileTool(CoreTool):
+class WriteFileInput(BaseModel):
+    """Input model for WriteFileTool."""
+    file_path: str = Field(description="The absolute path to the file to write to")
+    content: str = Field(description="The content to write into the file")
+
+
+class WriteFileTool(CoreBackendTool[WriteFileInput, TextOutputModel]):
     """
     Framework-agnostic file writing tool.
 
@@ -24,11 +30,7 @@ class WriteFileTool(CoreTool):
     name = "write_file"
     description = "Writes content to a specified file. If the file exists, it will be overwritten. If the file doesn't exist, it (and any necessary parent directories) will be created."
 
-    class InputModel(BaseModel):
-        file_path: str = Field(description="The absolute path to the file to write to")
-        content: str = Field(description="The content to write into the file")
-
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: WriteFileInput) -> TextOutputModel:
         """
         Execute the write_file tool.
 

@@ -6,14 +6,19 @@ This tool saves and recalls information across sessions by appending to a memory
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )
 
 
-class SaveMemoryTool(CoreTool):
+class SaveMemoryInput(BaseModel):
+    """Input model for SaveMemoryTool."""
+    fact: str = Field(description="The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').")
+
+
+class SaveMemoryTool(CoreBackendTool[SaveMemoryInput, TextOutputModel]):
     """
     Framework-agnostic memory persistence tool.
 
@@ -23,9 +28,6 @@ class SaveMemoryTool(CoreTool):
 
     name = "save_memory"
     description = "Saves and recalls information across sessions. Use this to direct the assistant to remember key details, enabling personalized and context-aware assistance in subsequent sessions. The tool appends the provided fact to a special memory file (GEMINI.md) located in the user's home directory (~/.gemini/). Once added, the facts are stored under a '## Gemini Added Memories' section and loaded as context in future sessions."
-
-    class InputModel(BaseModel):
-        fact: str = Field(description="The specific fact or piece of information to remember. This should be a clear, self-contained statement written in natural language (e.g., 'My preferred programming language is Python.' or 'The project I'm currently working on is called gemini-cli.').")
 
     # Default memory file location (in user's home directory)
     MEMORY_FILE_DIR = ".gemini"
@@ -59,7 +61,7 @@ class SaveMemoryTool(CoreTool):
         home_dir = home_result.output.strip()
         return str(Path(home_dir) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: SaveMemoryInput) -> TextOutputModel:
         """
         Execute the save_memory tool.
 

@@ -6,7 +6,7 @@ This tool lists the names of files and subdirectories within a specified directo
 from fnmatch import fnmatch
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     FileInfo,
@@ -16,7 +16,14 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class ListDirectoryTool(CoreTool):
+class ListDirectoryInput(BaseModel):
+    """Input model for ListDirectoryTool."""
+    path: str = Field(description="The absolute path to the directory to list (must be absolute, not relative).")
+    ignore: list[str] | None = Field(default=None, description="Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).")
+    respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.")
+
+
+class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
     """
     Framework-agnostic directory listing tool.
 
@@ -26,11 +33,6 @@ class ListDirectoryTool(CoreTool):
 
     name = "list_directory"
     description = "Lists the names of files and subdirectories directly within a specified directory path. Can optionally ignore entries matching provided glob patterns. Returns entries sorted with directories first, then alphabetically."
-
-    class InputModel(BaseModel):
-        path: str = Field(description="The absolute path to the directory to list (must be absolute, not relative).")
-        ignore: list[str] | None = Field(default=None, description="Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).")
-        respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.")
 
     def _is_git_repository(self) -> bool:
         """
@@ -69,7 +71,7 @@ class ListDirectoryTool(CoreTool):
         except Exception:
             return False
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: ListDirectoryInput) -> ToolOutputModel:
         """
         Execute the list_directory tool.
 

@@ -232,7 +232,7 @@ class SmolagentsToolAdapter:
         """
         self._tool_class = tool_class
         self._core_tool = tool_class(backend=backend)
-        self._input_model = tool_class.InputModel
+        self._input_model = tool_class.get_input_model()
 
         # Set smolagents required attributes
         self.name = tool_class.name
@@ -240,7 +240,7 @@ class SmolagentsToolAdapter:
         self.output_type = "string"
 
         # Build inputs from schema
-        schema = tool_class.get_json_schema()
+        schema = tool_class.get_input_schema()
         self.inputs = _build_smolagents_inputs(schema=schema)
 
         self.is_initialized = True
@@ -393,7 +393,7 @@ class LangChainToolAdapter:
         """
         self._tool_class = tool_class
         self._core_tool = tool_class(backend=backend)
-        self._input_model = tool_class.InputModel
+        self._input_model = tool_class.get_input_model()
         self.name = tool_class.name
         self.description = tool_class.description
 
@@ -519,7 +519,7 @@ class PydanticAIToolAdapter:
             backend_attr: Attribute name on deps that holds the backend.
         """
         self._tool_class = tool_class
-        self._input_model = tool_class.InputModel
+        self._input_model = tool_class.get_input_model()
         self._backend_attr = backend_attr
         self.name = tool_class.name
         self.description = tool_class.description

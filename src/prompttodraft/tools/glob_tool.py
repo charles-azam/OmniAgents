@@ -6,7 +6,7 @@ This tool finds files matching specific glob patterns.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
@@ -14,7 +14,15 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class GlobTool(CoreTool):
+class GlobInput(BaseModel):
+    """Input model for GlobTool."""
+    pattern: str = Field(description="The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').")
+    path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. If omitted, searches the root directory.")
+    case_sensitive: bool = Field(default=False, description="Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).")
+    respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.")
+
+
+class GlobTool(CoreBackendTool[GlobInput, ToolOutputModel]):
     """
     Framework-agnostic glob file finding tool.
 
@@ -24,12 +32,6 @@ class GlobTool(CoreTool):
 
     name = "glob"
     description = "Efficiently finds files matching specific glob patterns (e.g., '**/*.py', 'docs/*.md'), returning absolute paths sorted by modification time (newest first). Ideal for quickly locating files based on their name or path structure, especially in large codebases."
-
-    class InputModel(BaseModel):
-        pattern: str = Field(description="The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').")
-        path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. If omitted, searches the root directory.")
-        case_sensitive: bool = Field(default=False, description="Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).")
-        respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.")
 
     def _is_git_repository(self, search_path: str) -> bool:
         """
@@ -100,7 +102,7 @@ class GlobTool(CoreTool):
         # For now, we'll just return all files since glob already matched them
         return file_paths
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: GlobInput) -> ToolOutputModel:
         """
         Execute the glob tool.
 

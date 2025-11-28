@@ -6,14 +6,21 @@ This tool executes shell commands in the execution environment.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )
 
 
-class RunShellCommandTool(CoreTool):
+class RunShellCommandInput(BaseModel):
+    """Input model for RunShellCommandTool."""
+    command: str = Field(description="The exact shell command to execute.")
+    description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
+    directory: str | None = Field(default=None, description="Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.")
+
+
+class RunShellCommandTool(CoreBackendTool[RunShellCommandInput, TextOutputModel]):
     """
     Framework-agnostic shell command execution tool.
 
@@ -24,12 +31,7 @@ class RunShellCommandTool(CoreTool):
     name = "run_shell_command"
     description = "Executes a shell command in the execution environment. Use this to interact with the underlying system, run scripts, or perform command-line operations. Returns detailed information about the execution including stdout, stderr, exit code, and any errors. Commands are executed with bash -c on Unix-like systems."
 
-    class InputModel(BaseModel):
-        command: str = Field(description="The exact shell command to execute.")
-        description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
-        directory: str | None = Field(default=None, description="Optional: The directory (relative to the project root) in which to execute the command. If not provided, the command runs in the project root.")
-
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: RunShellCommandInput) -> TextOutputModel:
         """
         Execute the run_shell_command tool.
 

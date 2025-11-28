@@ -7,7 +7,7 @@ Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
@@ -17,7 +17,14 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class ReadFileTool(CoreTool):
+class ReadFileInput(BaseModel):
+    """Input model for ReadFileTool."""
+    path: str = Field(description="The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.")
+    offset: int | None = Field(default=None, description="Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.")
+    limit: int | None = Field(default=None, description="Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).")
+
+
+class ReadFileTool(CoreBackendTool[ReadFileInput, ToolOutputModel]):
     """
     Framework-agnostic file reading tool.
 
@@ -32,11 +39,6 @@ class ReadFileTool(CoreTool):
 
     name = "read_file"
     description = "Reads and returns the content of a specified file. If the file is large, the content will be truncated. The tool's response will clearly indicate if truncation has occurred. Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files. For text files, can read specific line ranges using offset and limit."
-
-    class InputModel(BaseModel):
-        path: str = Field(description="The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.")
-        offset: int | None = Field(default=None, description="Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.")
-        limit: int | None = Field(default=None, description="Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).")
 
     def _get_mime_type(self, file_path: str) -> str:
         """
@@ -86,7 +88,7 @@ class ReadFileTool(CoreTool):
         """
         return "\x00" in content[:8192]  # Check first 8KB
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: ReadFileInput) -> ToolOutputModel:
         """
         Execute the read_file tool.
 

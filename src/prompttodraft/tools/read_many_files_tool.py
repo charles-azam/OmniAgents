@@ -6,7 +6,7 @@ This tool reads content from multiple files specified by paths or glob patterns.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import FileType
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
@@ -14,7 +14,17 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class ReadManyFilesTool(CoreTool):
+class ReadManyFilesInput(BaseModel):
+    """Input model for ReadManyFilesTool."""
+    paths: list[str] = Field(description="An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png']). Note: A directory path such as '/docs' will return an empty result; use a pattern such as '/docs/*' or '/docs/*.md'.")
+    exclude: list[str] | None = Field(default=None, description="Optional: Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.")
+    include: list[str] | None = Field(default=None, description="Optional: Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files if they were broadly excluded, or ['images/*.jpg'] to include specific image types).")
+    recursive: bool = Field(default=True, description="Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.")
+    useDefaultExcludes: bool = Field(default=True, description="Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.")
+    respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.")
+
+
+class ReadManyFilesTool(CoreBackendTool[ReadManyFilesInput, TextOutputModel]):
     """
     Framework-agnostic multi-file reading tool.
 
@@ -42,14 +52,6 @@ class ReadManyFilesTool(CoreTool):
 
     name = "read_many_files"
     description = "Reads content from multiple files specified by paths or glob patterns. The behavior depends on the provided files: for text files, concatenates their content into a single string; for image (PNG, JPEG), PDF, audio (MP3, WAV), and video (MP4, MOV) files, reads and returns them as base64-encoded data if explicitly requested by name or extension. Can be used to get an overview of a codebase, find where specific functionality is implemented, review documentation, or gather context from multiple configuration files."
-
-    class InputModel(BaseModel):
-        paths: list[str] = Field(description="An array of glob patterns or paths relative to the tool's target directory (e.g., ['src/**/*.ts'], ['README.md', 'docs/*', 'assets/logo.png']). Note: A directory path such as '/docs' will return an empty result; use a pattern such as '/docs/*' or '/docs/*.md'.")
-        exclude: list[str] | None = Field(default=None, description="Optional: Glob patterns for files/directories to exclude (e.g., ['**/*.log', 'temp/']). These are added to default excludes if useDefaultExcludes is true.")
-        include: list[str] | None = Field(default=None, description="Optional: Additional glob patterns to include. These are merged with paths (e.g., ['*.test.ts'] to specifically add test files if they were broadly excluded, or ['images/*.jpg'] to include specific image types).")
-        recursive: bool = Field(default=True, description="Optional: Whether to search recursively. This is primarily controlled by ** in glob patterns. Defaults to true.")
-        useDefaultExcludes: bool = Field(default=True, description="Optional: Whether to apply a list of default exclusion patterns (e.g., node_modules, .git, non-image/PDF binary files). Defaults to true.")
-        respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Defaults to true.")
 
     def _is_media_file(self, file_path: str) -> bool:
         """
@@ -131,7 +133,7 @@ class ReadManyFilesTool(CoreTool):
                 return True
         return False
 
-    def execute(self, inputs: InputModel) -> ToolOutputModel:
+    def execute(self, inputs: ReadManyFilesInput) -> TextOutputModel:
         """
         Execute the read_many_files tool.
 
