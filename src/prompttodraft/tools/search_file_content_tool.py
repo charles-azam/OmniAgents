@@ -3,11 +3,9 @@ Search file content tool implementation.
 
 This tool searches for a regular expression pattern within file contents.
 """
-from pathlib import Path
+from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
@@ -15,7 +13,14 @@ from prompttodraft.outputs.outputs import (
 )
 
 
-class SearchFileContentTool(CoreTool):
+class SearchFileContentInput(BaseModel):
+    """Input model for SearchFileContentTool."""
+    pattern: str = Field(description="The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').")
+    path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. Defaults to the current working directory.")
+    include: str | None = Field(default=None, description="Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.")
+
+
+class SearchFileContentTool(CoreBackendTool[SearchFileContentInput, ToolOutputModel]):
     """
     Framework-agnostic file content search tool (grep functionality).
 
@@ -23,47 +28,20 @@ class SearchFileContentTool(CoreTool):
     in a specified directory. Can filter files by a glob pattern.
     """
 
-    metadata = ToolMetadata(
-        name="search_file_content",
-        description="Searches for a regular expression pattern within the content of files in a specified directory. Uses git grep if available in a Git repository for speed; otherwise, falls back to system grep. Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers.",
-        inputs={
-            "pattern": {
-                "type": "string",
-                "description": "The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').",
-                "nullable": False,
-            },
-            "path": {
-                "type": "string",
-                "description": "Optional: The absolute path to the directory to search within. Defaults to the current working directory.",
-                "nullable": True,
-            },
-            "include": {
-                "type": "string",
-                "description": "Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.",
-                "nullable": True,
-            },
-        },
-        output_type="string",
-    )
+    name = "search_file_content"
+    description = "Searches for a regular expression pattern within the content of files in a specified directory. Uses git grep if available in a Git repository for speed; otherwise, falls back to system grep. Can filter files by a glob pattern. Returns the lines containing matches, along with their file paths and line numbers."
 
-    def execute(
-        self,
-        pattern: str,
-        path: str | None = None,
-        include: str | None = None,
-    ) -> ToolOutputModel:
+    def execute(self, inputs: SearchFileContentInput) -> ToolOutputModel:
         """
         Execute the search_file_content tool.
 
         Args:
-            pattern: The regular expression to search for
-            path: Optional directory to search within
-            include: Optional glob pattern to filter files
+            inputs: Validated input model with pattern, path, and include
 
         Returns:
             TextOutputModel with search results or ErrorOutputModel on failure
         """
-        search_path = path if path else self.backend.get_working_directory()
+        search_path = inputs.path if inputs.path else self.backend.get_working_directory()
 
         # Build grep command
         # Try git grep first if in a git repo, otherwise use regular grep
@@ -77,16 +55,16 @@ class SearchFileContentTool(CoreTool):
 
         if git_check.exit_code == 0:
             # Use git grep
-            grep_cmd_parts.append(f'cd "{search_path}" && git grep -n "{pattern}"')
-            if include:
+            grep_cmd_parts.append(f'cd "{search_path}" && git grep -n "{inputs.pattern}"')
+            if inputs.include:
                 # Add file pattern as pathspec (git grep uses pathspec, not --glob)
-                grep_cmd_parts.append(f'-- "{include}"')
+                grep_cmd_parts.append(f'-- "{inputs.include}"')
         else:
             # Use regular grep
-            grep_cmd_parts.append(f'grep -rn "{pattern}" "{search_path}"')
-            if include:
+            grep_cmd_parts.append(f'grep -rn "{inputs.pattern}" "{search_path}"')
+            if inputs.include:
                 # Add file pattern using --include
-                grep_cmd_parts.append(f'--include="{include}"')
+                grep_cmd_parts.append(f'--include="{inputs.include}"')
 
         grep_cmd = " ".join(grep_cmd_parts)
 
@@ -105,8 +83,8 @@ class SearchFileContentTool(CoreTool):
 
         if not result.output or result.exit_code == 1:
             return TextOutputModel(
-                content=f'Found 0 matches for pattern "{pattern}" in path "{search_path}"'
-                + (f' (filter: "{include}")' if include else ""),
+                content=f'Found 0 matches for pattern "{inputs.pattern}" in path "{search_path}"'
+                + (f' (filter: "{inputs.include}")' if inputs.include else ""),
             )
 
         # Parse grep output and format it
@@ -129,8 +107,8 @@ class SearchFileContentTool(CoreTool):
         # Format output
         total_matches = sum(len(matches) for matches in matches_by_file.values())
         output_lines = [
-            f'Found {total_matches} matches for pattern "{pattern}" in path "{search_path}"'
-            + (f' (filter: "{include}")' if include else "") + ":",
+            f'Found {total_matches} matches for pattern "{inputs.pattern}" in path "{search_path}"'
+            + (f' (filter: "{inputs.include}")' if inputs.include else "") + ":",
         ]
 
         for file_path, matches in matches_by_file.items():
