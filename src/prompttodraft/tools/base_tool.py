@@ -8,12 +8,15 @@ Tools use Pydantic models for automatic validation and schema generation.
 - CoreBackendTool: Base class for tools that need filesystem/command access
 """
 from abc import ABC, abstractmethod
-from typing import ClassVar, TypeVar, Generic, get_args, get_origin
+from typing import ClassVar, TypeVar, Generic, get_args, get_origin, Any
 
 from pydantic import BaseModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import ToolOutputModel
+from smolagents import Tool as SmolagentsTool
+from langchain_core.tools import Tool as LangChainTool
+from pydantic_ai import Tool as PydanticAITool
 
 
 TInput = TypeVar('TInput', bound=BaseModel)
@@ -51,17 +54,13 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
 
     @abstractmethod
     def execute(self, inputs: TInput) -> TOutput:
-        """
-        Execute the tool with validated Pydantic inputs.
-
-        Args:
-            inputs: Validated input model instance (type matches TInput from Generic parameters)
-
-        Returns:
-            ToolOutputModel instance (type matches TOutput from Generic parameters)
-        """
         ...
 
+    def execute_unpacked(self, **kwargs: Any) -> TOutput:
+        input_model = self.get_input_model()
+        pydantic_inputs = input_model.model_validate(kwargs)
+        return self.execute(inputs=pydantic_inputs)
+    
     @classmethod
     def get_input_model(cls) -> type[BaseModel]:
         """
@@ -139,6 +138,48 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
             "input_schema": cls.get_input_schema(),
             "output_schema": cls.get_output_schema(),
         }
+        
+    def to_smolagents_tool(main_class_self, use_string_outputs: bool = True) -> type[SmolagentsTool]:
+        """
+        Convert the tool to a smolagents Tool.
+
+        Returns:
+            A smolagents Tool instance.
+        """
+        
+        class CustomSmolagentsTool(SmolagentsTool):
+            name = main_class_self.name
+            description = main_class_self.description
+            inputs = main_class_self.get_input_schema()
+            outputs = "string" if use_string_outputs else main_class_self.get_output_schema()
+            
+            def forward(self2, **kwargs: Any) -> str:
+                return main_class_self.execute_unpacked(**kwargs)
+            
+        return CustomSmolagentsTool
+        
+    def to_langchain_tool(self) -> LangChainTool:
+        """
+        Convert the tool to a LangChain tool.
+
+        Returns:
+            A LangChain tool instance.
+        """
+        return LangChainTool(
+            name=self.name,
+            description=self.description,
+            inputs=self.get_input_schema(),
+            outputs=self.get_output_schema(),
+        )
+    def to_pydantic_ai_tool(self) -> PydanticAITool:
+        """
+        Convert the tool to a Pydantic-AI tool.
+
+        Returns:
+            A Pydantic-AI tool instance.
+        """
+        return PydanticAITool(
+            name=self.name,)
 
 
 class CoreBackendTool(CoreTool[TInput, TOutput]):
@@ -160,3 +201,11 @@ class CoreBackendTool(CoreTool[TInput, TOutput]):
             backend: The execution backend to use (local, docker, e2b)
         """
         self.backend = backend
+
+    def to_smolagents_tool(self, use_string_outputs: bool = True) -> type[SmolagentsTool]:
+        CustomSmolagentsTool = super().to_smolagents_tool(use_string_outputs)
+        class BackendCustomSmolagentsTool(CustomSmolagentsTool):
+            def __init__(self, backend: ExecutionBackend):
+                self.backend = backend
+            
+        return BackendCustomSmolagentsTool

@@ -83,42 +83,42 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
     save_memory_core = SaveMemoryTool(backend=backend)
     uv_core = UVTool(backend=backend)
 
-    @tool(description=write_file_core.metadata.description)
+    @tool(description=write_file_core.description)
     def write_file(file_path: str, content: str) -> str:
-        result = write_file_core.execute(file_path=file_path, content=content)
+        result = write_file_core.execute_unpacked(file_path=file_path, content=content)
         return str(result)
 
-    @tool(description=read_file_core.metadata.description)
+    @tool(description=read_file_core.description)
     def read_file(path: str, offset: int | None = None, limit: int | None = None) -> str:
-        result = read_file_core.execute(path=path, offset=offset, limit=limit)
+        result = read_file_core.execute_unpacked(path=path, offset=offset, limit=limit)
         return str(result)
 
-    @tool(description=list_directory_core.metadata.description)
+    @tool(description=list_directory_core.description)
     def list_directory(path: str, ignore: list[str] | None = None, respect_git_ignore: bool = True) -> str:
-        result = list_directory_core.execute(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
+        result = list_directory_core.execute_unpacked(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
         return str(result)
 
-    @tool(description=glob_core.metadata.description)
+    @tool(description=glob_core.description)
     def glob(pattern: str, path: str | None = None, case_sensitive: bool = False, respect_git_ignore: bool = True) -> str:
-        result = glob_core.execute(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
+        result = glob_core.execute_unpacked(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
         return str(result)
 
-    @tool(description=search_file_content_core.metadata.description)
+    @tool(description=search_file_content_core.description)
     def search_file_content(pattern: str, path: str | None = None, include: str | None = None) -> str:
-        result = search_file_content_core.execute(pattern=pattern, path=path, include=include)
+        result = search_file_content_core.execute_unpacked(pattern=pattern, path=path, include=include)
         return str(result)
 
-    @tool(description=replace_core.metadata.description)
+    @tool(description=replace_core.description)
     def replace(file_path: str, old_string: str, new_string: str, expected_replacements: int = 1) -> str:
-        result = replace_core.execute(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
+        result = replace_core.execute_unpacked(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
         return str(result)
 
-    @tool(description=run_shell_command_core.metadata.description)
+    @tool(description=run_shell_command_core.description)
     def run_shell_command(command: str, description: str | None = None, directory: str | None = None) -> str:
-        result = run_shell_command_core.execute(command=command, description=description, directory=directory)
+        result = run_shell_command_core.execute_unpacked(command=command, description=description, directory=directory)
         return str(result)
 
-    @tool(description=read_many_files_core.metadata.description)
+    @tool(description=read_many_files_core.description)
     def read_many_files(
         paths: list[str],
         exclude: list[str] | None = None,
@@ -127,7 +127,7 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
         useDefaultExcludes: bool = True,
         respect_git_ignore: bool = True,
     ) -> str:
-        result = read_many_files_core.execute(
+        result = read_many_files_core.execute_unpacked(
             paths=paths,
             exclude=exclude,
             include=include,
@@ -137,14 +137,14 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
         )
         return str(result)
 
-    @tool(description=save_memory_core.metadata.description)
+    @tool(description=save_memory_core.description)
     def save_memory(fact: str) -> str:
-        result = save_memory_core.execute(fact=fact)
+        result = save_memory_core.execute_unpacked(fact=fact)
         return str(result)
 
-    @tool(description=uv_core.metadata.description)
+    @tool(description=uv_core.description)
     def uv(command: str, description: str | None = None) -> str:
-        result = uv_core.execute(command=command, description=description)
+        result = uv_core.execute_unpacked(command=command, description=description)
         return str(result)
 
     return [

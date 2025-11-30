@@ -76,7 +76,8 @@ def test_tool_execution_with_correct_types():
         # Execute with proper input
         inputs = FakeInput(message="Hello", count=3)
         result = tool.execute(inputs=inputs)
-
+        result2 = tool.execute_unpacked(message="Hello", count=3)
+        assert result.content == result2.content
         # Check result type and content
         assert isinstance(result, TextOutputModel)
         assert result.content == "HelloHelloHello"
