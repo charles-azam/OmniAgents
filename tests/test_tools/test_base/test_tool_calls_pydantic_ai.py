@@ -4,6 +4,9 @@ import os
 import random
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, Tool as PydanticAITool
+from pydantic_ai.models.huggingface import HuggingFaceModel
+from pydantic_ai.providers.huggingface import HuggingFaceProvider
+
 
 from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
@@ -282,20 +285,20 @@ def test_pydantic_ai_agent_with_llm():
 
     # Create agent with gpt-4o-mini model
     agent = Agent(
-        model="openai:gpt-5-mini",
+        model=HuggingFaceModel(model_name="openai/gpt-oss-120b", provider=HuggingFaceProvider(api_key=os.environ["HF_TOKEN"], provider_name='groq')),
         tools=[calculator_tool, greeter_tool],
         system_prompt="You are a helpful assistant. Use the provided tools to answer questions."
     )
 
     # Test 1: Math task
-    result = agent.run_sync(user_prompt="What is 15 multiplied by 3?")
-    assert "45" in str(result.data) or "45.0" in str(result.data), f"Expected result to contain 45, got: {result.data}"
+    result = agent.run_sync(user_prompt="What is 15 multiplied by 3? you must use the calculator tool to answer the question")
+    assert "45" in str(result.output) or "45.0" in str(result.output), f"Expected result to contain 45, got: {result.output}"
     assert metadata["CalculatorOutput"] == 1
     assert metadata["GreeterOutput"] == 0
 
     # Test 2: Greeting task
     result = agent.run_sync(user_prompt="Greet Alice in Spanish")
-    assert "Hola" in str(result.data) and "Alice" in str(result.data), f"Expected Spanish greeting for Alice, got: {result.data}"
+    assert "Hola" in str(result.output) and "Alice" in str(result.output), f"Expected Spanish greeting for Alice, got: {result.output}"
     assert metadata["CalculatorOutput"] == 1
     assert metadata["GreeterOutput"] == 1
 
