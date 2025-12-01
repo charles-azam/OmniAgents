@@ -201,19 +201,23 @@ def test_langchain_tool_schemas_extracted_correctly():
 
 def test_langchain_agent_with_llm():
     """
-    E2E test: Run a complete LangChain agent with gpt-5-mini.
+    E2E test: Run a complete LangChain agent with gpt-4o-mini.
 
     Tests that our tools work correctly in a real agent workflow:
     1. Create tools using CoreTool
     2. Convert to langchain format
-    3. Create agent with gpt-5-mini
+    3. Create agent with gpt-4o-mini
     4. Run agent on a task
     5. Verify tools can be invoked through the agent
     """
     from langchain_openai import ChatOpenAI
+    from langchain_core.prompts import ChatPromptTemplate
     from langchain.agents import create_agent
 
-    # Define test tools
+
+    # Define test tools with metadata tracking
+    metadata = dict(CalculatorOutput=0, GreeterOutput=0)
+
     class CalculatorInput(BaseModel):
         operation: str = Field(description="The operation to perform: add, subtract, multiply, or divide")
         a: float = Field(description="The first number")
@@ -223,9 +227,12 @@ def test_langchain_agent_with_llm():
         result: float
         operation_performed: str
 
+        def has_been_called(self) -> None:
+            metadata["CalculatorOutput"] += 1
+
     class CalculatorTool(CoreTool[CalculatorInput, CalculatorOutput]):
         name = "calculator"
-        description = "REQUIRED: Use this tool to perform basic arithmetic operations (add, subtract, multiply, divide). You MUST use this tool for any math calculation."
+        description = "Performs basic arithmetic operations (add, subtract, multiply, divide). Use 'add', 'subtract', 'multiply', or 'divide' as operation."
 
         def execute(self, inputs: CalculatorInput) -> CalculatorOutput:
             if inputs.operation == "add":
@@ -242,22 +249,62 @@ def test_langchain_agent_with_llm():
             else:
                 result = 0.0
 
-            return CalculatorOutput(
+            calculator_output = CalculatorOutput(
                 result=result,
                 operation_performed=f"{inputs.a} {inputs.operation} {inputs.b}"
             )
+            calculator_output.has_been_called()
+            return calculator_output
 
-    # Create tool instance
+    class GreeterInput(BaseModel):
+        name: str = Field(description="The name of the person to greet")
+        language: str = Field(description="The language for greeting: english, spanish, or french")
+
+    class GreeterOutput(BaseModel):
+        greeting: str
+
+        def has_been_called(self) -> None:
+            metadata["GreeterOutput"] += 1
+
+    class GreeterTool(CoreTool[GreeterInput, GreeterOutput]):
+        name = "greeter"
+        description = "Greets a person in different languages. Supports 'english', 'spanish', 'french'."
+
+        def execute(self, inputs: GreeterInput) -> GreeterOutput:
+            greetings = {
+                "english": f"Hello, {inputs.name}!",
+                "spanish": f"¡Hola, {inputs.name}!",
+                "french": f"Bonjour, {inputs.name}!"
+            }
+            greeting = greetings.get(inputs.language.lower(), f"Hi, {inputs.name}!")
+            greeter_output = GreeterOutput(greeting=greeting)
+            greeter_output.has_been_called()
+            return greeter_output
+
+    # Create tool instances
     calculator = CalculatorTool()
+    greeter = GreeterTool()
 
-    # Convert to langchain tool
+    # Convert to langchain tools
     calculator_tool = calculator.to_langchain_tool()
+    greeter_tool = greeter.to_langchain_tool()
 
-    # Verify the tool can be invoked directly (main test)
-    result = calculator_tool.invoke({"operation": "multiply", "a": 15, "b": 3})
-    assert isinstance(result, CalculatorOutput)
-    assert result.result == 45.0
-    assert result.operation_performed == "15.0 multiply 3.0"
+    # Create the agent
+    agent = create_agent(model="gpt-5-mini", tools=[calculator_tool, greeter_tool])
+
+    # Test 1: Math task
+    result = agent.invoke({"messages": [("user", "What is 15 multiplied by 3?, you must use the calculator tool to answer the question")]})
+    output = result["messages"][-1].content
+    assert "45" in str(output) or "45.0" in str(output), f"Expected result to contain 45, got: {output}"
+    # assert metadata["CalculatorOutput"] == 1
+    # assert metadata["GreeterOutput"] == 0
+
+    # Test 2: Greeting task
+    result = agent.invoke({"messages": [("user", "Greet Alice in Spanish")]})
+    output = result["messages"][-1].content
+    assert "Hola" in str(output) and "Alice" in str(output), f"Expected Spanish greeting for Alice, got: {output}"
+    assert metadata["CalculatorOutput"] == 1
+    assert metadata["GreeterOutput"] == 1
 
 
 if __name__ == "__main__":

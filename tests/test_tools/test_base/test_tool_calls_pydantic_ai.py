@@ -196,15 +196,19 @@ def test_pydantic_ai_tool_schemas_extracted_correctly():
 
 def test_pydantic_ai_agent_with_llm():
     """
-    E2E test: Test Pydantic AI tool conversion and invocation.
+    E2E test: Run a complete Pydantic AI agent with gpt-4o-mini.
 
-    Tests that our tools work correctly:
+    Tests that our tools work correctly in a real agent workflow:
     1. Create tools using CoreTool
     2. Convert to pydantic_ai format
-    3. Verify tools can be invoked
+    3. Create agent with gpt-4o-mini
+    4. Run agent on a task
+    5. Verify tools can be invoked through the agent
     """
 
-    # Define test tool
+    # Define test tools with metadata tracking
+    metadata = dict(CalculatorOutput=0, GreeterOutput=0)
+
     class CalculatorInput(BaseModel):
         operation: str = Field(description="The operation to perform: add, subtract, multiply, or divide")
         a: float = Field(description="The first number")
@@ -213,6 +217,9 @@ def test_pydantic_ai_agent_with_llm():
     class CalculatorOutput(BaseModel):
         result: float
         operation_performed: str
+
+        def has_been_called(self) -> None:
+            metadata["CalculatorOutput"] += 1
 
     class CalculatorTool(CoreTool[CalculatorInput, CalculatorOutput]):
         name = "calculator"
@@ -233,22 +240,64 @@ def test_pydantic_ai_agent_with_llm():
             else:
                 result = 0.0
 
-            return CalculatorOutput(
+            calculator_output = CalculatorOutput(
                 result=result,
                 operation_performed=f"{inputs.a} {inputs.operation} {inputs.b}"
             )
+            calculator_output.has_been_called()
+            return calculator_output
 
-    # Create tool instance
+    class GreeterInput(BaseModel):
+        name: str = Field(description="The name of the person to greet")
+        language: str = Field(description="The language for greeting: english, spanish, or french")
+
+    class GreeterOutput(BaseModel):
+        greeting: str
+
+        def has_been_called(self) -> None:
+            metadata["GreeterOutput"] += 1
+
+    class GreeterTool(CoreTool[GreeterInput, GreeterOutput]):
+        name = "greeter"
+        description = "Greets a person in different languages. Supports 'english', 'spanish', 'french'."
+
+        def execute(self, inputs: GreeterInput) -> GreeterOutput:
+            greetings = {
+                "english": f"Hello, {inputs.name}!",
+                "spanish": f"¡Hola, {inputs.name}!",
+                "french": f"Bonjour, {inputs.name}!"
+            }
+            greeting = greetings.get(inputs.language.lower(), f"Hi, {inputs.name}!")
+            greeter_output = GreeterOutput(greeting=greeting)
+            greeter_output.has_been_called()
+            return greeter_output
+
+    # Create tool instances
     calculator = CalculatorTool()
+    greeter = GreeterTool()
 
-    # Convert to pydantic_ai tool
+    # Convert to pydantic_ai tools
     calculator_tool = calculator.to_pydantic_ai_tool()
+    greeter_tool = greeter.to_pydantic_ai_tool()
 
-    # Verify the tool can be invoked directly (main test)
-    result = calculator_tool.function(operation="multiply", a=15, b=3)
-    assert isinstance(result, CalculatorOutput)
-    assert result.result == 45.0
-    assert result.operation_performed == "15.0 multiply 3.0"
+    # Create agent with gpt-4o-mini model
+    agent = Agent(
+        model="openai:gpt-5-mini",
+        tools=[calculator_tool, greeter_tool],
+        system_prompt="You are a helpful assistant. Use the provided tools to answer questions."
+    )
+
+    # Test 1: Math task
+    result = agent.run_sync(user_prompt="What is 15 multiplied by 3?")
+    assert "45" in str(result.data) or "45.0" in str(result.data), f"Expected result to contain 45, got: {result.data}"
+    assert metadata["CalculatorOutput"] == 1
+    assert metadata["GreeterOutput"] == 0
+
+    # Test 2: Greeting task
+    result = agent.run_sync(user_prompt="Greet Alice in Spanish")
+    assert "Hola" in str(result.data) and "Alice" in str(result.data), f"Expected Spanish greeting for Alice, got: {result.data}"
+    assert metadata["CalculatorOutput"] == 1
+    assert metadata["GreeterOutput"] == 1
 
 
 if __name__ == "__main__":
