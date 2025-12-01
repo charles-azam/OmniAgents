@@ -190,16 +190,17 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         """
         Convert the tool to a Pydantic-AI tool.
 
+        Uses Tool.from_schema() to create the tool with the JSON schema
+        directly from the input model, avoiding function introspection.
+
         Returns:
             A Pydantic-AI tool instance.
         """
-        def tool_func(**kwargs: Any) -> Any:
-            return self.execute_unpacked(**kwargs)
-
-        return PydanticAITool(
-            function=tool_func,
+        return PydanticAITool.from_schema(
+            function=self.execute_unpacked,
             name=self.name,
             description=self.description,
+            json_schema=self.get_input_schema(),
         )
 
 
