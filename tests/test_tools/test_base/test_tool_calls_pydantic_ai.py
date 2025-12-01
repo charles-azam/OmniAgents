@@ -13,6 +13,37 @@ from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
 
 
+# MONKEY-PATCH: Fix pydantic_ai HuggingFace adapter bug where tool call arguments
+# are lost during serialization. The bug is that _map_tool_call uses
+# ChatCompletionInputToolCall (which has ChatCompletionInputFunctionDefinition
+# without 'arguments' field) instead of ChatCompletionOutputToolCall (which has
+# ChatCompletionOutputFunctionDefinition with 'arguments' field).
+# This patch should be removed once pydantic_ai fixes this upstream.
+def _patch_pydantic_ai_huggingface() -> None:
+    from pydantic_ai.messages import ToolCallPart
+    from pydantic_ai._utils import guard_tool_call_id as _guard_tool_call_id
+    from huggingface_hub.inference._generated.types.chat_completion import (
+        ChatCompletionOutputToolCall,
+        ChatCompletionOutputFunctionDefinition,
+    )
+
+    @staticmethod  # type: ignore[misc]
+    def _map_tool_call_fixed(t: ToolCallPart) -> ChatCompletionOutputToolCall:
+        return ChatCompletionOutputToolCall(
+            id=_guard_tool_call_id(t=t),
+            type="function",
+            function=ChatCompletionOutputFunctionDefinition(
+                name=t.tool_name,
+                arguments=t.args_as_json_str(),
+            ),
+        )
+
+    HuggingFaceModel._map_tool_call = _map_tool_call_fixed
+
+
+_patch_pydantic_ai_huggingface()
+
+
 def test_pydantic_ai_tool_created_correctly():
     """Test that CoreTool converts correctly to pydantic_ai tool with proper attributes and execution."""
 
