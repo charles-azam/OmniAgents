@@ -20,7 +20,7 @@ from pydantic_ai import Tool as PydanticAITool
 
 
 TInput = TypeVar('TInput', bound=BaseModel)
-TOutput = TypeVar('TOutput', bound=ToolOutputModel)
+TOutput = TypeVar('TOutput', bound=ToolOutputModel | BaseModel)
 
 
 class CoreTool(ABC, Generic[TInput, TOutput]):
