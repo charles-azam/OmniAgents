@@ -10,6 +10,7 @@ from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
 from pydantic import Field
+import random
 
 def test_smolagent_tool_created_correctly():
     """Test that CoreTool converts correctly to smolagents tool with proper attributes and execution."""
@@ -37,7 +38,7 @@ def test_smolagent_tool_created_correctly():
     tool = SimpleTool()
 
     # Convert to smolagents tool
-    SmolagentsToolClass = tool.to_smolagents_tool(use_string_outputs=True)
+    SmolagentsToolClass = tool.to_smolagents_tool()
     smolagent_instance = SmolagentsToolClass()
 
     # Verify tool is created with correct type and attributes
@@ -92,7 +93,7 @@ def test_smolagent_tool_backend_created_correctly():
     tool = BackendTool(backend=backend)
 
     # Convert to smolagents tool
-    SmolagentsToolClass = tool.to_smolagents_tool(use_string_outputs=True)
+    SmolagentsToolClass = tool.to_smolagents_tool()
     smolagent_instance = SmolagentsToolClass(backend=backend)
 
     # Verify tool structure
@@ -108,6 +109,75 @@ def test_smolagent_tool_backend_created_correctly():
     assert result.result == "Executed ls -la"
     assert "LocalBackend" in result.status
 
+    
+def test_smolagents_tool_backend_works_correctly():
+    """Test that CoreBackendTool converts correctly to smolagents tool and can use backend to write files."""
+    from prompttodraft.tools.write_file_tool import WriteFileTool
+    from prompttodraft.outputs.outputs import TextOutputModel
+
+    # Create local backend with NoOp state manager for testing
+    state_manager = NoOpStateManager()
+    backend = LocalBackend(project_id="test_smolagents_tool_backend_works_correctly", state_manager=state_manager)
+
+    try:
+        # Start backend
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        # Create a real backend tool (WriteFileTool)
+        write_tool = WriteFileTool(backend=backend)
+        
+        # Convert to smolagents tool
+        WriteSmolagentsTool = write_tool.to_smolagents_tool()
+
+        # Instantiate the smolagents tool with the backend
+        smolagents_write_tool = WriteSmolagentsTool(backend=backend)
+
+        # Verify tool structure
+        assert issubclass(WriteSmolagentsTool, SmolagentsTool)
+        assert smolagents_write_tool.name == "write_file"
+        assert "write" in smolagents_write_tool.description.lower()
+        assert hasattr(smolagents_write_tool, "backend")
+        assert smolagents_write_tool.backend == backend
+
+        # Test execution with backend - write a file
+        random_number = random.randint(1, 1000000)
+        content = f"# Test file written by smolagents tool\nprint('Hello from backend! {random_number}')\n"
+        test_file = f"{working_dir}/test_backend.py"
+        result = smolagents_write_tool.forward(
+            file_path=test_file,
+            content=content
+        )
+
+        # Verify the result
+        assert isinstance(result, TextOutputModel)
+        assert "created" in result.content.lower() or "wrote" in result.content.lower()
+
+        # Verify the file was actually written to the backend
+        assert backend.file_exists(path=test_file)
+        file_content = backend.read_file(file_path=test_file)
+        assert content in file_content
+        assert "Hello from backend!" in file_content
+
+        # Test overwriting the file
+        updated_content = f"# Updated content\nprint('Updated! {random_number}')\n"
+        result = smolagents_write_tool.forward(
+            file_path=test_file,
+            content=updated_content
+        )
+        assert isinstance(result, TextOutputModel)
+        assert "overwrote" in result.content.lower()
+
+        # Verify the file was overwritten
+        file_content = backend.read_file(file_path=test_file)
+        assert updated_content in file_content
+        assert "Updated!" in file_content
+        assert "Hello from backend!" not in file_content
+
+    finally:
+        # Clean up
+        backend.shutdown()
+        backend.cleanup()
 
 def test_tool_schemas_extracted_correctly():
     """Test that tool schemas are correctly extracted from Generic parameters."""
@@ -243,8 +313,8 @@ def test_smolagents_agent_with_llm():
     greeter = GreeterTool()
     
     # Convert to smolagents tools
-    CalculatorSmolagentsTool = calculator.to_smolagents_tool(use_string_outputs=True)
-    GreeterSmolagentsTool = greeter.to_smolagents_tool(use_string_outputs=True)
+    CalculatorSmolagentsTool = calculator.to_smolagents_tool()
+    GreeterSmolagentsTool = greeter.to_smolagents_tool()
 
     # Create tool instances for the agent
     calculator_tool = CalculatorSmolagentsTool()
@@ -275,4 +345,5 @@ if __name__ == "__main__":
     test_smolagent_tool_created_correctly()
     test_smolagent_tool_backend_created_correctly()
     test_tool_schemas_extracted_correctly()
+    test_smolagents_tool_backend_works_correctly()
     test_smolagents_agent_with_llm()

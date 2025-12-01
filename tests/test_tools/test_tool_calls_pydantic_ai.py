@@ -1,0 +1,258 @@
+# Test tool calling with Pydantic AI
+# test that the framework works as expected
+import os
+import random
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent, Tool as PydanticAITool
+
+from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
+from prompttodraft.backends.local_backend import LocalBackend
+from prompttodraft.backends.state_manager import NoOpStateManager
+
+
+def test_pydantic_ai_tool_created_correctly():
+    """Test that CoreTool converts correctly to pydantic_ai tool with proper attributes and execution."""
+
+    # Mock data - define test inputs and expected outputs
+    class SimpleInput(BaseModel):
+        path: str
+        count: int
+
+    class SimpleOutput(BaseModel):
+        content: str
+        processed: int
+
+    class SimpleTool(CoreTool[SimpleInput, SimpleOutput]):
+        name = "simple_tool"
+        description = "Does something simple"
+
+        def execute(self, inputs: SimpleInput) -> SimpleOutput:
+            return SimpleOutput(
+                content=f"Processed {inputs.path}",
+                processed=inputs.count * 2
+            )
+
+    # Create tool instance
+    tool = SimpleTool()
+
+    # Convert to pydantic_ai tool
+    pydantic_ai_tool = tool.to_pydantic_ai_tool()
+
+    # Verify tool is created with correct type and attributes
+    assert isinstance(pydantic_ai_tool, PydanticAITool)
+    assert pydantic_ai_tool.name == "simple_tool"
+    assert pydantic_ai_tool.description == "Does something simple"
+
+    # Test execution through the tool's function
+    result = pydantic_ai_tool.function(path="/test/path", count=5)
+    assert isinstance(result, SimpleOutput)
+    assert result.content == "Processed /test/path"
+    assert result.processed == 10
+
+
+def test_pydantic_ai_tool_backend_created_correctly():
+    """Test that CoreBackendTool converts correctly to pydantic_ai tool with backend support."""
+
+    # Mock data
+    class BackendInput(BaseModel):
+        command: str
+
+    class BackendOutput(BaseModel):
+        result: str
+        status: str
+
+    class BackendTool(CoreBackendTool[BackendInput, BackendOutput]):
+        name = "backend_tool"
+        description = "Tool that uses backend"
+
+        def execute(self, inputs: BackendInput) -> BackendOutput:
+            # Use backend in execution
+            backend_type = self.backend.__class__.__name__
+            return BackendOutput(
+                result=f"Executed {inputs.command}",
+                status=f"Using {backend_type}"
+            )
+
+    # Create local backend with NoOp state manager for testing
+    state_manager = NoOpStateManager()
+    backend = LocalBackend(project_id="test_project", state_manager=state_manager)
+    tool = BackendTool(backend=backend)
+
+    # Convert to pydantic_ai tool
+    pydantic_ai_tool = tool.to_pydantic_ai_tool()
+
+    # Verify tool structure
+    assert isinstance(pydantic_ai_tool, PydanticAITool)
+    assert pydantic_ai_tool.name == "backend_tool"
+    assert pydantic_ai_tool.description == "Tool that uses backend"
+
+    # Test execution with backend
+    result = pydantic_ai_tool.function(command="ls -la")
+    assert isinstance(result, BackendOutput)
+    assert result.result == "Executed ls -la"
+    assert "LocalBackend" in result.status
+
+
+def test_pydantic_ai_tool_backend_works_correctly():
+    """Test that CoreBackendTool converts correctly to pydantic_ai tool and can use backend to write files."""
+    from prompttodraft.tools.write_file_tool import WriteFileTool
+    from prompttodraft.outputs.outputs import TextOutputModel
+
+    # Create local backend with NoOp state manager for testing
+    state_manager = NoOpStateManager()
+    backend = LocalBackend(project_id="test_pydantic_ai_tool_backend_works_correctly", state_manager=state_manager)
+
+    try:
+        # Start backend
+        backend.start()
+        working_dir = backend.get_working_directory()
+
+        # Create a real backend tool (WriteFileTool)
+        write_tool = WriteFileTool(backend=backend)
+
+        # Convert to pydantic_ai tool
+        pydantic_ai_write_tool = write_tool.to_pydantic_ai_tool()
+
+        # Verify tool structure
+        assert isinstance(pydantic_ai_write_tool, PydanticAITool)
+        assert pydantic_ai_write_tool.name == "write_file"
+        assert "write" in pydantic_ai_write_tool.description.lower()
+
+        # Test execution with backend - write a file
+        random_number = random.randint(1, 1000000)
+        content = f"# Test file written by pydantic_ai tool\nprint('Hello from backend! {random_number}')\n"
+        test_file = f"{working_dir}/test_backend.py"
+        result = pydantic_ai_write_tool.function(
+            file_path=test_file,
+            content=content
+        )
+
+        # Verify the result
+        assert isinstance(result, TextOutputModel)
+        assert "created" in result.content.lower() or "wrote" in result.content.lower()
+
+        # Verify the file was actually written to the backend
+        assert backend.file_exists(path=test_file)
+        file_content = backend.read_file(file_path=test_file)
+        assert content in file_content
+        assert "Hello from backend!" in file_content
+
+        # Test overwriting the file
+        updated_content = f"# Updated content\nprint('Updated! {random_number}')\n"
+        result = pydantic_ai_write_tool.function(
+            file_path=test_file,
+            content=updated_content
+        )
+        assert isinstance(result, TextOutputModel)
+        assert "overwrote" in result.content.lower()
+
+        # Verify the file was overwritten
+        file_content = backend.read_file(file_path=test_file)
+        assert updated_content in file_content
+        assert "Updated!" in file_content
+        assert "Hello from backend!" not in file_content
+
+    finally:
+        # Clean up
+        backend.shutdown()
+        backend.cleanup()
+
+
+def test_pydantic_ai_tool_schemas_extracted_correctly():
+    """Test that tool schemas are correctly extracted from Generic parameters for pydantic_ai."""
+
+    class SchemaInput(BaseModel):
+        name: str = Field(description="The name of the person")
+        age: int = Field(description="The age of the person")
+        active: bool = Field(description="Whether the person is active")
+
+    class SchemaOutput(BaseModel):
+        message: str
+
+    class SchemaTool(CoreTool[SchemaInput, SchemaOutput]):
+        name = "schema_tool"
+        description = "Tool for schema testing"
+
+        def execute(self, inputs: SchemaInput) -> SchemaOutput:
+            return SchemaOutput(message=f"{inputs.name} is {inputs.age}")
+
+    # Test input/output model extraction
+    input_model = SchemaTool.get_input_model()
+    output_model = SchemaTool.get_output_model()
+
+    assert input_model == SchemaInput
+    assert output_model == SchemaOutput
+
+    # Verify the schema itself
+    schema = SchemaInput.model_json_schema()
+    assert "properties" in schema
+    assert "name" in schema["properties"]
+    assert schema["properties"]["name"]["description"] == "The name of the person"
+    assert "age" in schema["properties"]
+    assert schema["properties"]["age"]["description"] == "The age of the person"
+    assert "active" in schema["properties"]
+    assert schema["properties"]["active"]["description"] == "Whether the person is active"
+
+
+def test_pydantic_ai_agent_with_llm():
+    """
+    E2E test: Test Pydantic AI tool conversion and invocation.
+
+    Tests that our tools work correctly:
+    1. Create tools using CoreTool
+    2. Convert to pydantic_ai format
+    3. Verify tools can be invoked
+    """
+
+    # Define test tool
+    class CalculatorInput(BaseModel):
+        operation: str = Field(description="The operation to perform: add, subtract, multiply, or divide")
+        a: float = Field(description="The first number")
+        b: float = Field(description="The second number")
+
+    class CalculatorOutput(BaseModel):
+        result: float
+        operation_performed: str
+
+    class CalculatorTool(CoreTool[CalculatorInput, CalculatorOutput]):
+        name = "calculator"
+        description = "Performs basic arithmetic operations (add, subtract, multiply, divide). Use 'add', 'subtract', 'multiply', or 'divide' as operation."
+
+        def execute(self, inputs: CalculatorInput) -> CalculatorOutput:
+            if inputs.operation == "add":
+                result = inputs.a + inputs.b
+            elif inputs.operation == "subtract":
+                result = inputs.a - inputs.b
+            elif inputs.operation == "multiply":
+                result = inputs.a * inputs.b
+            elif inputs.operation == "divide":
+                if inputs.b == 0:
+                    result = float('inf')
+                else:
+                    result = inputs.a / inputs.b
+            else:
+                result = 0.0
+
+            return CalculatorOutput(
+                result=result,
+                operation_performed=f"{inputs.a} {inputs.operation} {inputs.b}"
+            )
+
+    # Create tool instance
+    calculator = CalculatorTool()
+
+    # Convert to pydantic_ai tool
+    calculator_tool = calculator.to_pydantic_ai_tool()
+
+    # Verify the tool can be invoked directly (main test)
+    result = calculator_tool.function(operation="multiply", a=15, b=3)
+    assert isinstance(result, CalculatorOutput)
+    assert result.result == 45.0
+    assert result.operation_performed == "15.0 multiply 3.0"
+
+
+if __name__ == "__main__":
+    test_pydantic_ai_tool_created_correctly()
+    test_pydantic_ai_tool_backend_created_correctly()
+    test_pydantic_ai_tool_schemas_extracted_correctly()
+    test_pydantic_ai_agent_with_llm()
