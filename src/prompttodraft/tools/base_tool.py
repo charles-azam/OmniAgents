@@ -14,10 +14,9 @@ from pydantic import BaseModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import ToolOutputModel
-from smolagents import Tool as SmolagentsTool
+from smolagents.tools import Tool as SmolagentsTool
 from langchain_core.tools import Tool as LangChainTool
 from pydantic_ai import Tool as PydanticAITool
-
 
 TInput = TypeVar('TInput', bound=BaseModel)
 TOutput = TypeVar('TOutput', bound=ToolOutputModel | BaseModel)
@@ -146,16 +145,28 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         Returns:
             A smolagents Tool instance.
         """
-        
+
+        # Convert JSON schema to smolagents format
+        input_schema = main_class_self.get_input_schema()
+        smolagents_inputs = {}
+
+        if "properties" in input_schema:
+            for param_name, param_schema in input_schema["properties"].items():
+                smolagents_inputs[param_name] = {
+                    "type": param_schema.get("type", "string"),
+                    "description": param_schema.get("description", f"Parameter {param_name}")
+                }
+
         class CustomSmolagentsTool(SmolagentsTool):
             name = main_class_self.name
             description = main_class_self.description
-            inputs = main_class_self.get_input_schema()
-            outputs = "string" if use_string_outputs else main_class_self.get_output_schema()
-            
-            def forward(self2, **kwargs: Any) -> str:
+            inputs = smolagents_inputs
+            output_type = "string" if use_string_outputs else "any"
+            skip_forward_signature_validation = True
+
+            def forward(self, **kwargs: Any) -> str | Any:
                 return main_class_self.execute_unpacked(**kwargs)
-            
+
         return CustomSmolagentsTool
         
     def to_langchain_tool(self) -> LangChainTool:
