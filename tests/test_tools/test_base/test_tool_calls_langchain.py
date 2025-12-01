@@ -213,6 +213,7 @@ def test_langchain_agent_with_llm():
     from langchain_openai import ChatOpenAI
     from langchain_core.prompts import ChatPromptTemplate
     from langchain.agents import create_agent
+    from langchain_huggingface import ChatHuggingFace
 
 
     # Define test tools with metadata tracking
@@ -290,7 +291,7 @@ def test_langchain_agent_with_llm():
     greeter_tool = greeter.to_langchain_tool()
 
     # Create the agent
-    agent = create_agent(model="gpt-5-mini", tools=[calculator_tool, greeter_tool])
+    agent = create_agent(model=ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=os.environ["HF_TOKEN"], model="openai/gpt-oss-120b:groq"), tools=[calculator_tool, greeter_tool])
 
     # Test 1: Math task
     result = agent.invoke({"messages": [("user", "What is 15 multiplied by 3?, you must use the calculator tool to answer the question")]})
