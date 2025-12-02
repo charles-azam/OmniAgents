@@ -74,52 +74,52 @@ def create_pydantic_ai_tools() -> list[Tool]:
 
     def write_file(ctx: RunContext[AgentDependencies], file_path: str, content: str) -> str:
         write_file_core = WriteFileTool(backend=ctx.deps.backend)
-        result = write_file_core.execute(file_path=file_path, content=content)
+        result = write_file_core.execute_unpacked(file_path=file_path, content=content)
         return str(result)
 
     def read_file(ctx: RunContext[AgentDependencies], path: str, offset: int | None = None, limit: int | None = None) -> str:
         read_file_core = ReadFileTool(backend=ctx.deps.backend)
-        result = read_file_core.execute(path=path, offset=offset, limit=limit)
+        result = read_file_core.execute_unpacked(path=path, offset=offset, limit=limit)
         return str(result)
 
     def list_directory(ctx: RunContext[AgentDependencies], path: str, ignore: list[str] | None = None, respect_git_ignore: bool = True) -> str:
         list_directory_core = ListDirectoryTool(backend=ctx.deps.backend)
-        result = list_directory_core.execute(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
+        result = list_directory_core.execute_unpacked(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
         return str(result)
 
     def glob(ctx: RunContext[AgentDependencies], pattern: str, path: str | None = None, case_sensitive: bool = False, respect_git_ignore: bool = True) -> str:
         glob_core = GlobTool(backend=ctx.deps.backend)
-        result = glob_core.execute(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
+        result = glob_core.execute_unpacked(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
         return str(result)
 
     def search_file_content(ctx: RunContext[AgentDependencies], pattern: str, path: str | None = None, include: str | None = None) -> str:
         search_file_content_core = SearchFileContentTool(backend=ctx.deps.backend)
-        result = search_file_content_core.execute(pattern=pattern, path=path, include=include)
+        result = search_file_content_core.execute_unpacked(pattern=pattern, path=path, include=include)
         return str(result)
 
     def replace(ctx: RunContext[AgentDependencies], file_path: str, old_string: str, new_string: str, expected_replacements: int | None = None) -> str:
         replace_core = ReplaceTool(backend=ctx.deps.backend)
-        result = replace_core.execute(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
+        result = replace_core.execute_unpacked(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
         return str(result)
 
     def run_shell_command(ctx: RunContext[AgentDependencies], command: str, description: str | None = None, directory: str | None = None) -> str:
         run_shell_command_core = RunShellCommandTool(backend=ctx.deps.backend)
-        result = run_shell_command_core.execute(command=command, description=description, directory=directory)
+        result = run_shell_command_core.execute_unpacked(command=command, description=description, directory=directory)
         return str(result)
 
     def read_many_files(ctx: RunContext[AgentDependencies], paths: list[str], exclude: list[str] | None = None, include: list[str] | None = None, recursive: bool = True, useDefaultExcludes: bool = True, respect_git_ignore: bool = True) -> str:
         read_many_files_core = ReadManyFilesTool(backend=ctx.deps.backend)
-        result = read_many_files_core.execute(paths=paths, exclude=exclude, include=include, recursive=recursive, useDefaultExcludes=useDefaultExcludes, respect_git_ignore=respect_git_ignore)
+        result = read_many_files_core.execute_unpacked(paths=paths, exclude=exclude, include=include, recursive=recursive, useDefaultExcludes=useDefaultExcludes, respect_git_ignore=respect_git_ignore)
         return str(result)
 
     def save_memory(ctx: RunContext[AgentDependencies], fact: str) -> str:
         save_memory_core = SaveMemoryTool(backend=ctx.deps.backend)
-        result = save_memory_core.execute(fact=fact)
+        result = save_memory_core.execute_unpacked(fact=fact)
         return str(result)
 
     def uv(ctx: RunContext[AgentDependencies], command: str, description: str | None = None) -> str:
         uv_core = UVTool(backend=ctx.deps.backend)
-        result = uv_core.execute(command=command, description=description)
+        result = uv_core.execute_unpacked(command=command, description=description)
         return str(result)
 
     # Create temporary instances to get metadata
@@ -143,16 +143,16 @@ def create_pydantic_ai_tools() -> list[Tool]:
     uv_meta = UVTool(backend=metadata_backend)  # type: ignore
 
     return [
-        Tool(function=write_file, takes_ctx=True, name=write_file_meta.metadata.name, description=write_file_meta.metadata.description),
-        Tool(function=read_file, takes_ctx=True, name=read_file_meta.metadata.name, description=read_file_meta.metadata.description),
-        Tool(function=list_directory, takes_ctx=True, name=list_directory_meta.metadata.name, description=list_directory_meta.metadata.description),
-        Tool(function=glob, takes_ctx=True, name=glob_meta.metadata.name, description=glob_meta.metadata.description),
-        Tool(function=search_file_content, takes_ctx=True, name=search_file_content_meta.metadata.name, description=search_file_content_meta.metadata.description),
-        Tool(function=replace, takes_ctx=True, name=replace_meta.metadata.name, description=replace_meta.metadata.description),
-        Tool(function=run_shell_command, takes_ctx=True, name=run_shell_command_meta.metadata.name, description=run_shell_command_meta.metadata.description),
-        Tool(function=read_many_files, takes_ctx=True, name=read_many_files_meta.metadata.name, description=read_many_files_meta.metadata.description),
-        Tool(function=save_memory, takes_ctx=True, name=save_memory_meta.metadata.name, description=save_memory_meta.metadata.description),
-        Tool(function=uv, takes_ctx=True, name=uv_meta.metadata.name, description=uv_meta.metadata.description),
+        Tool(function=write_file, takes_ctx=True, name=write_file_meta.name, description=write_file_meta.description),
+        Tool(function=read_file, takes_ctx=True, name=read_file_meta.name, description=read_file_meta.description),
+        Tool(function=list_directory, takes_ctx=True, name=list_directory_meta.name, description=list_directory_meta.description),
+        Tool(function=glob, takes_ctx=True, name=glob_meta.name, description=glob_meta.description),
+        Tool(function=search_file_content, takes_ctx=True, name=search_file_content_meta.name, description=search_file_content_meta.description),
+        Tool(function=replace, takes_ctx=True, name=replace_meta.name, description=replace_meta.description),
+        Tool(function=run_shell_command, takes_ctx=True, name=run_shell_command_meta.name, description=run_shell_command_meta.description),
+        Tool(function=read_many_files, takes_ctx=True, name=read_many_files_meta.name, description=read_many_files_meta.description),
+        Tool(function=save_memory, takes_ctx=True, name=save_memory_meta.name, description=save_memory_meta.description),
+        Tool(function=uv, takes_ctx=True, name=uv_meta.name, description=uv_meta.description),
     ]
 
 

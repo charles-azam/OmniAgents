@@ -56,5 +56,6 @@ jobs:
         PROMPTTODRAFT_GITHUB_API_KEY: ${{ secrets.PROMPTTODRAFT_GITHUB_API_KEY }}
         PROMPTTODRAFT_GITHUB_STATE_REPO: ${{ secrets.PROMPTTODRAFT_GITHUB_STATE_REPO }}
         CI_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
+        HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
           uv run pytest tests -vvvv -m "not e2b"

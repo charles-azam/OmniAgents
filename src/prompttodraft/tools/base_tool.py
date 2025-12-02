@@ -8,16 +8,18 @@ Tools use Pydantic models for automatic validation and schema generation.
 - CoreBackendTool: Base class for tools that need filesystem/command access
 """
 from abc import ABC, abstractmethod
-from typing import ClassVar, TypeVar, Generic, get_args, get_origin
+from typing import ClassVar, TypeVar, Generic, get_args, get_origin, Any
 
 from pydantic import BaseModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.outputs.outputs import ToolOutputModel
-
+from smolagents.tools import Tool as SmolagentsTool
+from langchain_core.tools import StructuredTool as LangChainTool
+from pydantic_ai import Tool as PydanticAITool
 
 TInput = TypeVar('TInput', bound=BaseModel)
-TOutput = TypeVar('TOutput', bound=ToolOutputModel)
+TOutput = TypeVar('TOutput', bound=ToolOutputModel | BaseModel)
 
 
 class CoreTool(ABC, Generic[TInput, TOutput]):
@@ -51,17 +53,13 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
 
     @abstractmethod
     def execute(self, inputs: TInput) -> TOutput:
-        """
-        Execute the tool with validated Pydantic inputs.
-
-        Args:
-            inputs: Validated input model instance (type matches TInput from Generic parameters)
-
-        Returns:
-            ToolOutputModel instance (type matches TOutput from Generic parameters)
-        """
         ...
 
+    def execute_unpacked(self, **kwargs: Any) -> TOutput:
+        input_model = self.get_input_model()
+        pydantic_inputs = input_model.model_validate(kwargs)
+        return self.execute(inputs=pydantic_inputs)
+    
     @classmethod
     def get_input_model(cls) -> type[BaseModel]:
         """
@@ -139,6 +137,71 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
             "input_schema": cls.get_input_schema(),
             "output_schema": cls.get_output_schema(),
         }
+        
+    def to_smolagents_tool(main_class_self) -> type[SmolagentsTool]:
+        """
+        Convert the tool to a smolagents Tool.
+
+        Returns:
+            A smolagents Tool instance.
+        """
+
+        # Convert JSON schema to smolagents format
+        input_schema = main_class_self.get_input_schema()
+        smolagents_inputs = {}
+
+        if "properties" in input_schema:
+            for param_name, param_schema in input_schema["properties"].items():
+                smolagents_inputs[param_name] = {
+                    "type": param_schema.get("type", "string"),
+                    "description": param_schema.get("description", f"Parameter {param_name}")
+                }
+
+        class CustomSmolagentsTool(SmolagentsTool):
+            name = main_class_self.name
+            description = main_class_self.description
+            inputs = smolagents_inputs
+            output_type = "string"
+            skip_forward_signature_validation = True
+
+            def forward(self, **kwargs: Any) -> str | Any:
+                return main_class_self.execute_unpacked(**kwargs)
+
+        return CustomSmolagentsTool
+        
+    def to_langchain_tool(self, **kwargs: Any) -> LangChainTool:
+        """
+        Convert the tool to a LangChain tool.
+
+        Returns:
+            A LangChain tool instance.
+        """
+        
+        
+        return LangChainTool(
+            name=self.name,
+            description=self.description,
+            args_schema=self.get_input_model(),
+            func=self.execute_unpacked,
+            **kwargs,
+        )
+        
+    def to_pydantic_ai_tool(self) -> PydanticAITool:
+        """
+        Convert the tool to a Pydantic-AI tool.
+
+        Uses Tool.from_schema() to create the tool with the JSON schema
+        directly from the input model, avoiding function introspection.
+
+        Returns:
+            A Pydantic-AI tool instance.
+        """
+        return PydanticAITool.from_schema(
+            function=self.execute_unpacked,
+            name=self.name,
+            description=self.description,
+            json_schema=self.get_input_schema(),
+        )
 
 
 class CoreBackendTool(CoreTool[TInput, TOutput]):
@@ -160,3 +223,69 @@ class CoreBackendTool(CoreTool[TInput, TOutput]):
             backend: The execution backend to use (local, docker, e2b)
         """
         self.backend = backend
+
+    def to_smolagents_tool(self) -> type[SmolagentsTool]:
+        """
+        Convert the backend tool to a smolagents Tool class.
+
+        Returns a class that accepts a backend parameter in its constructor,
+        allowing the tool to be instantiated with different backends.
+        """
+        CustomSmolagentsTool = super().to_smolagents_tool()
+        class BackendCustomSmolagentsTool(CustomSmolagentsTool):
+            def __init__(self, backend: ExecutionBackend):
+                self.backend = backend
+
+        return BackendCustomSmolagentsTool
+
+    def to_langchain_tool(self, **kwargs: Any) -> LangChainTool:
+        """
+        Convert the backend tool to a LangChain tool.
+
+        This method creates a LangChain StructuredTool that has access to the backend
+        instance. The tool's execution function will use self.backend for any
+        backend operations (filesystem, commands, etc.).
+
+        Note: This method is only available on CoreBackendTool instances that have
+        been initialized with a backend.
+
+        Returns:
+            A LangChain StructuredTool instance with the backend captured in its execution.
+
+        Example:
+            backend = LocalBackend(project_id="test")
+            tool = WriteFileTool(backend=backend)
+            langchain_tool = tool.to_langchain_tool()
+            # langchain_tool now has access to the backend
+        """
+        # Ensure backend exists (should always be true for CoreBackendTool)
+        if not hasattr(self, 'backend'):
+            raise AttributeError(f"{self.__class__.__name__} requires a backend but none was found")
+
+        return super().to_langchain_tool(**kwargs)
+
+    def to_pydantic_ai_tool(self) -> PydanticAITool:
+        """
+        Convert the backend tool to a Pydantic-AI tool.
+
+        This method creates a Pydantic-AI Tool that has access to the backend
+        instance. The tool's execution function will use self.backend for any
+        backend operations (filesystem, commands, etc.).
+
+        Note: This method is only available on CoreBackendTool instances that have
+        been initialized with a backend.
+
+        Returns:
+            A Pydantic-AI Tool instance with the backend captured in its execution.
+
+        Example:
+            backend = LocalBackend(project_id="test")
+            tool = WriteFileTool(backend=backend)
+            pydantic_ai_tool = tool.to_pydantic_ai_tool()
+            # pydantic_ai_tool now has access to the backend
+        """
+        # Ensure backend exists (should always be true for CoreBackendTool)
+        if not hasattr(self, 'backend'):
+            raise AttributeError(f"{self.__class__.__name__} requires a backend but none was found")
+
+        return super().to_pydantic_ai_tool()
