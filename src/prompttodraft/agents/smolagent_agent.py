@@ -5,7 +5,7 @@ This module provides a simple interface to create and run a smolagents CodeAgent
 with manually defined tools, working across any execution backend.
 """
 import os
-from smolagents import Tool, ToolCallingAgent, OpenAIModel, InferenceClientModel
+from smolagents import ToolCallingAgent, OpenAIModel, InferenceClientModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.write_file_tool import WriteFileTool
@@ -45,241 +45,30 @@ def create_model(provider: str, model_id: str):
         raise ValueError(f"Unsupported provider: {provider}")
 
 
-# Manual smolagents Tool definitions
-class WriteFileSmolagentsTool(Tool):
-    """Manual smolagents tool for writing files."""
+def create_smolagents_tools(backend: ExecutionBackend) -> list:
+    """
+    Create smolagents tools using the core tools' conversion methods.
 
-    name = WriteFileTool.name
-    description = WriteFileTool.description
-    inputs = {
-        "file_path": {"type": "string", "description": "The absolute path to the file to write to"},
-        "content": {"type": "string", "description": "The content to write into the file"},
-    }
-    output_type = "string"
+    Args:
+        backend: The execution backend instance.
 
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = WriteFileTool(backend=backend)
-        super().__init__()
+    Returns:
+        List of smolagents tool instances.
+    """
+    tool_classes = [
+        WriteFileTool,
+        ReadFileTool,
+        ListDirectoryTool,
+        GlobTool,
+        SearchFileContentTool,
+        ReplaceTool,
+        RunShellCommandTool,
+        ReadManyFilesTool,
+        SaveMemoryTool,
+        UVTool,
+    ]
 
-    def forward(self, file_path: str, content: str) -> str:
-        """Execute the write_file tool."""
-        result = self.core_tool.execute_unpacked(file_path=file_path, content=content)
-        return str(result)
-
-
-class ReadFileSmolagentsTool(Tool):
-    """Manual smolagents tool for reading files."""
-
-    name = ReadFileTool.name
-    description = ReadFileTool.description
-    inputs = {
-        "path": {"type": "string", "description": "The absolute path to the file to read"},
-        "offset": {"type": "number", "description": "Optional: For text files, the 0-based line number to start reading from", "nullable": True},
-        "limit": {"type": "number", "description": "Optional: For text files, maximum number of lines to read", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = ReadFileTool(backend=backend)
-        super().__init__()
-
-    def forward(self, path: str, offset: int | None = None, limit: int | None = None) -> str:
-        """Execute the read_file tool."""
-        result = self.core_tool.execute_unpacked(path=path, offset=offset, limit=limit)
-        return str(result)
-
-
-class ListDirectorySmolagentsTool(Tool):
-    """Manual smolagents tool for listing directory contents."""
-
-    name = ListDirectoryTool.name
-    description = ListDirectoryTool.description
-    inputs = {
-        "path": {"type": "string", "description": "The absolute path to the directory to list"},
-        "ignore": {"type": "array", "items": {"type": "string"}, "description": "Optional: List of glob patterns to ignore", "nullable": True},
-        "respect_git_ignore": {"type": "boolean", "description": "Optional: Whether to respect .gitignore patterns", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = ListDirectoryTool(backend=backend)
-        super().__init__()
-
-    def forward(self, path: str, ignore: list[str] | None = None, respect_git_ignore: bool = True) -> str:
-        """Execute the list_directory tool."""
-        result = self.core_tool.execute_unpacked(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
-        return str(result)
-
-
-class GlobSmolagentsTool(Tool):
-    """Manual smolagents tool for finding files by glob patterns."""
-
-    name = GlobTool.name
-    description = GlobTool.description
-    inputs = {
-        "pattern": {"type": "string", "description": "The glob pattern to match against"},
-        "path": {"type": "string", "description": "Optional: The absolute path to the directory to search within", "nullable": True},
-        "case_sensitive": {"type": "boolean", "description": "Optional: Whether the search should be case-sensitive", "nullable": True},
-        "respect_git_ignore": {"type": "boolean", "description": "Optional: Whether to respect .gitignore patterns", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = GlobTool(backend=backend)
-        super().__init__()
-
-    def forward(self, pattern: str, path: str | None = None, case_sensitive: bool = False, respect_git_ignore: bool = True) -> str:
-        """Execute the glob tool."""
-        result = self.core_tool.execute_unpacked(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
-        return str(result)
-
-
-class SearchFileContentSmolagentsTool(Tool):
-    """Manual smolagents tool for searching file contents."""
-
-    name = SearchFileContentTool.name
-    description = SearchFileContentTool.description
-    inputs = {
-        "pattern": {"type": "string", "description": "The regular expression to search for in file contents"},
-        "path": {"type": "string", "description": "Optional: The absolute path to the directory to search within", "nullable": True},
-        "include": {"type": "string", "description": "Optional: File pattern to include in the search", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = SearchFileContentTool(backend=backend)
-        super().__init__()
-
-    def forward(self, pattern: str, path: str | None = None, include: str | None = None) -> str:
-        """Execute the search_file_content tool."""
-        result = self.core_tool.execute_unpacked(pattern=pattern, path=path, include=include)
-        return str(result)
-
-
-class ReplaceSmolagentsTool(Tool):
-    """Manual smolagents tool for replacing text in files."""
-
-    name = ReplaceTool.name
-    description = ReplaceTool.description
-    inputs = {
-        "file_path": {"type": "string", "description": "The absolute path to the file to modify"},
-        "old_string": {"type": "string", "description": "The exact literal text to replace"},
-        "new_string": {"type": "string", "description": "The exact literal text to replace old_string with"},
-        "expected_replacements": {"type": "number", "description": "Number of replacements expected", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = ReplaceTool(backend=backend)
-        super().__init__()
-
-    def forward(self, file_path: str, old_string: str, new_string: str, expected_replacements: int = 1) -> str:
-        """Execute the replace tool."""
-        result = self.core_tool.execute_unpacked(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
-        return str(result)
-
-
-class RunShellCommandSmolagentsTool(Tool):
-    """Manual smolagents tool for running shell commands."""
-
-    name = RunShellCommandTool.name
-    description = RunShellCommandTool.description
-    inputs = {
-        "command": {"type": "string", "description": "The exact shell command to execute"},
-        "description": {"type": "string", "description": "Optional: A brief description of the command's purpose", "nullable": True},
-        "directory": {"type": "string", "description": "Optional: The directory in which to execute the command", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = RunShellCommandTool(backend=backend)
-        super().__init__()
-
-    def forward(self, command: str, description: str | None = None, directory: str | None = None) -> str:
-        """Execute the run_shell_command tool."""
-        result = self.core_tool.execute_unpacked(command=command, description=description, directory=directory)
-        return str(result)
-
-
-class ReadManyFilesSmolagentsTool(Tool):
-    """Manual smolagents tool for reading multiple files."""
-
-    name = ReadManyFilesTool.name
-    description = ReadManyFilesTool.description
-    inputs = {
-        "paths": {"type": "array", "items": {"type": "string"}, "description": "An array of glob patterns or paths"},
-        "exclude": {"type": "array", "items": {"type": "string"}, "description": "Optional: Glob patterns to exclude", "nullable": True},
-        "include": {"type": "array", "items": {"type": "string"}, "description": "Optional: Additional glob patterns to include", "nullable": True},
-        "recursive": {"type": "boolean", "description": "Optional: Whether to search recursively", "nullable": True},
-        "useDefaultExcludes": {"type": "boolean", "description": "Optional: Whether to apply default exclusion patterns", "nullable": True},
-        "respect_git_ignore": {"type": "boolean", "description": "Optional: Whether to respect .gitignore patterns", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = ReadManyFilesTool(backend=backend)
-        super().__init__()
-
-    def forward(
-        self,
-        paths: list[str],
-        exclude: list[str] | None = None,
-        include: list[str] | None = None,
-        recursive: bool = True,
-        useDefaultExcludes: bool = True,
-        respect_git_ignore: bool = True,
-    ) -> str:
-        """Execute the read_many_files tool."""
-        result = self.core_tool.execute_unpacked(
-            paths=paths,
-            exclude=exclude,
-            include=include,
-            recursive=recursive,
-            useDefaultExcludes=useDefaultExcludes,
-            respect_git_ignore=respect_git_ignore,
-        )
-        return str(result)
-
-
-class SaveMemorySmolagentsTool(Tool):
-    """Manual smolagents tool for saving memories."""
-
-    name = SaveMemoryTool.name
-    description = SaveMemoryTool.description
-    inputs = {
-        "fact": {"type": "string", "description": "The specific fact or piece of information to remember"},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = SaveMemoryTool(backend=backend)
-        super().__init__()
-
-    def forward(self, fact: str) -> str:
-        """Execute the save_memory tool."""
-        result = self.core_tool.execute_unpacked(fact=fact)
-        return str(result)
-
-
-class UVSmolagentsTool(Tool):
-    """Manual smolagents tool for executing uv commands."""
-
-    name = UVTool.name
-    description = UVTool.description
-    inputs = {
-        "command": {"type": "string", "description": "The uv command to execute (without the 'uv' prefix)"},
-        "description": {"type": "string", "description": "Optional: A brief description of the command's purpose", "nullable": True},
-    }
-    output_type = "string"
-
-    def __init__(self, backend: ExecutionBackend):
-        self.core_tool = UVTool(backend=backend)
-        super().__init__()
-
-    def forward(self, command: str, description: str | None = None) -> str:
-        """Execute the uv tool."""
-        result = self.core_tool.execute_unpacked(command=command, description=description)
-        return str(result)
+    return [tool_class(backend=backend).to_smolagents_tool() for tool_class in tool_classes]
 
 
 class SmolAgentAgent:
@@ -313,19 +102,8 @@ class SmolAgentAgent:
         self.backend = backend
         self.model_id = model_id
 
-        # Create core tools manually
-        self.tools = [
-            WriteFileSmolagentsTool(backend=backend),
-            ReadFileSmolagentsTool(backend=backend),
-            ListDirectorySmolagentsTool(backend=backend),
-            GlobSmolagentsTool(backend=backend),
-            SearchFileContentSmolagentsTool(backend=backend),
-            ReplaceSmolagentsTool(backend=backend),
-            RunShellCommandSmolagentsTool(backend=backend),
-            ReadManyFilesSmolagentsTool(backend=backend),
-            SaveMemorySmolagentsTool(backend=backend),
-            UVSmolagentsTool(backend=backend),
-        ]
+        # Create core tools using conversion methods
+        self.tools = create_smolagents_tools(backend=backend)
 
         # Add any additional tools
         if additional_tools:

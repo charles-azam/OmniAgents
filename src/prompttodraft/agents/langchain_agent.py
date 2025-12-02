@@ -4,10 +4,8 @@ Minimalist LangChain agent implementation.
 This module provides a simple interface to create and run a LangChain agent
 with manually defined tools, working across any execution backend.
 """
-import os
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
-from langchain_core.tools import tool
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.write_file_tool import WriteFileTool
@@ -63,7 +61,7 @@ def create_model(provider: str, model_id: str):
 
 def create_langchain_tools(backend: ExecutionBackend) -> list:
     """
-    Create manually defined LangChain tools using the core tools.
+    Create LangChain tools using the core tools' conversion methods.
 
     Args:
         backend: The execution backend instance.
@@ -71,94 +69,20 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
     Returns:
         List of LangChain tool objects.
     """
-    # Initialize all core tools
-    write_file_core = WriteFileTool(backend=backend)
-    read_file_core = ReadFileTool(backend=backend)
-    list_directory_core = ListDirectoryTool(backend=backend)
-    glob_core = GlobTool(backend=backend)
-    search_file_content_core = SearchFileContentTool(backend=backend)
-    replace_core = ReplaceTool(backend=backend)
-    run_shell_command_core = RunShellCommandTool(backend=backend)
-    read_many_files_core = ReadManyFilesTool(backend=backend)
-    save_memory_core = SaveMemoryTool(backend=backend)
-    uv_core = UVTool(backend=backend)
-
-    @tool(description=write_file_core.description)
-    def write_file(file_path: str, content: str) -> str:
-        result = write_file_core.execute_unpacked(file_path=file_path, content=content)
-        return str(result)
-
-    @tool(description=read_file_core.description)
-    def read_file(path: str, offset: int | None = None, limit: int | None = None) -> str:
-        result = read_file_core.execute_unpacked(path=path, offset=offset, limit=limit)
-        return str(result)
-
-    @tool(description=list_directory_core.description)
-    def list_directory(path: str, ignore: list[str] | None = None, respect_git_ignore: bool = True) -> str:
-        result = list_directory_core.execute_unpacked(path=path, ignore=ignore, respect_git_ignore=respect_git_ignore)
-        return str(result)
-
-    @tool(description=glob_core.description)
-    def glob(pattern: str, path: str | None = None, case_sensitive: bool = False, respect_git_ignore: bool = True) -> str:
-        result = glob_core.execute_unpacked(pattern=pattern, path=path, case_sensitive=case_sensitive, respect_git_ignore=respect_git_ignore)
-        return str(result)
-
-    @tool(description=search_file_content_core.description)
-    def search_file_content(pattern: str, path: str | None = None, include: str | None = None) -> str:
-        result = search_file_content_core.execute_unpacked(pattern=pattern, path=path, include=include)
-        return str(result)
-
-    @tool(description=replace_core.description)
-    def replace(file_path: str, old_string: str, new_string: str, expected_replacements: int = 1) -> str:
-        result = replace_core.execute_unpacked(file_path=file_path, old_string=old_string, new_string=new_string, expected_replacements=expected_replacements)
-        return str(result)
-
-    @tool(description=run_shell_command_core.description)
-    def run_shell_command(command: str, description: str | None = None, directory: str | None = None) -> str:
-        result = run_shell_command_core.execute_unpacked(command=command, description=description, directory=directory)
-        return str(result)
-
-    @tool(description=read_many_files_core.description)
-    def read_many_files(
-        paths: list[str],
-        exclude: list[str] | None = None,
-        include: list[str] | None = None,
-        recursive: bool = True,
-        useDefaultExcludes: bool = True,
-        respect_git_ignore: bool = True,
-    ) -> str:
-        result = read_many_files_core.execute_unpacked(
-            paths=paths,
-            exclude=exclude,
-            include=include,
-            recursive=recursive,
-            useDefaultExcludes=useDefaultExcludes,
-            respect_git_ignore=respect_git_ignore,
-        )
-        return str(result)
-
-    @tool(description=save_memory_core.description)
-    def save_memory(fact: str) -> str:
-        result = save_memory_core.execute_unpacked(fact=fact)
-        return str(result)
-
-    @tool(description=uv_core.description)
-    def uv(command: str, description: str | None = None) -> str:
-        result = uv_core.execute_unpacked(command=command, description=description)
-        return str(result)
-
-    return [
-        write_file,
-        read_file,
-        list_directory,
-        glob,
-        search_file_content,
-        replace,
-        run_shell_command,
-        read_many_files,
-        save_memory,
-        uv,
+    tool_classes = [
+        WriteFileTool,
+        ReadFileTool,
+        ListDirectoryTool,
+        GlobTool,
+        SearchFileContentTool,
+        ReplaceTool,
+        RunShellCommandTool,
+        ReadManyFilesTool,
+        SaveMemoryTool,
+        UVTool,
     ]
+
+    return [tool_class(backend=backend).to_langchain_tool() for tool_class in tool_classes]
 
 
 class LangChainAgent:
