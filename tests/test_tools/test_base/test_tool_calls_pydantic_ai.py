@@ -7,7 +7,6 @@ from pydantic_ai import Agent, Tool as PydanticAITool
 from pydantic_ai.models.huggingface import HuggingFaceModel
 from pydantic_ai.providers.huggingface import HuggingFaceProvider
 
-
 from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
@@ -314,9 +313,12 @@ def test_pydantic_ai_agent_with_llm():
     calculator_tool = calculator.to_pydantic_ai_tool()
     greeter_tool = greeter.to_pydantic_ai_tool()
 
-    # Create agent with gpt-4o-mini model
+    # Create agent with HuggingFace model via Groq provider
     agent = Agent(
-        model=HuggingFaceModel(model_name="openai/gpt-oss-120b", provider=HuggingFaceProvider(api_key=os.environ["HF_TOKEN"], provider_name='groq')),
+        model=HuggingFaceModel(
+            model_name="openai/gpt-oss-120b",
+            provider=HuggingFaceProvider(api_key=os.environ["HF_TOKEN"], provider_name="groq"),
+        ),
         tools=[calculator_tool, greeter_tool],
         system_prompt="You are a helpful assistant. Use the provided tools to answer questions."
     )
