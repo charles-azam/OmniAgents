@@ -7,6 +7,7 @@ with manually defined tools, working across any execution backend.
 import os
 from pydantic_ai import Agent, Tool
 from pydantic_ai.models.openai import OpenAIChatModel
+from pydantic_ai.models.huggingface import HuggingFaceModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from openai import AsyncOpenAI
 
@@ -30,30 +31,17 @@ logfire.instrument_pydantic_ai(
 )
 
 
-def create_model(provider: str, model_id: str) -> OpenAIChatModel:
-    """
-    Create a pydantic_ai model from provider and model_id.
+# MODEL EXAMPLES
+GPT_5_MINI_OPENAI_PYDANTIC_AI = OpenAIChatModel(model_name="gpt-5-mini")
 
-    Args:
-        provider: Provider name (openai, huggingface, xai).
-        model_id: Model identifier.
+hf_client = AsyncOpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=os.getenv("HF_TOKEN"),
+)
+hf_provider = OpenAIProvider(openai_client=hf_client)
+GPT_OSS_120B_HF_PYDANTIC_AI = OpenAIChatModel(model_name="openai/gpt-oss-120b:cerebras", provider=hf_provider)
 
-    Returns:
-        Configured pydantic_ai model.
-    """
-    if provider == "openai":
-        return OpenAIChatModel(model_name=model_id)
-    elif provider == "huggingface":
-        raise NotImplementedError("HuggingFace provider not yet supported in Pydantic AI")
-    elif provider == "xai":
-        xai_client = AsyncOpenAI(
-            base_url="https://api.x.ai/v1",
-            api_key=os.getenv("XAI_API_KEY"),
-        )
-        xai_provider = OpenAIProvider(openai_client=xai_client)
-        return OpenAIChatModel(model_name=model_id, provider=xai_provider)
-    else:
-        raise ValueError(f"Unsupported provider: {provider}")
+
 
 
 def create_pydantic_ai_tools(backend: ExecutionBackend) -> list[Tool]:
@@ -95,8 +83,7 @@ class PydanticAIAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model_id: str = "gpt-5-mini",
-        provider: str = "openai",
+        model: OpenAIChatModel = GPT_OSS_120B_HF_PYDANTIC_AI,
         additional_tools: list | None = None,
     ) -> None:
         """
@@ -104,13 +91,11 @@ class PydanticAIAgent:
 
         Args:
             backend: Execution backend (LocalBackend, DockerBackend, or E2BBackend)
-            model_id: Model identifier
-            provider: Provider name (openai, xai)
+            model: Pydantic AI model
             additional_tools: Optional additional pydantic_ai tools to add
         """
         self.backend = backend
-        self.model_id = model_id
-        self.provider = provider
+        self.model = model
 
         # Create core tools
         self.tools = create_pydantic_ai_tools(backend=backend)
@@ -119,12 +104,9 @@ class PydanticAIAgent:
         if additional_tools:
             self.tools.extend(additional_tools)
 
-        # Create the model
-        self.model = create_model(provider=provider, model_id=model_id)
-
         # Generate system prompt with current project context
         self.backend.start()
-        system_prompt = get_system_prompt(backend=self.backend, model_id=self.model_id)
+        system_prompt = get_system_prompt(backend=self.backend, model_id="pydantic_ai")
 
         # Initialize the pydantic_ai Agent
         self.agent = Agent[str](
@@ -147,9 +129,9 @@ class PydanticAIAgent:
         self.backend.start()
 
         if reset_history:
-            self.backend.cleanup()
+            self.backend.clean_state_manager()
             # Regenerate system prompt with updated project context
-            system_prompt = get_system_prompt(backend=self.backend, model_id=self.model_id)
+            system_prompt = get_system_prompt(backend=self.backend, model_id="pydantic_ai")
             # Recreate agent with updated system prompt
             self.agent = Agent(
                 model=self.model,

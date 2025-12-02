@@ -10,37 +10,7 @@ from pydantic_ai.providers.huggingface import HuggingFaceProvider
 from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
-
-
-# MONKEY-PATCH: Fix pydantic_ai HuggingFace adapter bug where tool call arguments
-# are lost during serialization. The bug is that _map_tool_call uses
-# ChatCompletionInputToolCall (which has ChatCompletionInputFunctionDefinition
-# without 'arguments' field) instead of ChatCompletionOutputToolCall (which has
-# ChatCompletionOutputFunctionDefinition with 'arguments' field).
-# This patch should be removed once pydantic_ai fixes this upstream.
-def _patch_pydantic_ai_huggingface() -> None:
-    from pydantic_ai.messages import ToolCallPart
-    from pydantic_ai._utils import guard_tool_call_id as _guard_tool_call_id
-    from huggingface_hub.inference._generated.types.chat_completion import (
-        ChatCompletionOutputToolCall,
-        ChatCompletionOutputFunctionDefinition,
-    )
-
-    @staticmethod  # type: ignore[misc]
-    def _map_tool_call_fixed(t: ToolCallPart) -> ChatCompletionOutputToolCall:
-        return ChatCompletionOutputToolCall(
-            id=_guard_tool_call_id(t=t),
-            type="function",
-            function=ChatCompletionOutputFunctionDefinition(
-                name=t.tool_name,
-                arguments=t.args_as_json_str(),
-            ),
-        )
-
-    HuggingFaceModel._map_tool_call = _map_tool_call_fixed
-
-
-_patch_pydantic_ai_huggingface()
+from prompttodraft.agents.pydantic_ai_agent import GPT_OSS_120B_HF_PYDANTIC_AI
 
 
 def test_pydantic_ai_tool_created_correctly():
@@ -188,7 +158,7 @@ def test_pydantic_ai_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.cleanup()
+        backend.clean_state_manager()
 
 
 def test_pydantic_ai_tool_schemas_extracted_correctly():
@@ -315,10 +285,7 @@ def test_pydantic_ai_agent_with_llm():
 
     # Create agent with HuggingFace model via Groq provider
     agent = Agent(
-        model=HuggingFaceModel(
-            model_name="openai/gpt-oss-120b",
-            provider=HuggingFaceProvider(api_key=os.environ["HF_TOKEN"], provider_name="groq"),
-        ),
+        model=GPT_OSS_120B_HF_PYDANTIC_AI,
         tools=[calculator_tool, greeter_tool],
         system_prompt="You are a helpful assistant. Use the provided tools to answer questions."
     )

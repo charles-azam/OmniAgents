@@ -158,7 +158,7 @@ def test_langchain_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.cleanup()
+        backend.clean_state_manager()
 
 
 def test_langchain_tool_schemas_extracted_correctly():

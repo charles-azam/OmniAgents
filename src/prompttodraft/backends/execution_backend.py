@@ -82,13 +82,13 @@ class ExecutionBackend(ABC):
         """
         pass
     
-    def cleanup(self) -> None:
+    def clean_state_manager(self) -> None:
         """
         Cleanup the backend environment.
         """
         self.state_manager.cleanup(project_id=self.project_id)
 
-    def clean(self) -> None:
+    def clean(self, clean_state_manager: bool = False) -> None:
         """
         Remove all files from working directory and save a clean snapshot.
 
@@ -124,9 +124,8 @@ class ExecutionBackend(ABC):
         # timestamp won't be discoverable
         self.write_file(file_path=working_dir / "README.md", content="")
 
-        # Save the clean state
-        self.state_manager.save_snapshot(backend=self, message="clean")
-
+        if clean_state_manager:
+            self.state_manager.cleanup(project_id=self.project_id)
 
     @abstractmethod
     def shutdown(self) -> None:
@@ -224,14 +223,25 @@ class ExecutionBackend(ABC):
     
     def convert_to_path(self, path: str | Path) -> Path:
         """
-        Convert a string path to a Path object.
+        Convert a string path to a Path object, relative to working directory.
+
+        If path is absolute but outside the working directory, strips the
+        leading '/' and treats it as relative to the working directory.
+        This handles cases where LLMs generate paths like '/home/sandbox/file.py'.
         """
         path = Path(path)
         working_dir = self.get_working_directory()
+
+        # If path is already relative to working dir, use it as-is
         if path.is_relative_to(working_dir):
             return path
-        else:
-            return working_dir / path
+
+        # If path is absolute but outside working dir,
+        # strip leading '/' and treat as relative
+        if path.is_absolute():
+            path = Path(*path.parts[1:])  # Remove the root '/'
+
+        return working_dir / path
 
     # === File Operations ===
 

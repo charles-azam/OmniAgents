@@ -3,7 +3,7 @@ Example usage of the PydanticAIAgent.
 
 This demonstrates how to use the pydantic_ai agent with different backends.
 """
-from prompttodraft.agents.pydantic_ai_agent import PydanticAIAgent
+from prompttodraft.agents.pydantic_ai_agent import PydanticAIAgent, GPT_OSS_120B_HF_PYDANTIC_AI, GPT_5_MINI_OPENAI_PYDANTIC_AI
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.state_manager import GitStateManager
 from dotenv import load_dotenv
@@ -23,14 +23,13 @@ def main(reset_history: bool = True) -> None:
 
     # Start the backend (loads from git if exists)
     backend.start()
-
+    model = GPT_OSS_120B_HF_PYDANTIC_AI
     # Create the agent
     # Note: The backend is passed here but will be injected into tools
     # via pydantic_ai's deps (AgentDependencies) at runtime
     agent = PydanticAIAgent(
         backend=backend,
-        model_id="gpt-5-mini",
-        provider="openai",
+        model=model,
     )
 
     # Run a task
