@@ -1,7 +1,5 @@
 # PromptToDraft
 
-[![Test All Backends](https://github.com/charles-azam/prompttodraft/actions/workflows/test.yml/badge.svg)](https://github.com/charles-azam/prompttodraft/actions/workflows/test.yml)
-
 A multi-backend execution framework for AI coding agents. Run the same tools across local, Docker, or E2B environments with any AI framework (smolagents, Pydantic-AI, LangChain).
 
 ## Core Design Principle
