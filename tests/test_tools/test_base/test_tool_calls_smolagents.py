@@ -168,7 +168,7 @@ def test_smolagents_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.cleanup()
+        backend.clean_state_manager()
 
 def test_tool_schemas_extracted_correctly():
     """Test that tool schemas are correctly extracted from Generic parameters."""
@@ -237,13 +237,13 @@ def test_smolagents_agent_with_llm():
         operation: str
         a: float
         b: float
-        
-    metadata = dict(CalculatorOutput=0, GreeterOutput=0)
+
+    metadata = dict(CalculatorOutput=0, GreeterOutput=0, TextJoinerOutput=0)
 
     class CalculatorOutput(BaseModel):
         result: float
         operation_performed: str
-        
+
         def has_been_called(self) -> bool:
             metadata["CalculatorOutput"] += 1
 
@@ -265,13 +265,13 @@ def test_smolagents_agent_with_llm():
                     result = inputs.a / inputs.b
             else:
                 result = 0.0
-                
+
             calculator_output = CalculatorOutput(
                 result=result,
                 operation_performed=f"{inputs.a} {inputs.operation} {inputs.b}"
             )
             calculator_output.has_been_called()
-            
+
             return str(calculator_output)
 
     class GreeterInput(BaseModel):
@@ -280,7 +280,7 @@ def test_smolagents_agent_with_llm():
 
     class GreeterOutput(BaseModel):
         greeting: str
-        
+
         def has_been_called(self) -> bool:
             metadata["GreeterOutput"] += 1
 
@@ -299,18 +299,53 @@ def test_smolagents_agent_with_llm():
             greeter_output.has_been_called()
             return greeter_output
 
+    class TextJoinerInput(BaseModel):
+        items: list[str] = Field(description="List of text items to join") # smolagents handles array differently
+        format_type: str = Field(description="Format type: 'comma', 'numbered', or 'bullets'")
+        additional_context: str | None = Field(default=None, description="Additional context to add to the formatted text, should almost always be empty") # smolagents handles optional differently
+
+    class TextJoinerOutput(BaseModel):
+        formatted_text: str
+        item_count: int
+
+        def has_been_called(self) -> bool:
+            metadata["TextJoinerOutput"] += 1
+
+    class TextJoinerTool(CoreTool[TextJoinerInput, TextJoinerOutput]):
+        name = "text_joiner"
+        description = "Takes a list of text items and formats them. Supports 'comma' (comma-separated), 'numbered' (numbered list), or 'bullets' (bullet points)."
+
+        def execute(self, inputs: TextJoinerInput) -> TextJoinerOutput:
+            if inputs.format_type == "comma":
+                formatted = ", ".join(inputs.items)
+            elif inputs.format_type == "numbered":
+                formatted = "\n".join([f"{i+1}. {item}" for i, item in enumerate(inputs.items)])
+            elif inputs.format_type == "bullets":
+                formatted = "\n".join([f"• {item}" for item in inputs.items])
+            else:
+                formatted = " ".join(inputs.items)
+
+            text_joiner_output = TextJoinerOutput(
+                formatted_text=formatted,
+                item_count=len(inputs.items)
+            )
+            text_joiner_output.has_been_called()
+            return text_joiner_output
+
     # Create tool instances
     calculator = CalculatorTool()
     greeter = GreeterTool()
+    text_joiner = TextJoinerTool()
 
     # Convert to smolagents tools
     calculator_tool = calculator.to_smolagents_tool()
     greeter_tool = greeter.to_smolagents_tool()
+    text_joiner_tool = text_joiner.to_smolagents_tool()
 
     # Create agent with gpt-5-mini model
     model = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")
     agent = ToolCallingAgent(
-        tools=[calculator_tool, greeter_tool],
+        tools=[calculator_tool, greeter_tool, text_joiner_tool],
         model=model,
         max_steps=2
     )
@@ -320,12 +355,22 @@ def test_smolagents_agent_with_llm():
     assert "45" in str(result) or "45.0" in str(result), f"Expected result to contain 45, got: {result}"
     assert metadata["CalculatorOutput"] == 1
     assert metadata["GreeterOutput"] == 0
+    assert metadata["TextJoinerOutput"] == 0
 
     # Test 2: Greeting task
     result = agent.run(task="Greet Alice in Spanish")
     assert "Hola" in str(result) and "Alice" in str(result), f"Expected Spanish greeting for Alice, got: {result}"
     assert metadata["CalculatorOutput"] == 1
     assert metadata["GreeterOutput"] == 1
+    assert metadata["TextJoinerOutput"] == 0
+
+    # Test 3: List processing task - test that list[str] input works correctly
+    result = agent.run(task="Format these grocery items as a numbered list: milk, eggs, bread, cheese")
+    result_str = str(result)
+    # Check that the text joiner was called
+    assert metadata["TextJoinerOutput"] == 1, f"Expected TextJoinerTool to be called, but it wasn't"
+    # Check that result contains the items formatted
+    assert ("milk" in result_str and "eggs" in result_str and "bread" in result_str and "cheese" in result_str), f"Expected all grocery items in result, got: {result}"
     pass
 
 if __name__ == "__main__":

@@ -3,9 +3,9 @@ Example usage of the LangChainAgent.
 
 This demonstrates how to use the LangChain agent with different backends.
 """
-from prompttodraft.agents.langchain_agent import LangChainAgent
+from prompttodraft.agents.langchain_agent import LangChainAgent, GPT_OSS_120B_HF_LANGCHAIN, GPT_5_MINI_OPENAI_LANGCHAIN
 from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.backends.state_manager import NoOpStateManager
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -15,7 +15,7 @@ def main() -> None:
     """Run a simple coding task with the agent."""
     # Create a backend with git storage
     project_id = "example-project-langchain"
-    state_manager = GitStateManager()
+    state_manager = NoOpStateManager()
     backend = LocalBackend(
         project_id=project_id,
         state_manager=state_manager,
@@ -23,12 +23,11 @@ def main() -> None:
 
     # Start the backend (loads from git if exists)
     backend.start()
-
+    model = GPT_OSS_120B_HF_LANGCHAIN
     # Create the agent
     agent = LangChainAgent(
         backend=backend,
-        model_id="gpt-5-mini",
-        provider="openai",
+        model=model,
     )
 
     # Run a task

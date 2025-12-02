@@ -19,30 +19,9 @@ from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
 
-
-def create_model(provider: str, model_id: str):
-    """
-    Create a smolagents model from provider and model_id.
-
-    Args:
-        provider: Provider name (openai, huggingface, xai).
-        model_id: Model identifier.
-
-    Returns:
-        Configured smolagents model.
-    """
-    if provider == "openai":
-        return OpenAIModel(model_id=model_id)
-    elif provider == "huggingface":
-        return InferenceClientModel(model_id=model_id)
-    elif provider == "xai":
-        return OpenAIModel(
-            model_id=model_id,
-            api_key=os.getenv("XAI_API_KEY"),
-            api_base="https://api.x.ai/v1"
-        )
-    else:
-        raise ValueError(f"Unsupported provider: {provider}")
+# MODEL EXAMPLES
+GPT_5_MINI_OPENAI_SMOLAGENTS = OpenAIModel(model_id="gpt-5-mini")
+GPT_OSS_120B_HF_SMOLAGENTS = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")
 
 
 def create_smolagents_tools(backend: ExecutionBackend) -> list:
@@ -84,8 +63,7 @@ class SmolAgentAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model_id: str = "openai/gpt-oss-120b",
-        provider: str = "huggingface",
+        model: OpenAIModel | InferenceClientModel = GPT_OSS_120B_HF_SMOLAGENTS,
         additional_tools: list | None = None,
         max_steps: int = 30,
     ) -> None:
@@ -94,13 +72,12 @@ class SmolAgentAgent:
 
         Args:
             backend: Execution backend (LocalBackend, DockerBackend, or E2BBackend)
-            model_id: Model identifier
-            provider: Provider name (openai, huggingface, xai)
+            model: Smolagents model
             additional_tools: Optional additional smolagents tools to add
             max_steps: Maximum number of agent steps
         """
         self.backend = backend
-        self.model_id = model_id
+        self.model = model
 
         # Create core tools using conversion methods
         self.tools = create_smolagents_tools(backend=backend)
@@ -110,7 +87,6 @@ class SmolAgentAgent:
             self.tools.extend(additional_tools)
 
         # Initialize the smolagents agent
-        self.model = create_model(provider=provider, model_id=model_id)
         self.agent = ToolCallingAgent(
             tools=self.tools,
             model=self.model,
@@ -130,7 +106,7 @@ class SmolAgentAgent:
         """
         self.backend.start()
         if reset_history:
-            self.backend.cleanup()
+            self.backend.clean_state_manager()
 
         # Run the agent
         result = self.agent.run(task=task)

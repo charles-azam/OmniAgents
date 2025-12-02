@@ -6,6 +6,7 @@ with manually defined tools, working across any execution backend.
 """
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
+from langchain_core.language_models.chat_models import BaseChatModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.write_file_tool import WriteFileTool
@@ -18,45 +19,19 @@ from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
-
+from prompttodraft.tools.base_tool import CoreBackendTool
 from langsmith import traceable
+import os
 
-
-def create_model(provider: str, model_id: str):
-    """
-    Create a LangChain model from provider and model_id.
-
-    Args:
-        provider: Provider name (openai, huggingface, xai).
-        model_id: Model identifier.
-
-    Returns:
-        Configured LangChain model.
-    """
-    if provider == "openai":
-        return ChatOpenAI(
-            model=model_id,
-            temperature=0,
-        )
-    elif provider == "huggingface":
-        from langchain_huggingface import ChatHuggingFace
-        from langchain_huggingface import HuggingFaceEndpoint
-
-        llm = HuggingFaceEndpoint(
-            repo_id=model_id,
-            task="text-generation",
-            temperature=0,
-        )
-        return ChatHuggingFace(llm=llm)
-    elif provider == "xai":
-        from langchain_xai import ChatXAI
-
-        return ChatXAI(
-            model=model_id,
-            temperature=0,
-        )
-    else:
-        raise ValueError(f"Unsupported provider: {provider}")
+# MODEL EXAMPLES
+GPT_5_MINI_OPENAI_LANGCHAIN = ChatOpenAI(
+    model="gpt-5-mini",
+)
+GPT_OSS_120B_HF_LANGCHAIN = ChatOpenAI(
+    base_url="https://router.huggingface.co/v1",
+    api_key=os.environ["HF_TOKEN"],
+    model="openai/gpt-oss-120b:groq",
+)
 
 
 def create_langchain_tools(backend: ExecutionBackend) -> list:
@@ -69,7 +44,7 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
     Returns:
         List of LangChain tool objects.
     """
-    tool_classes = [
+    tool_classes: list[type[CoreBackendTool]] = [
         WriteFileTool,
         ReadFileTool,
         ListDirectoryTool,
@@ -99,8 +74,7 @@ class LangChainAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model_id: str = "gpt-5-mini",
-        provider: str = "openai",
+        model: BaseChatModel = GPT_OSS_120B_HF_LANGCHAIN,
         additional_tools: list | None = None,
     ) -> None:
         """
@@ -108,13 +82,11 @@ class LangChainAgent:
 
         Args:
             backend: Execution backend (LocalBackend, DockerBackend, or E2BBackend)
-            model_id: Model identifier
-            provider: Provider name (openai, huggingface, xai)
+            model: LangChain model
             additional_tools: Optional additional LangChain tools to add
         """
         self.backend = backend
-        self.model_id = model_id
-        self.provider = provider
+        self.model = model
 
         # Create core tools manually
         self.tools = create_langchain_tools(backend=backend)
@@ -122,9 +94,6 @@ class LangChainAgent:
         # Add any additional tools
         if additional_tools:
             self.tools.extend(additional_tools)
-
-        # Initialize the LangChain model
-        self.model = create_model(provider=provider, model_id=model_id)
 
     @traceable
     def run(self, task: str, reset_history: bool = True) -> str:
@@ -143,7 +112,7 @@ class LangChainAgent:
 
         # Cleanup if requested
         if reset_history:
-            self.backend.cleanup()
+            self.backend.clean_state_manager()
 
         # Generate system prompt with current project context
 

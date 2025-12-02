@@ -318,7 +318,8 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert len(non_git_files_before) > 0, "Expected files before clean()"
 
         # Call clean()
-        backend.clean()
+        backend.clean(clean_state_manager=False)
+        backend.state_manager.save_snapshot(backend=backend, message="clean")
 
         # Verify files were removed (except .git for Git storage and README.md marker)
         files_after_clean = backend.list_directory(path=working_dir, recursive=False)
@@ -604,10 +605,10 @@ def test_e2b_backend_git_storage():
 
 
 if __name__ == "__main__":
-    # test_local_backend_e2e()
-    # test_docker_backend_e2e()
-    # test_docker_backend_container_reuse()
-    # test_e2b_backend_e2e()
-    # test_local_backend_git_storage()
+    test_local_backend_e2e()
+    test_docker_backend_e2e()
+    test_docker_backend_container_reuse()
+    test_e2b_backend_e2e()
+    test_local_backend_git_storage()
     test_docker_backend_git_storage()
     test_e2b_backend_git_storage()

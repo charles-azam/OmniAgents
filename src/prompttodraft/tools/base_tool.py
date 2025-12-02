@@ -152,10 +152,37 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
 
         if "properties" in input_schema:
             for param_name, param_schema in input_schema["properties"].items():
-                smolagents_inputs[param_name] = {
-                    "type": param_schema.get("type", "string"),
-                    "description": param_schema.get("description", f"Parameter {param_name}")
-                }
+                # Handle anyOf (optional types like list[str] | None)
+                if "anyOf" in param_schema:
+                    # Find the non-null type in anyOf and use it as the base
+                    for any_of_option in param_schema["anyOf"]:
+                        if any_of_option.get("type") != "null":
+                            # Use this type's schema as the base
+                            param_def = any_of_option.copy()
+                            # Add description and default from parent if present
+                            if "description" in param_schema:
+                                param_def["description"] = param_schema["description"]
+                            elif "title" in param_schema:
+                                param_def["description"] = param_schema["title"]
+                            elif "title" in param_def:
+                                param_def["description"] = param_def["title"]
+                            else:
+                                param_def["description"] = f"Parameter {param_name}"
+                            if "default" in param_schema:
+                                param_def["default"] = param_schema["default"]
+                            # Mark as nullable since this was anyOf with null
+                            param_def["nullable"] = True
+                            smolagents_inputs[param_name] = param_def
+                            break
+                else:
+                    # Use the param_schema directly, but ensure it has a description
+                    param_def = param_schema.copy()
+                    if "description" not in param_def:
+                        if "title" in param_def:
+                            param_def["description"] = param_def["title"]
+                        else:
+                            param_def["description"] = f"Parameter {param_name}"
+                    smolagents_inputs[param_name] = param_def
 
         class CustomSmolagentsTool(SmolagentsTool):
             name = main_class_self.name
