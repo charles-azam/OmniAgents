@@ -68,7 +68,7 @@ def create_smolagents_tools(backend: ExecutionBackend) -> list:
         UVTool,
     ]
 
-    return [tool_class(backend=backend).to_smolagents_tool()(backend=backend) for tool_class in tool_classes]
+    return [tool_class(backend=backend).to_smolagents_tool() for tool_class in tool_classes]
 
 
 class SmolAgentAgent:

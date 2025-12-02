@@ -38,11 +38,10 @@ def test_smolagent_tool_created_correctly():
     tool = SimpleTool()
 
     # Convert to smolagents tool
-    SmolagentsToolClass = tool.to_smolagents_tool()
-    smolagent_instance = SmolagentsToolClass()
+    smolagent_instance = tool.to_smolagents_tool()
 
     # Verify tool is created with correct type and attributes
-    assert issubclass(SmolagentsToolClass, SmolagentsTool)
+    assert isinstance(smolagent_instance, SmolagentsTool)
     assert smolagent_instance.name == "simple_tool"
     assert smolagent_instance.description == "Does something simple"
     assert smolagent_instance.output_type == "string"
@@ -93,15 +92,12 @@ def test_smolagent_tool_backend_created_correctly():
     tool = BackendTool(backend=backend)
 
     # Convert to smolagents tool
-    SmolagentsToolClass = tool.to_smolagents_tool()
-    smolagent_instance = SmolagentsToolClass(backend=backend)
+    smolagent_instance = tool.to_smolagents_tool()
 
     # Verify tool structure
-    assert issubclass(SmolagentsToolClass, SmolagentsTool)
+    assert isinstance(smolagent_instance, SmolagentsTool)
     assert smolagent_instance.name == "backend_tool"
     assert smolagent_instance.description == "Tool that uses backend"
-    assert hasattr(smolagent_instance, "backend")
-    assert smolagent_instance.backend == backend
 
     # Test execution with backend
     result = smolagent_instance.forward(command="ls -la")
@@ -126,19 +122,14 @@ def test_smolagents_tool_backend_works_correctly():
 
         # Create a real backend tool (WriteFileTool)
         write_tool = WriteFileTool(backend=backend)
-        
-        # Convert to smolagents tool
-        WriteSmolagentsTool = write_tool.to_smolagents_tool()
 
-        # Instantiate the smolagents tool with the backend
-        smolagents_write_tool = WriteSmolagentsTool(backend=backend)
+        # Convert to smolagents tool
+        smolagents_write_tool = write_tool.to_smolagents_tool()
 
         # Verify tool structure
-        assert issubclass(WriteSmolagentsTool, SmolagentsTool)
+        assert isinstance(smolagents_write_tool, SmolagentsTool)
         assert smolagents_write_tool.name == "write_file"
         assert "write" in smolagents_write_tool.description.lower()
-        assert hasattr(smolagents_write_tool, "backend")
-        assert smolagents_write_tool.backend == backend
 
         # Test execution with backend - write a file
         random_number = random.randint(1, 1000000)
@@ -311,14 +302,10 @@ def test_smolagents_agent_with_llm():
     # Create tool instances
     calculator = CalculatorTool()
     greeter = GreeterTool()
-    
-    # Convert to smolagents tools
-    CalculatorSmolagentsTool = calculator.to_smolagents_tool()
-    GreeterSmolagentsTool = greeter.to_smolagents_tool()
 
-    # Create tool instances for the agent
-    calculator_tool = CalculatorSmolagentsTool()
-    greeter_tool = GreeterSmolagentsTool()
+    # Convert to smolagents tools
+    calculator_tool = calculator.to_smolagents_tool()
+    greeter_tool = greeter.to_smolagents_tool()
 
     # Create agent with gpt-5-mini model
     model = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")

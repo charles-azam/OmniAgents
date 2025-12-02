@@ -138,7 +138,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
             "output_schema": cls.get_output_schema(),
         }
         
-    def to_smolagents_tool(main_class_self) -> type[SmolagentsTool]:
+    def to_smolagents_tool(main_class_self) -> SmolagentsTool:
         """
         Convert the tool to a smolagents Tool.
 
@@ -167,7 +167,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
             def forward(self, **kwargs: Any) -> str | Any:
                 return main_class_self.execute_unpacked(**kwargs)
 
-        return CustomSmolagentsTool
+        return CustomSmolagentsTool()
         
     def to_langchain_tool(self, **kwargs: Any) -> LangChainTool:
         """
@@ -224,19 +224,14 @@ class CoreBackendTool(CoreTool[TInput, TOutput]):
         """
         self.backend = backend
 
-    def to_smolagents_tool(self) -> type[SmolagentsTool]:
+    def to_smolagents_tool(self) -> SmolagentsTool:
         """
-        Convert the backend tool to a smolagents Tool class.
+        Convert the backend tool to a smolagents Tool instance.
 
-        Returns a class that accepts a backend parameter in its constructor,
-        allowing the tool to be instantiated with different backends.
+        Returns:
+            A smolagents Tool instance with the backend already bound.
         """
-        CustomSmolagentsTool = super().to_smolagents_tool()
-        class BackendCustomSmolagentsTool(CustomSmolagentsTool):
-            def __init__(self, backend: ExecutionBackend):
-                self.backend = backend
-
-        return BackendCustomSmolagentsTool
+        return super().to_smolagents_tool()
 
     def to_langchain_tool(self, **kwargs: Any) -> LangChainTool:
         """
