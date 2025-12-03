@@ -5,6 +5,7 @@ This module implements the ExecutionBackend for E2B sandbox execution.
 """
 from pathlib import Path
 
+from beartype import beartype
 from e2b_code_interpreter import Sandbox
 from e2b.sandbox.filesystem.filesystem import FileType as E2BFileType
 from e2b.sandbox.commands.command_handle import CommandExitException
@@ -22,9 +23,10 @@ from prompttodraft.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 SANDBOX_TIMEOUT = 3600  # 1 hour for sandbox lifetime
-SANDBOX_WORKING_DIR = "/tmp/workspace"  # Working directory inside E2B sandbox
+SANDBOX_WORKING_DIR = "/workspace"  # Working directory inside E2B sandbox
 
 
+@beartype
 class E2BBackend(ExecutionBackend):
     """E2B execution backend."""
 
@@ -97,155 +99,144 @@ class E2BBackend(ExecutionBackend):
                 exit_code=e.exit_code
             )
 
-    def get_working_directory(self) -> str:
-        return SANDBOX_WORKING_DIR
+    def get_working_directory(self) -> Path:
+        """Get the working directory as seen by the LLM (/workspace)."""
+        return Path(SANDBOX_WORKING_DIR)
 
-    def _normalize_path(self, path: str | Path) -> str:
-        """
-        Normalize a path to an absolute path within the sandbox.
-        Converts relative paths to absolute paths based on working directory.
-        """
-        path_obj = Path(path)
-        # If path is already absolute, return as-is
-        if path_obj.is_absolute():
-            return str(path_obj)
-        # If path is relative, make it absolute relative to working directory
-        return str(Path(SANDBOX_WORKING_DIR) / path_obj)
+    def _to_system_path(self, virtual_path: Path) -> Path:
+        """Convert virtual path to sandbox path."""
+        if not virtual_path.is_absolute():
+            virtual_path = Path(SANDBOX_WORKING_DIR) / virtual_path
 
-    def read_file(self, file_path: str | Path) -> str:
+        if not str(virtual_path).startswith(SANDBOX_WORKING_DIR):
+            raise ValueError(f"Path {virtual_path} is outside workspace {SANDBOX_WORKING_DIR}")
+
+        return virtual_path
+
+    def _to_virtual_path(self, system_path: str | Path) -> Path:
+        """Convert sandbox path to virtual path."""
+        return Path(system_path)
+
+    def read_file(self, file_path: Path) -> str:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=file_path)
+        sandbox_path = self._to_system_path(file_path)
         try:
-            return self._sandbox.files.read(path=sandbox_path)
+            return self._sandbox.files.read(path=str(sandbox_path))
         except NotFoundException as e:
             raise FileNotFoundError(str(e)) from e
 
-    def write_file(self, file_path: str | Path, content: str) -> None:
+    def write_file(self, file_path: Path, content: str) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=file_path)
-        # Create parent directory if needed
-        parent = str(Path(sandbox_path).parent)
+        sandbox_path = self._to_system_path(file_path)
+        parent = str(sandbox_path.parent)
         if parent != "/" and parent != ".":
             try:
                 self._sandbox.files.make_dir(path=parent)
             except:
-                pass  # Directory might already exist
+                pass
 
-        self._sandbox.files.write(path=sandbox_path, data=content)
+        self._sandbox.files.write(path=str(sandbox_path), data=content)
 
-    def delete_file(self, path: str | Path) -> None:
+    def delete_file(self, path: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=path)
-        # Check if file exists first, since E2B's remove() doesn't raise exception for non-existent files
-        if not self._sandbox.files.exists(path=sandbox_path):
+        sandbox_path = self._to_system_path(path)
+        if not self._sandbox.files.exists(path=str(sandbox_path)):
             raise FileNotFoundError(f"File not found: {path}")
 
-        self._sandbox.files.remove(path=sandbox_path)
+        self._sandbox.files.remove(path=str(sandbox_path))
 
-    def delete_directory(self, path: str | Path) -> None:
+    def delete_directory(self, path: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=path)
-        # E2B remove works for both files and directories
-        self._sandbox.files.remove(path=sandbox_path)
+        sandbox_path = self._to_system_path(path)
+        self._sandbox.files.remove(path=str(sandbox_path))
 
-    def create_directory(self, path: str | Path, parents: bool = False) -> None:
+    def create_directory(self, path: Path, parents: bool = False) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=path)
-        self._sandbox.files.make_dir(path=sandbox_path)
+        sandbox_path = self._to_system_path(path)
+        self._sandbox.files.make_dir(path=str(sandbox_path))
 
-    def copy_file(self, src: str | Path, dst: str | Path) -> None:
+    def copy_file(self, src: Path, dst: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        src_path = self._normalize_path(path=src)
-        dst_path = self._normalize_path(path=dst)
-        # E2B doesn't have built-in copy, use command
+        src_path = self._to_system_path(src)
+        dst_path = self._to_system_path(dst)
         result = self._sandbox.commands.run(cmd=f"cp {src_path} {dst_path}", cwd=SANDBOX_WORKING_DIR)
         if result.exit_code != 0:
             raise RuntimeError(f"Copy failed: {result.stderr}")
 
-    def move_file(self, src: str | Path, dst: str | Path) -> None:
+    def move_file(self, src: Path, dst: Path) -> None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        src_path = self._normalize_path(path=src)
-        dst_path = self._normalize_path(path=dst)
-        self._sandbox.files.rename(old_path=src_path, new_path=dst_path)
+        src_path = self._to_system_path(src)
+        dst_path = self._to_system_path(dst)
+        self._sandbox.files.rename(old_path=str(src_path), new_path=str(dst_path))
 
-    def list_directory(self, path: str | Path, recursive: bool = False) -> list[FileInfo]:
+    def list_directory(self, path: Path, recursive: bool = False) -> list[FileInfo]:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=path)
+        sandbox_path = self._to_system_path(path)
         files = []
-        entries = self._sandbox.files.list(path=sandbox_path)
+        entries = self._sandbox.files.list(path=str(sandbox_path))
+        if not entries:
+            raise FileNotFoundError(f"Directory {path} does not exist")
 
         for entry in sorted(entries, key=lambda x: x.name):
             file_type = FileType.DIRECTORY if entry.type == E2BFileType.DIR else FileType.FILE
-            entry_path = str(Path(sandbox_path) / entry.name)
-            files.append(FileInfo(
-                name=entry.name,
-                path=entry_path,
-                type=file_type
-            ))
+            entry_path = sandbox_path / entry.name
+            virtual_path = self._to_virtual_path(entry_path)
+
+            files.append(FileInfo(name=entry.name, path=virtual_path, type=file_type))
 
             if recursive and file_type == FileType.DIRECTORY:
                 try:
-                    subdir_files = self.list_directory(
-                        path=entry_path,
-                        recursive=True
-                    )
-                    files.extend(subdir_files)
+                    files.extend(self.list_directory(path=virtual_path, recursive=True))
                 except:
-                    pass  # Skip inaccessible directories
+                    pass
 
         return files
 
-    def file_exists(self, path: str | Path) -> FileType | None:
+    def file_exists(self, path: Path) -> FileType | None:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        sandbox_path = self._normalize_path(path=path)
-        if not self._sandbox.files.exists(path=sandbox_path):
+        sandbox_path = self._to_system_path(path)
+        if not self._sandbox.files.exists(path=str(sandbox_path)):
             return None
 
-        info = self._sandbox.files.get_info(path=sandbox_path)
+        info = self._sandbox.files.get_info(path=str(sandbox_path))
         return FileType.DIRECTORY if info.type == E2BFileType.DIR else FileType.FILE
 
-    def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
+    def glob_files(self, pattern: str, path: Path | None = None) -> list[str]:
         if self._sandbox is None:
             raise RuntimeError("Sandbox not initialized - call start() first")
 
-        # Use find command for glob since E2B doesn't have native glob
-        search_path = self._normalize_path(path=path) if path else SANDBOX_WORKING_DIR
+        search_path = str(self._to_system_path(path)) if path else SANDBOX_WORKING_DIR
 
-        # Convert glob pattern to find command
-        # Handle ** recursive glob patterns
         if pattern.startswith("**/"):
-            # **/*.py -> find all .py files recursively
-            file_pattern = pattern[3:]  # Remove **/
+            file_pattern = pattern[3:]
             result = self._sandbox.commands.run(
                 cmd=f"find {search_path} -type f -name '{file_pattern}'",
                 cwd=SANDBOX_WORKING_DIR
             )
         elif "**/" in pattern:
-            # Complex pattern with ** in middle - not common, treat as literal
             result = self._sandbox.commands.run(
                 cmd=f"find {search_path} -type f -name '{pattern}'",
                 cwd=SANDBOX_WORKING_DIR
             )
         else:
-            # Simple pattern like *.py -> only search in the directory itself
             result = self._sandbox.commands.run(
                 cmd=f"find {search_path} -maxdepth 1 -type f -name '{pattern}'",
                 cwd=SANDBOX_WORKING_DIR
@@ -255,4 +246,4 @@ class E2BBackend(ExecutionBackend):
             return []
 
         files = [f.strip() for f in result.stdout.split("\n") if f.strip()]
-        return sorted(files)
+        return sorted([str(self._to_virtual_path(f)) for f in files])

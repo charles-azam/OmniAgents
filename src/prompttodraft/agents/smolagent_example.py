@@ -3,7 +3,7 @@ Example usage of the SmolAgentAgent.
 
 This demonstrates how to use the smolagent agent with different backends.
 """
-from prompttodraft.agents.smolagent_agent import SmolAgentAgent, GPT_OSS_120B_HF_SMOLAGENTS, GPT_5_MINI_OPENAI_SMOLAGENTS
+from prompttodraft.agents.smolagent_agent import SmolAgentAgent, get_smolagents_model_example
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import GitStateManager
 
@@ -20,7 +20,7 @@ def main() -> None:
 
     # Start the backend (loads from git if exists)
     backend.start()
-    model = GPT_OSS_120B_HF_SMOLAGENTS
+    model = get_smolagents_model_example()
     # Create the agent
     agent = SmolAgentAgent(
         backend=backend,

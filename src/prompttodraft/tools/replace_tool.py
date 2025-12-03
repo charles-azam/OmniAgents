@@ -16,7 +16,7 @@ from prompttodraft.outputs.outputs import (
 
 class ReplaceInput(BaseModel):
     """Input model for ReplaceTool."""
-    file_path: str = Field(description="The absolute path to the file to modify (e.g., '/home/user/project/file.txt'). Relative paths are not supported.")
+    file_path: str = Field(description="The path to the file to modify, relative to the working directory (e.g., 'hello.py' or 'src/main.py')")
     old_string: str = Field(description="The exact literal text to replace. This string must uniquely identify the single instance to change. It should include at least 3 lines of context before and after the target text, matching whitespace and indentation precisely. If old_string is empty, the tool attempts to create a new file at file_path with new_string as content.")
     new_string: str = Field(description="The exact literal text to replace old_string with.")
     expected_replacements: int = Field(default=1, description="Number of replacements expected. Defaults to 1 if not specified. Use when you want to replace multiple occurrences.")
@@ -43,22 +43,25 @@ class ReplaceTool(CoreBackendTool[ReplaceInput, ToolOutputModel]):
         Returns:
             TextOutputModel with success message or ErrorOutputModel on failure
         """
+        # Convert str path to Path object
+        path_obj = self.backend.convert_to_path(path=inputs.file_path)
+
         # Handle empty old_string (create new file)
         if not inputs.old_string:
-            file_exists = self.backend.file_exists(path=inputs.file_path)
+            file_exists = self.backend.file_exists(path=path_obj)
             if file_exists is not None:
                 return ErrorOutputModel(
                     error=f"Cannot create new file: {inputs.file_path} already exists",
                     error_type="FileExistsError",
                 )
 
-            self.backend.write_file(file_path=inputs.file_path, content=inputs.new_string)
+            self.backend.write_file(file_path=path_obj, content=inputs.new_string)
             return TextOutputModel(
                 content=f"Created new file: {inputs.file_path} with provided content.",
             )
 
         # Check if file exists
-        file_type = self.backend.file_exists(path=inputs.file_path)
+        file_type = self.backend.file_exists(path=path_obj)
         if file_type is None:
             return ErrorOutputModel(
                 error=f"File does not exist: {inputs.file_path}",
@@ -72,7 +75,7 @@ class ReplaceTool(CoreBackendTool[ReplaceInput, ToolOutputModel]):
             )
 
         # Read current content
-        content = self.backend.read_file(file_path=inputs.file_path)
+        content = self.backend.read_file(file_path=path_obj)
 
         # Count occurrences
         occurrences = content.count(inputs.old_string)
@@ -100,7 +103,7 @@ class ReplaceTool(CoreBackendTool[ReplaceInput, ToolOutputModel]):
         new_content = content.replace(inputs.old_string, inputs.new_string, inputs.expected_replacements)
 
         # Write modified content
-        self.backend.write_file(file_path=inputs.file_path, content=new_content)
+        self.backend.write_file(file_path=path_obj, content=new_content)
 
         return TextOutputModel(
             content=f"Successfully modified file: {inputs.file_path} ({inputs.expected_replacements} replacements).",

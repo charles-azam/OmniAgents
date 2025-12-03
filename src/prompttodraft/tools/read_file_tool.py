@@ -19,7 +19,7 @@ from prompttodraft.outputs.outputs import (
 
 class ReadFileInput(BaseModel):
     """Input model for ReadFileTool."""
-    path: str = Field(description="The absolute path to the file to read (e.g., '/home/user/project/file.txt'). Must be an absolute path.")
+    path: str = Field(description="The path to the file to read, relative to the working directory (e.g., 'hello.py' or 'src/main.py')")
     offset: int | None = Field(default=None, description="Optional: For text files, the 0-based line number to start reading from. Requires 'limit' to be set. Use for paginating through large files.")
     limit: int | None = Field(default=None, description="Optional: For text files, maximum number of lines to read. Use with 'offset' to paginate through large files. If omitted, reads the entire file (up to a default limit of 2000 lines).")
 
@@ -98,8 +98,11 @@ class ReadFileTool(CoreBackendTool[ReadFileInput, ToolOutputModel]):
         Returns:
             TextOutputModel with file content or ErrorOutputModel on failure
         """
+        # Convert str path to Path object
+        path_obj = self.backend.convert_to_path(path=inputs.path)
+
         # Check if file exists
-        file_type = self.backend.file_exists(path=inputs.path)
+        file_type = self.backend.file_exists(path=path_obj)
         if file_type is None:
             return ErrorOutputModel(
                 error=f"File does not exist: {inputs.path}",
@@ -151,7 +154,7 @@ class ReadFileTool(CoreBackendTool[ReadFileInput, ToolOutputModel]):
             )
 
         # Read text file
-        content = self.backend.read_file(file_path=inputs.path)
+        content = self.backend.read_file(file_path=path_obj)
 
         # Check if it's a binary file
         if self._is_binary_file(content=content):

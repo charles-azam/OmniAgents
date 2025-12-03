@@ -7,6 +7,7 @@ import os
 import shutil
 from pathlib import Path
 
+from beartype import beartype
 import docker
 from docker.models.containers import Container
 
@@ -25,6 +26,7 @@ DOCKER_IMAGE = "ghcr.io/astral-sh/uv:debian"
 CONTAINER_WORKSPACE = "/workspace"
 
 
+@beartype
 class DockerBackend(ExecutionBackend):
     """Docker execution backend."""
 
@@ -135,110 +137,86 @@ class DockerBackend(ExecutionBackend):
 
         return CommandResult(output=output.rstrip("\n") if output else "", exit_code=exit_code)
 
-    def get_working_directory(self) -> str:
-        """Get the working directory path for commands (container path)."""
-        return CONTAINER_WORKSPACE
+    def get_working_directory(self) -> Path:
+        """Get the working directory as seen by the LLM (/workspace)."""
+        return Path(CONTAINER_WORKSPACE)
 
-    def _get_host_working_directory(self) -> Path:
-        """Get the host filesystem path where files are actually stored."""
-        return self._project_path
+    def _to_system_path(self, virtual_path: Path) -> Path:
+        """Convert LLM path (/workspace/...) to host path."""
+        if virtual_path.is_absolute():
+            if not str(virtual_path).startswith(CONTAINER_WORKSPACE):
+                raise ValueError(f"Path {virtual_path} is outside workspace {CONTAINER_WORKSPACE}")
+            rel_path = virtual_path.relative_to(CONTAINER_WORKSPACE)
+            return self._project_path / rel_path
+        return self._project_path / virtual_path
 
-    def convert_to_path(self, path: str | Path) -> Path:
-        """
-        Convert container path to host path for file operations.
-
-        Container paths (e.g., /workspace/file.py) are mapped to host paths
-        (e.g., /Users/.../data/project_id/file.py) where the volume is mounted.
-        """
-        path_obj = Path(path)
-
-        # If path is absolute and starts with container workspace, convert to host path
-        if path_obj.is_absolute() and path_obj.is_relative_to(CONTAINER_WORKSPACE):
-            # Remove /workspace prefix and append to host project path
-            relative_path = path_obj.relative_to(CONTAINER_WORKSPACE)
-            return self._project_path / relative_path
-        elif path_obj.is_absolute():
-            # Absolute path outside workspace - just use it
-            return path_obj
-        else:
-            # Relative path - make it relative to host project path
-            return self._project_path / path_obj
-
-    def _convert_to_container_path(self, host_path: Path) -> str:
-        """
-        Convert host path to container path.
-
-        This is the reverse operation of convert_to_path().
-        Host paths (e.g., /Users/.../data/project_id/file.py) are mapped back to
-        container paths (e.g., /workspace/file.py).
-        """
+    def _to_virtual_path(self, system_path: str | Path) -> Path:
+        """Convert host path to container path."""
+        host_path = Path(system_path)
         if host_path.is_relative_to(self._project_path):
             relative_path = host_path.relative_to(self._project_path)
-            return str(Path(CONTAINER_WORKSPACE) / relative_path)
-        # If not under project path, return as-is
-        return str(host_path)
+            return Path(CONTAINER_WORKSPACE) / relative_path
+        return host_path
 
-    def read_file(self, file_path: str | Path) -> str:
-        return self.convert_to_path(file_path).read_text()
+    def read_file(self, file_path: Path) -> str:
+        host_path = self._to_system_path(file_path)
+        return host_path.read_text()
 
-    def write_file(self, file_path: str | Path, content: str) -> None:
-        p = self.convert_to_path(file_path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content)
+    def write_file(self, file_path: Path, content: str) -> None:
+        host_path = self._to_system_path(file_path)
+        host_path.parent.mkdir(parents=True, exist_ok=True)
+        host_path.write_text(content)
 
-    def delete_file(self, path: str | Path) -> None:
-        self.convert_to_path(path).unlink()
+    def delete_file(self, path: Path) -> None:
+        host_path = self._to_system_path(path)
+        host_path.unlink()
 
-    def delete_directory(self, path: str | Path) -> None:
-        shutil.rmtree(self.convert_to_path(path))
+    def delete_directory(self, path: Path) -> None:
+        host_path = self._to_system_path(path)
+        shutil.rmtree(host_path)
 
-    def create_directory(self, path: str | Path, parents: bool = False) -> None:
-        self.convert_to_path(path).mkdir(parents=parents, exist_ok=True)
+    def create_directory(self, path: Path, parents: bool = False) -> None:
+        host_path = self._to_system_path(path)
+        host_path.mkdir(parents=parents, exist_ok=True)
 
-    def copy_file(self, src: str | Path, dst: str | Path) -> None:
-        dst_path = self.convert_to_path(dst)
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.convert_to_path(src), dst_path)
+    def copy_file(self, src: Path, dst: Path) -> None:
+        host_src = self._to_system_path(src)
+        host_dst = self._to_system_path(dst)
+        host_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(host_src, host_dst)
 
-    def move_file(self, src: str | Path, dst: str | Path) -> None:
-        dst_path = self.convert_to_path(dst)
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(self.convert_to_path(src), dst_path)
+    def move_file(self, src: Path, dst: Path) -> None:
+        host_src = self._to_system_path(src)
+        host_dst = self._to_system_path(dst)
+        host_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(host_src, host_dst)
 
-    def list_directory(self, path: str | Path, recursive: bool = False) -> list[FileInfo]:
-        p = self.convert_to_path(path)
+    def list_directory(self, path: Path, recursive: bool = False) -> list[FileInfo]:
         files = []
+        host_path = self._to_system_path(path)
 
-        for item in sorted(p.iterdir()):
+        if not host_path.exists():
+            raise FileNotFoundError(f"Directory {path} does not exist")
+
+        for item in sorted(host_path.iterdir()):
             file_type = (
                 FileType.SYMLINK if item.is_symlink()
                 else FileType.FILE if item.is_file()
                 else FileType.DIRECTORY if item.is_dir()
                 else FileType.OTHER
             )
-            # Convert host path back to container path for consistency with get_working_directory()
-            container_path = self._convert_to_container_path(host_path=item)
-            files.append(FileInfo(name=item.name, path=container_path, type=file_type))
+            virtual_path = self._to_virtual_path(item)
+            files.append(FileInfo(name=item.name, path=virtual_path, type=file_type))
 
             if recursive and file_type == FileType.DIRECTORY:
-                # Use container path for recursive call to maintain consistency
-                files.extend(self.list_directory(path=container_path, recursive=True))
+                files.extend(self.list_directory(path=virtual_path, recursive=True))
 
         return files
 
-    def file_exists(self, path: str | Path) -> FileType | None:
-        p = self.convert_to_path(path)
-        if not p.exists():
-            return None
-        if p.is_symlink():
-            return FileType.SYMLINK
-        if p.is_file():
-            return FileType.FILE
-        if p.is_dir():
-            return FileType.DIRECTORY
-        return FileType.OTHER
+    def file_exists(self, path: Path) -> FileType | None:
+        host_path = self._to_system_path(path)
+        return self._determine_file_type(system_path=host_path)
 
-    def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
-        search_path = self.convert_to_path(path) if path else self._project_path
-        # Convert host paths back to container paths for consistency
-        return [self._convert_to_container_path(host_path=p) for p in sorted(search_path.glob(pattern)) if p.is_file()]
+    def glob_files(self, pattern: str, path: Path | None = None) -> list[str]:
+        search_path = self._to_system_path(path) if path else self._project_path
+        return [str(self._to_virtual_path(p)) for p in sorted(search_path.glob(pattern)) if p.is_file()]

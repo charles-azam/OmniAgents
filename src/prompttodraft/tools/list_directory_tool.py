@@ -14,11 +14,11 @@ from prompttodraft.outputs.outputs import (
     ErrorOutputModel,
     ToolOutputModel,
 )
-
+from pathlib import Path
 
 class ListDirectoryInput(BaseModel):
     """Input model for ListDirectoryTool."""
-    path: str = Field(description="The absolute path to the directory to list (must be absolute, not relative).")
+    path: str = Field(description="The path to the directory to list, relative to the working directory (e.g., '.' for root, 'src' for src directory)")
     ignore: list[str] | None = Field(default=None, description="Optional: List of glob patterns to ignore (e.g., ['*.log', '.git']).")
     respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when listing files. Only available in git repositories. Defaults to true.")
 
@@ -50,12 +50,12 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
         except Exception:
             return False
 
-    def _should_ignore_by_git(self, entry_path: str) -> bool:
+    def _should_ignore_by_git(self, entry_path: Path) -> bool:
         """
         Check if a file should be ignored according to .gitignore.
 
         Args:
-            entry_path: Absolute path to the entry to check
+            entry_path: Path object to the entry to check
 
         Returns:
             True if the entry should be ignored, False otherwise
@@ -64,7 +64,7 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
             # git check-ignore returns exit code 0 if the path is ignored
             # Use -q flag for quiet mode (no output, just exit code)
             result = self.backend.execute_command(
-                command=f"git check-ignore -q '{entry_path}'",
+                command=f"git check-ignore -q '{str(entry_path)}'",
                 timeout=2000  # 2 seconds
             )
             return result.exit_code == 0
@@ -81,8 +81,11 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
         Returns:
             FileListOutputModel with directory contents or ErrorOutputModel on failure
         """
+        # Convert str path to Path object
+        path_obj = self.backend.convert_to_path(path=inputs.path)
+
         # Check if directory exists
-        file_type = self.backend.file_exists(path=inputs.path)
+        file_type = self.backend.file_exists(path=path_obj)
         if file_type is None:
             return ErrorOutputModel(
                 error=f"Directory does not exist: {inputs.path}",
@@ -99,7 +102,7 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
         use_gitignore = inputs.respect_git_ignore and self._is_git_repository()
 
         # List directory contents
-        entries = self.backend.list_directory(path=inputs.path, recursive=False)
+        entries = self.backend.list_directory(path=path_obj, recursive=False)
 
         # Apply gitignore filtering if enabled
         if use_gitignore:
@@ -122,13 +125,15 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
                     filtered_entries.append(entry)
             entries = filtered_entries
 
-        # Convert to FileInfo output format
+        # Convert to FileInfo output format (from outputs module)
+        from prompttodraft.outputs.outputs import FileInfo as OutputFileInfo
+
         file_infos = []
         for entry in entries:
             file_infos.append(
-                FileInfo(
+                OutputFileInfo(
                     name=entry.name,
-                    path=entry.path,
+                    path=str(entry.path),  # Convert Path to str for output
                     is_dir=entry.type == FileType.DIRECTORY,
                     size="",
                 )

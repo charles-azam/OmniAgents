@@ -221,7 +221,12 @@ class FileListOutputModel(ToolOutputModel):
     )
 
     def __str__(self) -> str:
-        return f"{len(self.files)} items in {self.path}"
+        if not self.files:
+            return f"0 items in {self.path}"
+        file_names = [f.name + ("/" if f.is_dir else "") for f in self.files]
+        if len(file_names) <= 10:
+            return f"{len(self.files)} items in {self.path}: {', '.join(file_names)}"
+        return f"{len(self.files)} items in {self.path}: {', '.join(file_names[:10])}... (+{len(file_names) - 10} more)"
 
     def handle_console(self) -> str:
         """Display file list as table."""

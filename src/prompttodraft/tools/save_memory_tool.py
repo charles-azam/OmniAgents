@@ -34,32 +34,16 @@ class SaveMemoryTool(CoreBackendTool[SaveMemoryInput, TextOutputModel]):
     MEMORY_FILE_NAME = "GEMINI.md"
     MEMORY_SECTION_HEADER = "## Gemini Added Memories"
 
-    def _get_memory_file_path(self) -> str:
+    def _get_memory_file_path(self) -> Path:
         """
         Get the path to the memory file.
 
         Returns:
-            Absolute path to the memory file
+            Absolute path to the memory file as a Path object
         """
-        # For Docker and E2B backends, use working directory to avoid permission issues
-        from prompttodraft.backends.docker_backend import DockerBackend
-        from prompttodraft.backends.e2b_backend import E2BBackend
+        # Always use working directory to ensure we stay within sandbox
+        return self.backend.get_working_directory() / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME
 
-        if isinstance(self.backend, (DockerBackend, E2BBackend)):
-            return str(Path(self.backend.get_working_directory()) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
-
-        # For local backend, try to use home directory
-        home_result = self.backend.execute_command(
-            command="echo $HOME",
-            timeout=5000,
-        )
-
-        if home_result.exit_code != 0 or not home_result.output:
-            # Fallback to working directory
-            return str(Path(self.backend.get_working_directory()) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
-
-        home_dir = home_result.output.strip()
-        return str(Path(home_dir) / self.MEMORY_FILE_DIR / self.MEMORY_FILE_NAME)
 
     def execute(self, inputs: SaveMemoryInput) -> TextOutputModel:
         """
@@ -74,7 +58,7 @@ class SaveMemoryTool(CoreBackendTool[SaveMemoryInput, TextOutputModel]):
         memory_file_path = self._get_memory_file_path()
 
         # Ensure the directory exists
-        memory_dir = str(Path(memory_file_path).parent)
+        memory_dir = memory_file_path.parent
         dir_exists = self.backend.file_exists(path=memory_dir)
 
         if dir_exists is None:
@@ -88,7 +72,7 @@ class SaveMemoryTool(CoreBackendTool[SaveMemoryInput, TextOutputModel]):
             initial_content = f"# Gemini Memory File\n\n{self.MEMORY_SECTION_HEADER}\n\n- {inputs.fact}\n"
             self.backend.write_file(file_path=memory_file_path, content=initial_content)
             return TextOutputModel(
-                content=f"Memory saved: '{inputs.fact}' (created new memory file at {memory_file_path})",
+                content=f"Memory saved: '{inputs.fact}' (created new memory file at {str(memory_file_path)})",
             )
 
         # File exists, read current content
@@ -107,5 +91,5 @@ class SaveMemoryTool(CoreBackendTool[SaveMemoryInput, TextOutputModel]):
         self.backend.write_file(file_path=memory_file_path, content=new_content)
 
         return TextOutputModel(
-            content=f"Memory saved: '{inputs.fact}' (appended to {memory_file_path})",
+            content=f"Memory saved: '{inputs.fact}' (appended to {str(memory_file_path)})",
         )

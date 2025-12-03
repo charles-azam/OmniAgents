@@ -30,7 +30,7 @@ def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
         RuntimeError: If uv installation, uv init, or uv sync fails
     """
     # Get working directory
-    working_dir = backend.get_working_directory()
+    working_dir = str(backend.get_working_directory())
 
     messages = []
 
@@ -57,13 +57,25 @@ def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
         messages.append("✓ uv installed successfully")
 
     # Check if this is the first run
-    pyproject_path = str(Path(working_dir) / "pyproject.toml")
+    pyproject_path = Path(working_dir) / "pyproject.toml"
     is_first_run = not backend.file_exists(path=pyproject_path)
 
     if is_first_run:
         # First run: execute uv init
         messages.append("Running 'uv init'...")
-        init_command = f'export PATH="$HOME/.local/bin:$PATH" && cd "{working_dir}" && uv init'
+        # For LocalBackend, we are in a temp directory, but LLM sees /workspace.
+        # We need to run uv init in the current working directory of the shell.
+        # backend.execute_command runs in the project root by default.
+        # So we don't need to cd anywhere if we want to init in project root.
+        # However, previously we used 'cd "{working_dir}"'. 
+        # On Docker/E2B, working_dir is /workspace, which is correct.
+        # On Local, working_dir is /workspace, which DOES NOT EXIST.
+        
+        # Solution: Don't cd to working_dir if it's the default.
+        # Or, let the backend handle CWD.
+        # backend.execute_command already sets CWD to project root.
+        
+        init_command = 'export PATH="$HOME/.local/bin:$PATH" && uv init'
         result = backend.execute_command(
             command=init_command,
             timeout=120000,
@@ -78,7 +90,7 @@ def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
 
     # Always run uv sync
     messages.append("Running 'uv sync'...")
-    sync_command = f'export PATH="$HOME/.local/bin:$PATH" && cd "{working_dir}" && uv sync'
+    sync_command = 'export PATH="$HOME/.local/bin:$PATH" && uv sync'
     result = backend.execute_command(
         command=sync_command,
         timeout=300000,

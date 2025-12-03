@@ -3437,7 +3437,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450 }
 wheels = [
@@ -3571,6 +3571,7 @@ name = "prompttodraft"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "beartype" },
     { name = "cadquery" },
     { name = "docker" },
     { name = "e2b-code-interpreter" },
@@ -3596,6 +3597,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "beartype", specifier = ">=0.22.7" },
     { name = "cadquery", specifier = ">=2.6.0" },
     { name = "docker", specifier = ">=7.1.0" },
     { name = "e2b-code-interpreter", specifier = ">=1.0.0" },

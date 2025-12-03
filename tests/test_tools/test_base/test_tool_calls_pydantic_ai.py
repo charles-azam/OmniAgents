@@ -10,7 +10,7 @@ from pydantic_ai.providers.huggingface import HuggingFaceProvider
 from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
-from prompttodraft.agents.pydantic_ai_agent import GPT_OSS_120B_HF_PYDANTIC_AI
+from prompttodraft.agents.pydantic_ai_agent import get_pydantic_ai_model_example
 
 
 def test_pydantic_ai_tool_created_correctly():
@@ -108,7 +108,7 @@ def test_pydantic_ai_tool_backend_works_correctly():
     try:
         # Start backend
         backend.start()
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         # Create a real backend tool (WriteFileTool)
         write_tool = WriteFileTool(backend=backend)
@@ -135,8 +135,8 @@ def test_pydantic_ai_tool_backend_works_correctly():
         assert "created" in result.content.lower() or "wrote" in result.content.lower()
 
         # Verify the file was actually written to the backend
-        assert backend.file_exists(path=test_file)
-        file_content = backend.read_file(file_path=test_file)
+        assert backend.file_exists(path=backend.convert_to_path(path=test_file))
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert content in file_content
         assert "Hello from backend!" in file_content
 
@@ -150,7 +150,7 @@ def test_pydantic_ai_tool_backend_works_correctly():
         assert "overwrote" in result.content.lower()
 
         # Verify the file was overwritten
-        file_content = backend.read_file(file_path=test_file)
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert updated_content in file_content
         assert "Updated!" in file_content
         assert "Hello from backend!" not in file_content
@@ -158,7 +158,7 @@ def test_pydantic_ai_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.clean_state_manager()
+        backend.cleanup_state_manager()
 
 
 def test_pydantic_ai_tool_schemas_extracted_correctly():
@@ -285,7 +285,7 @@ def test_pydantic_ai_agent_with_llm():
 
     # Create agent with HuggingFace model via Groq provider
     agent = Agent(
-        model=GPT_OSS_120B_HF_PYDANTIC_AI,
+        model=get_pydantic_ai_model_example(),
         tools=[calculator_tool, greeter_tool],
         system_prompt="You are a helpful assistant. Use the provided tools to answer questions."
     )
@@ -303,8 +303,111 @@ def test_pydantic_ai_agent_with_llm():
     assert metadata["GreeterOutput"] == 1
 
 
+
+def test_tools_strict_true_compatibility():
+    """
+    Test if all tools are compatible with strict=True mode.
+
+    This test tries to create tools with strict=True and checks if
+    any of them fail or cause issues.
+    """
+    from prompttodraft.tools.write_file_tool import WriteFileTool
+    from prompttodraft.tools.read_file_tool import ReadFileTool
+    from prompttodraft.tools.list_directory_tool import ListDirectoryTool
+    from prompttodraft.tools.glob_tool import GlobTool
+    from prompttodraft.tools.search_file_content_tool import SearchFileContentTool
+    from prompttodraft.tools.replace_tool import ReplaceTool
+    from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
+    from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
+    from prompttodraft.tools.save_memory_tool import SaveMemoryTool
+    from prompttodraft.tools.uv_tool import UVTool
+    from pydantic_ai.tools import _function_schema, _utils
+    from pydantic_core import SchemaValidator
+    from pydantic_core import core_schema
+
+    # Create a test backend
+    state_manager = NoOpStateManager()
+    backend = LocalBackend(project_id="test_strict_true", state_manager=state_manager)
+
+    tool_classes = [
+        WriteFileTool,
+        ReadFileTool,
+        ListDirectoryTool,
+        GlobTool,
+        SearchFileContentTool,
+        ReplaceTool,
+        RunShellCommandTool,
+        ReadManyFilesTool,
+        SaveMemoryTool,
+        UVTool,
+    ]
+
+    print("\n" + "="*80)
+    print("STRICT=TRUE COMPATIBILITY TEST")
+    print("="*80)
+
+    compatible_tools = []
+    incompatible_tools = []
+
+    for tool_class in tool_classes:
+        tool_instance = tool_class(backend=backend)
+        tool_name = tool_instance.name
+
+        # Try to create tool with strict=True
+        function_schema = _function_schema.FunctionSchema(
+            function=tool_instance.execute_unpacked,
+            description=tool_instance.description,
+            validator=SchemaValidator(schema=core_schema.any_schema()),
+            json_schema=tool_instance.get_input_schema(),
+            takes_ctx=False,
+            is_async=_utils.is_async_callable(tool_instance.execute_unpacked),
+        )
+
+        pydantic_ai_tool = PydanticAITool(
+            function=tool_instance.execute_unpacked,
+            takes_ctx=False,
+            name=tool_instance.name,
+            description=tool_instance.description,
+            function_schema=function_schema,
+            strict=True,
+        )
+
+        # Check if strict was set correctly
+        if pydantic_ai_tool.tool_def.strict is True:
+            compatible_tools.append(tool_name)
+            print(f"✓ {tool_name}: Compatible with strict=True")
+        else:
+            incompatible_tools.append(tool_name)
+            print(f"✗ {tool_name}: NOT compatible with strict=True (strict={pydantic_ai_tool.tool_def.strict})")
+
+    # Summary
+    print("\n" + "="*80)
+    print("SUMMARY")
+    print("="*80)
+
+    print(f"\nCompatible with strict=True: {len(compatible_tools)}/{len(tool_classes)}")
+    print(f"Incompatible with strict=True: {len(incompatible_tools)}/{len(tool_classes)}")
+
+    if len(incompatible_tools) == 0:
+        print("\n✅ RESULT: All tools are compatible with strict=True")
+        print("Recommendation: Use strict=True for all tools (best type safety)")
+    else:
+        print(f"\n❌ RESULT: {len(incompatible_tools)} tools are NOT compatible with strict=True")
+        print("Recommendation: Use strict=False for all tools (ensures compatibility)")
+        print("\nIncompatible tools:")
+        for name in incompatible_tools:
+            print(f"  - {name}")
+
+    print("\n" + "="*80)
+
+    # Cleanup
+    backend.shutdown()
+    backend.cleanup_state_manager()
+
+
 if __name__ == "__main__":
     test_pydantic_ai_tool_created_correctly()
     test_pydantic_ai_tool_backend_created_correctly()
     test_pydantic_ai_tool_schemas_extracted_correctly()
     test_pydantic_ai_agent_with_llm()
+    test_tools_strict_true_compatibility()

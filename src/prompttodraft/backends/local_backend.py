@@ -7,6 +7,8 @@ import subprocess
 import shutil
 from pathlib import Path
 
+from beartype import beartype
+
 from prompttodraft.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
@@ -20,6 +22,7 @@ from prompttodraft.common import LOCAL_BACKEND_PATH
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 
 
+@beartype
 class LocalBackend(ExecutionBackend):
     """Local execution backend."""
 
@@ -52,8 +55,10 @@ class LocalBackend(ExecutionBackend):
         return self._status
 
     def execute_command(self, command: str, timeout: int | None = None) -> CommandResult:
+        translated_command = self._replace_virtual_paths_in_command(command)
+
         proc = subprocess.Popen(
-            ["/bin/bash", "-c", command],
+            ["/bin/bash", "-c", translated_command],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
@@ -61,72 +66,105 @@ class LocalBackend(ExecutionBackend):
         )
         try:
             output, _ = proc.communicate(timeout=timeout or DEFAULT_TIMEOUT)
+            if output:
+                output = self._replace_system_paths_in_output(output)
             return CommandResult(output=output, exit_code=proc.returncode)
         except subprocess.TimeoutExpired:
             proc.kill()
             output, _ = proc.communicate()
+            if output:
+                output = self._replace_system_paths_in_output(output)
             return CommandResult(output=f"Timeout\n{output}", exit_code=124)
 
-    def get_working_directory(self) -> str:
-        return str(self._project_path)
+    def _replace_virtual_paths_in_command(self, command: str) -> str:
+        """Replace virtual paths (/workspace) with system paths in shell commands."""
+        return command.replace("/workspace", str(self._project_path))
 
-    def read_file(self, file_path: str | Path) -> str:
-        return self.convert_to_path(file_path).read_text()
+    def _replace_system_paths_in_output(self, output: str) -> str:
+        """Replace system paths with virtual paths (/workspace) in command output."""
+        return output.replace(str(self._project_path), "/workspace")
 
-    def write_file(self, file_path: str | Path, content: str) -> None:
-        p = self.convert_to_path(file_path)
-        p.parent.mkdir(parents=True, exist_ok=True)
-        p.write_text(content)
+    def get_working_directory(self) -> Path:
+        """Get the working directory as seen by the LLM."""
+        return Path("/workspace")
+    
+    def _to_system_path(self, virtual_path: Path) -> Path:
+        """Convert virtual path (/workspace/...) to host path."""
+        workspace = self.get_working_directory()
+        if virtual_path.is_absolute():
+            if not str(virtual_path).startswith(str(workspace)):
+                raise ValueError(f"Path {virtual_path} is outside workspace {workspace}")
+            rel_path = virtual_path.relative_to(workspace)
+            return self._project_path / rel_path
+        return self._project_path / virtual_path
 
-    def delete_file(self, path: str | Path) -> None:
-        self.convert_to_path(path).unlink()
+    def _to_virtual_path(self, system_path: str | Path) -> Path:
+        """Convert host path to virtual path."""
+        system_path_obj = Path(system_path)
+        if system_path_obj.is_relative_to(self._project_path):
+            rel = system_path_obj.relative_to(self._project_path)
+            return self.get_working_directory() / rel
+        return system_path_obj
 
-    def delete_directory(self, path: str | Path) -> None:
-        shutil.rmtree(self.convert_to_path(path))
+    def read_file(self, file_path: Path) -> str:
+        host_path = self._to_system_path(file_path)
+        return host_path.read_text()
 
-    def create_directory(self, path: str | Path, parents: bool = False) -> None:
-        self.convert_to_path(path).mkdir(parents=parents, exist_ok=True)
+    def write_file(self, file_path: Path, content: str) -> None:
+        host_path = self._to_system_path(file_path)
+        host_path.parent.mkdir(parents=True, exist_ok=True)
+        host_path.write_text(content)
 
-    def copy_file(self, src: str | Path, dst: str | Path) -> None:
-        dst_path = self.convert_to_path(dst)
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(self.convert_to_path(src), dst_path)
+    def delete_file(self, path: Path) -> None:
+        host_path = self._to_system_path(path)
+        host_path.unlink()
 
-    def move_file(self, src: str | Path, dst: str | Path) -> None:
-        dst_path = self.convert_to_path(dst)
-        dst_path.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(self.convert_to_path(src), dst_path)
+    def delete_directory(self, path: Path) -> None:
+        host_path = self._to_system_path(path)
+        shutil.rmtree(host_path)
 
-    def list_directory(self, path: str | Path, recursive: bool = False) -> list[FileInfo]:
-        p = self.convert_to_path(path)
+    def create_directory(self, path: Path, parents: bool = False) -> None:
+        host_path = self._to_system_path(path)
+        host_path.mkdir(parents=parents, exist_ok=True)
+
+    def copy_file(self, src: Path, dst: Path) -> None:
+        host_src = self._to_system_path(src)
+        host_dst = self._to_system_path(dst)
+        host_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(host_src, host_dst)
+
+    def move_file(self, src: Path, dst: Path) -> None:
+        host_src = self._to_system_path(src)
+        host_dst = self._to_system_path(dst)
+        host_dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(host_src, host_dst)
+
+    def list_directory(self, path: Path, recursive: bool = False) -> list[FileInfo]:
         files = []
+        host_path = self._to_system_path(path)
 
-        for item in sorted(p.iterdir()):
+        if not host_path.exists():
+            raise FileNotFoundError(f"Directory {path} does not exist")
+
+        for item in sorted(host_path.iterdir()):
             file_type = (
                 FileType.SYMLINK if item.is_symlink()
                 else FileType.FILE if item.is_file()
                 else FileType.DIRECTORY if item.is_dir()
                 else FileType.OTHER
             )
-            files.append(FileInfo(name=item.name, path=str(item), type=file_type))
+            virtual_path = self._to_virtual_path(item)
+            files.append(FileInfo(name=item.name, path=virtual_path, type=file_type))
 
             if recursive and file_type == FileType.DIRECTORY:
-                files.extend(self.list_directory(path=item, recursive=True))
+                files.extend(self.list_directory(path=virtual_path, recursive=True))
 
         return files
 
-    def file_exists(self, path: str | Path) -> FileType | None:
-        p = self.convert_to_path(path)
-        if not p.exists():
-            return None
-        if p.is_symlink():
-            return FileType.SYMLINK
-        if p.is_file():
-            return FileType.FILE
-        if p.is_dir():
-            return FileType.DIRECTORY
-        return FileType.OTHER
+    def file_exists(self, path: Path) -> FileType | None:
+        host_path = self._to_system_path(path)
+        return self._determine_file_type(system_path=host_path)
 
-    def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
-        search_path = self.convert_to_path(path) if path else self._project_path
-        return [str(p) for p in sorted(search_path.glob(pattern)) if p.is_file()]
+    def glob_files(self, pattern: str, path: Path | None = None) -> list[str]:
+        search_path = self._to_system_path(path) if path else self._project_path
+        return [str(self._to_virtual_path(p)) for p in sorted(search_path.glob(pattern)) if p.is_file()]

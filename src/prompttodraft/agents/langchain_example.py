@@ -3,7 +3,7 @@ Example usage of the LangChainAgent.
 
 This demonstrates how to use the LangChain agent with different backends.
 """
-from prompttodraft.agents.langchain_agent import LangChainAgent, GPT_OSS_120B_HF_LANGCHAIN, GPT_5_MINI_OPENAI_LANGCHAIN
+from prompttodraft.agents.langchain_agent import LangChainAgent, get_langchain_model_example
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
 from dotenv import load_dotenv
@@ -23,7 +23,7 @@ def main() -> None:
 
     # Start the backend (loads from git if exists)
     backend.start()
-    model = GPT_OSS_120B_HF_LANGCHAIN
+    model = get_langchain_model_example()
     # Create the agent
     agent = LangChainAgent(
         backend=backend,

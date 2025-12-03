@@ -24,9 +24,10 @@ Run basic tests (no markers): pytest tests/test_tools.py
 """
 import os
 from pathlib import Path
+
 import pytest
 
-from conftest import cleanup_test_environment
+from prompttodraft.test_utils import cleanup_test_environment
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
@@ -72,7 +73,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         # Start backend
         backend.start()
         assert backend.get_status() == BackendStatus.RUNNING
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         # TEST 1: write_file tool
         print("\n" + "="*80)
@@ -106,7 +107,8 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
         # Read with offset and limit
         large_file = f"{working_dir}/large.txt"
-        backend.write_file(file_path=large_file, content="".join([f"Line {i}\n" for i in range(1, 101)]))
+        # Use backend.write_file directly with virtual path
+        backend.write_file(file_path=Path(large_file), content="".join([f"Line {i}\n" for i in range(1, 101)]))
         result = read_tool.execute(inputs=ReadFileInput(path=large_file, offset=10, limit=5))
         assert isinstance(result, TextOutputModel)
         assert "Line 11" in result.content and "Line 15" in result.content
@@ -125,10 +127,10 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         list_dir_tool = ListDirectoryTool(backend=backend)
 
         # Create test directory structure
-        backend.create_directory(path=f"{working_dir}/subdir", parents=True)
+        backend.create_directory(path=Path(f"{working_dir}/subdir"), parents=True)
         for file_name, content in [("file1.py", "# file 1"), ("file2.txt", "text"),
                                      (".hidden", "hidden"), ("subdir/nested.py", "# nested")]:
-            backend.write_file(file_path=f"{working_dir}/{file_name}", content=content)
+            backend.write_file(file_path=Path(f"{working_dir}/{file_name}"), content=content)
 
         # Basic listing
         result = list_dir_tool.execute(inputs=ListDirectoryInput(path=working_dir, respect_git_ignore=False))
@@ -182,6 +184,12 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         search_tool = SearchFileContentTool(backend=backend)
 
         # Search for pattern
+        # The tool now receives /workspace path.
+        # This test ensures path translation works:
+        # 1. SearchFileContentTool uses backend.execute_command(grep ... /workspace)
+        # 2. LocalBackend translates /workspace -> temp_dir
+        # 3. grep runs successfully on temp_dir
+        
         result = search_tool.execute(inputs=SearchFileContentInput(pattern="def hello", path=working_dir))
         assert isinstance(result, TextOutputModel)
         assert "def hello" in result.content
@@ -204,7 +212,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         replace_tool = ReplaceTool(backend=backend)
         replace_file = f"{working_dir}/replace_test.py"
         backend.write_file(
-            file_path=replace_file,
+            file_path=Path(replace_file),
             content="def old_function():\n    return 'old'\n\ndef other():\n    pass\n"
         )
 
@@ -217,7 +225,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         ))
         assert isinstance(result, TextOutputModel)
         assert "successfully" in result.content.lower()
-        content = backend.read_file(file_path=replace_file)
+        content = backend.read_file(file_path=Path(replace_file))
         assert "new_function" in content and "old_function" not in content
 
         # No match
@@ -235,7 +243,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         result = replace_tool.execute(inputs=ReplaceInput(file_path=new_file, old_string="", new_string="# Created by replace tool\n"))
         assert isinstance(result, TextOutputModel)
         assert "created" in result.content.lower()
-        assert backend.file_exists(path=new_file)
+        assert backend.file_exists(path=Path(new_file))
 
         # TEST 7: run_shell_command
         print("\n" + "="*80)
@@ -314,7 +322,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
 
         # Create a simple Python script to run
         test_script = f"{working_dir}/test_script.py"
-        backend.write_file(file_path=test_script, content="print('Hello from uv run!')\n")
+        backend.write_file(file_path=Path(test_script), content="print('Hello from uv run!')\n")
 
         # Test uv run
         result = uv_tool.execute(inputs=UVInput(command="run test_script.py", description="Run Python script with uv"))
@@ -408,7 +416,7 @@ def test_git_storage_persistence():
     try:
         # Start backend and create some files
         backend.start()
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         write_tool = WriteFileTool(backend=backend)
         write_tool.execute(inputs=WriteFileInput(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n"))
@@ -422,7 +430,7 @@ def test_git_storage_persistence():
 
         # Verify file was restored
         read_tool = ReadFileTool(backend=backend2)
-        result = read_tool.execute(inputs=ReadFileInput(path=f"{backend2.get_working_directory()}/persistent.py"))
+        result = read_tool.execute(inputs=ReadFileInput(path=f"{str(backend2.get_working_directory())}/persistent.py"))
         assert isinstance(result, TextOutputModel)
         assert "Persistent file" in result.content
 
@@ -441,7 +449,7 @@ def test_gcs_storage_persistence():
     try:
         # Start backend and create some files
         backend.start()
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         write_tool = WriteFileTool(backend=backend)
         write_tool.execute(inputs=WriteFileInput(file_path=f"{working_dir}/persistent.py", content="# Persistent file\n"))
@@ -455,7 +463,7 @@ def test_gcs_storage_persistence():
 
         # Verify file was restored
         read_tool = ReadFileTool(backend=backend2)
-        result = read_tool.execute(inputs=ReadFileInput(path=f"{backend2.get_working_directory()}/persistent.py"))
+        result = read_tool.execute(inputs=ReadFileInput(path=f"{str(backend2.get_working_directory())}/persistent.py"))
         assert isinstance(result, TextOutputModel)
         assert "Persistent file" in result.content
 

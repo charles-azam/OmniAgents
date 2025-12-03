@@ -3,7 +3,7 @@ from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
-from conftest import cleanup_test_environment
+from prompttodraft.test_utils import cleanup_test_environment
 from pathlib import Path
 import pytest
 import os
@@ -75,29 +75,32 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         # Get working directory for constructing paths
         working_dir = backend.get_working_directory()
         assert working_dir is not None
-        assert len(working_dir) > 0
+        assert len(str(working_dir)) > 0
 
         # Verify preloaded files were loaded from bucket
-        assert backend.file_exists(path=f"{working_dir}/preloaded.py") == FileType.FILE
-        assert backend.file_exists(path=f"{working_dir}/config.json") == FileType.FILE
-        preloaded_content = backend.read_file(file_path=f"{working_dir}/preloaded.py")
+        assert backend.file_exists(path=working_dir / "preloaded.py") == FileType.FILE
+        assert backend.file_exists(path=working_dir / "config.json") == FileType.FILE
+        preloaded_content = backend.read_file(file_path=working_dir / "preloaded.py")
         assert preloaded_content == "# This file was preloaded from bucket"
-        config_content = backend.read_file(file_path=f"{working_dir}/config.json")
+        config_content = backend.read_file(file_path=working_dir / "config.json")
         assert config_content == '{"preloaded": true}'
 
         # Clean up preloaded files for rest of test
-        backend.delete_file(path=f"{working_dir}/preloaded.py")
-        backend.delete_file(path=f"./config.json") # relative path
-        backend.delete_file(path=Path(working_dir) / "config_2.json") # using pathlib
+        backend.delete_file(path=working_dir / "preloaded.py")
+        backend.delete_file(path=backend.convert_to_path(path="./config.json"))  # relative path
+        backend.delete_file(path=working_dir / "config_2.json")  # using pathlib
         
         with pytest.raises(FileNotFoundError):
-            backend.read_file(file_path=f"{working_dir}/config.json")
-            
+            backend.list_directory(path=working_dir / "nonexistent_dir")
+
         with pytest.raises(FileNotFoundError):
-            backend.delete_file(path=Path(working_dir) / "config_2.json")
+            backend.read_file(file_path=working_dir / "config.json")
+
+        with pytest.raises(FileNotFoundError):
+            backend.delete_file(path=working_dir / "config_2.json")
 
         # Test write_file
-        test_file = f"{working_dir}/test.txt"
+        test_file = working_dir / "test.txt"
         backend.write_file(file_path=test_file, content="Hello World")
         backend.shutdown()
         backend.start()
@@ -112,14 +115,14 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert file_type == FileType.FILE
 
         # Test create_directory
-        test_subdir = f"{working_dir}/subdir"
+        test_subdir = working_dir / "subdir"
         backend.create_directory(path=test_subdir, parents=True)
         assert backend.file_exists(path=test_subdir) == FileType.DIRECTORY
 
         # Test write file in subdirectory
-        nested_file = f"{test_subdir}/nested.txt"
+        nested_file = test_subdir / "nested.txt"
         backend.write_file(file_path=nested_file, content="Nested content")
-        assert backend.file_exists(path=Path("subdir") / "nested.txt") == FileType.FILE
+        assert backend.file_exists(path=backend.convert_to_path(path="subdir/nested.txt")) == FileType.FILE
 
         # Test list_directory (non-recursive)
         files = backend.list_directory(path=working_dir, recursive=False)
@@ -135,13 +138,13 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert nested_file in all_paths
 
         # Test copy_file
-        copy_dest = f"{working_dir}/test_copy.txt"
+        copy_dest = working_dir / "test_copy.txt"
         backend.copy_file(src=test_file, dst=copy_dest)
         assert backend.file_exists(path=copy_dest) == FileType.FILE
         assert backend.read_file(file_path=copy_dest) == "Hello World"
 
         # Test move_file
-        move_dest = f"{working_dir}/test_moved.txt"
+        move_dest = working_dir / "test_moved.txt"
         backend.move_file(src=copy_dest, dst=move_dest)
         assert backend.file_exists(path=move_dest) == FileType.FILE
         assert backend.file_exists(path=copy_dest) is None
@@ -150,6 +153,72 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         result = backend.execute_command(command="echo 'test output'", timeout=10)
         assert result.exit_code == 0
         assert "test output" in result.output
+
+        # Test absolute path command execution (virtual path /workspace)
+        # This verifies that LocalBackend correctly translates /workspace to host path
+        # and Docker/E2B handle it natively.
+        result_abs = backend.execute_command(command="ls -la /workspace", timeout=10)
+        assert result_abs.exit_code == 0
+        assert "test.txt" in result_abs.output
+
+        # === COMMAND EDGE CASES ===
+        # Test various command patterns to ensure all backends handle paths correctly
+
+        # Edge case 1: Command with no path (ls)
+        result_no_path = backend.execute_command(command="ls", timeout=10)
+        assert result_no_path.exit_code == 0
+        assert "test.txt" in result_no_path.output
+
+        # Edge case 2: Command with relative path (ls subdir)
+        result_rel_path = backend.execute_command(command="ls subdir", timeout=10)
+        assert result_rel_path.exit_code == 0
+        assert "nested.txt" in result_rel_path.output
+
+        # Edge case 3: cd with relative path then ls
+        result_cd_rel = backend.execute_command(command="cd subdir && ls", timeout=10)
+        assert result_cd_rel.exit_code == 0
+        assert "nested.txt" in result_cd_rel.output
+
+        # Edge case 4: cd with absolute /workspace path then ls
+        result_cd_abs = backend.execute_command(command="cd /workspace/subdir && ls", timeout=10)
+        assert result_cd_abs.exit_code == 0
+        assert "nested.txt" in result_cd_abs.output
+
+        # Edge case 5: cat with absolute /workspace path
+        result_cat = backend.execute_command(command="cat /workspace/test.txt", timeout=10)
+        assert result_cat.exit_code == 0
+        assert "Hello World" in result_cat.output
+
+        # Edge case 6: pwd returns virtual path (/workspace)
+        result_pwd = backend.execute_command(command="pwd", timeout=10)
+        assert result_pwd.exit_code == 0
+        assert "/workspace" in result_pwd.output
+
+        # Edge case 7: realpath should show /workspace paths (for LocalBackend, tests output translation)
+        result_realpath = backend.execute_command(command="realpath test.txt", timeout=10)
+        assert result_realpath.exit_code == 0
+        assert "/workspace/test.txt" in result_realpath.output
+
+        # Edge case 8: Commands with multiple /workspace references
+        result_multi = backend.execute_command(command="cp /workspace/test.txt /workspace/test_copy2.txt", timeout=10)
+        assert result_multi.exit_code == 0
+        assert backend.file_exists(path=working_dir / "test_copy2.txt") == FileType.FILE
+
+        # Edge case 9: find with /workspace path
+        result_find = backend.execute_command(command="find /workspace -name 'test.txt' -type f", timeout=10)
+        assert result_find.exit_code == 0
+        assert "test.txt" in result_find.output
+
+        # Edge case 10: echo with /workspace in string literal
+        # For LocalBackend: string replacement will replace /workspace (known limitation)
+        # For Docker/E2B: /workspace is preserved naturally
+        result_echo = backend.execute_command(command='echo "Path is /workspace/test"', timeout=10)
+        assert result_echo.exit_code == 0
+        # Just check command succeeded; output format varies by backend
+        assert "/test" in result_echo.output
+
+        # Clean up edge case test file
+        backend.delete_file(path=working_dir / "test_copy2.txt")
 
         # Test command with non-zero exit code
         result_error = backend.execute_command(command="exit 42", timeout=10)
@@ -199,9 +268,9 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert result7.output.strip() == ""
 
         # Test glob_files
-        backend.write_file(file_path=f"{working_dir}/file1.py", content="# python")
-        backend.write_file(file_path=f"{working_dir}/file2.py", content="# python")
-        backend.write_file(file_path=f"{working_dir}/file3.txt", content="text")
+        backend.write_file(file_path=working_dir / "file1.py", content="# python")
+        backend.write_file(file_path=working_dir / "file2.py", content="# python")
+        backend.write_file(file_path=working_dir / "file3.txt", content="text")
 
         py_files = backend.glob_files(pattern="*.py", path=working_dir)
         assert len(py_files) == 2
@@ -221,7 +290,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert uv_init_result.exit_code == 0
 
         # Verify pyproject.toml was created
-        pyproject_path = f"{working_dir}/pyproject.toml"
+        pyproject_path = working_dir / "pyproject.toml"
         assert backend.file_exists(path=pyproject_path) == FileType.FILE
 
         # Read initial pyproject.toml content
@@ -238,7 +307,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert "requests" in modified_pyproject, "requests should appear in dependencies"
 
         # Test uv run python - create and run a Python script
-        uv_test_script = f"{working_dir}/uv_test.py"
+        uv_test_script = working_dir / "uv_test.py"
         backend.write_file(file_path=uv_test_script, content="print('UV run test successful')")
 
         uv_run_result = backend.execute_uv(uv_command="run uv_test.py", timeout=60000)
@@ -253,7 +322,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.write_file(file_path=test_file, content="Modified content for sync test")
 
         # Create a new file that should be synced
-        sync_test_file = f"{working_dir}/sync_test.py"
+        sync_test_file = working_dir / "sync_test.py"
         backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
 
         # Test shutdown (should sync files to bucket)
@@ -305,9 +374,9 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Final verification using file_exists API (before shutdown)
         assert backend.file_exists(path=test_file) == FileType.FILE
-        assert backend.file_exists(path=f"{working_dir}/file1.py") == FileType.FILE
-        assert backend.file_exists(path=f"{working_dir}/file2.py") == FileType.FILE
-        assert backend.file_exists(path=f"{working_dir}/file3.txt") == FileType.FILE
+        assert backend.file_exists(path=working_dir / "file1.py") == FileType.FILE
+        assert backend.file_exists(path=working_dir / "file2.py") == FileType.FILE
+        assert backend.file_exists(path=working_dir / "file3.txt") == FileType.FILE
         assert backend.file_exists(path=move_dest) is None  # was deleted
         assert backend.file_exists(path=test_subdir) is None  # was deleted
 
@@ -318,7 +387,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert len(non_git_files_before) > 0, "Expected files before clean()"
 
         # Call clean()
-        backend.clean(clean_state_manager=False)
+        backend.clean(cleanup_state_manager=False)
         backend.state_manager.save_snapshot(backend=backend, message="clean")
 
         # Verify files were removed (except .git for Git storage and README.md marker)
@@ -327,7 +396,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert len(non_git_files_after) == 0, f"Expected only README.md after clean, found {len(non_git_files_after)}: {[f.name for f in non_git_files_after]}"
 
         # Verify README.md exists and is empty
-        readme_path = f"{working_dir}/README.md"
+        readme_path = working_dir / "README.md"
         assert backend.file_exists(path=readme_path) == FileType.FILE, "README.md should exist after clean()"
         readme_content = backend.read_file(file_path=readme_path)
         assert readme_content == "", f"README.md should be empty, got: {readme_content}"
@@ -405,7 +474,7 @@ def test_docker_backend_container_reuse():
 
         # Write a test file
         working_dir = backend1.get_working_directory()
-        test_file = f"{working_dir}/reuse_test.txt"
+        test_file = working_dir / "reuse_test.txt"
         backend1.write_file(file_path=test_file, content="container reuse test")
 
         # Execute a command to verify it's working
@@ -511,29 +580,28 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         # Get working directory
         working_dir = backend.get_working_directory()
         assert working_dir is not None
-        assert len(working_dir) > 0
 
         # Verify preloaded files were loaded from git
-        assert backend.file_exists(path=f"{working_dir}/preloaded.py") == FileType.FILE
-        assert backend.file_exists(path=f"{working_dir}/config.json") == FileType.FILE
-        preloaded_content = backend.read_file(file_path=f"{working_dir}/preloaded.py")
+        assert backend.file_exists(path=working_dir / "preloaded.py") == FileType.FILE
+        assert backend.file_exists(path=working_dir / "config.json") == FileType.FILE
+        preloaded_content = backend.read_file(file_path=working_dir / "preloaded.py")
         assert preloaded_content == "# This file was preloaded from git"
-        config_content = backend.read_file(file_path=f"{working_dir}/config.json")
+        config_content = backend.read_file(file_path=working_dir / "config.json")
         assert config_content == '{"preloaded": true}'
 
         # Verify .gitignore was loaded
-        assert backend.file_exists(path=f"{working_dir}/.gitignore") == FileType.FILE
+        assert backend.file_exists(path=working_dir / ".gitignore") == FileType.FILE
 
         # Clean up preloaded files
-        backend.delete_file(path=f"{working_dir}/preloaded.py")
-        backend.delete_file(path=f"{working_dir}/config.json")
+        backend.delete_file(path=working_dir / "preloaded.py")
+        backend.delete_file(path=working_dir / "config.json")
 
         # Test write_file
-        test_file = f"{working_dir}/test.txt"
+        test_file = working_dir / "test.txt"
         backend.write_file(file_path=test_file, content="Hello Git World")
 
         # Test sync/load with shutdown/start cycle
-        sync_test_file = f"{working_dir}/sync_test.py"
+        sync_test_file = working_dir / "sync_test.py"
         backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
 
         # Test shutdown (should commit and push to git)
@@ -605,7 +673,6 @@ def test_e2b_backend_git_storage():
 
 
 if __name__ == "__main__":
-    test_local_backend_e2e()
     test_docker_backend_e2e()
     test_docker_backend_container_reuse()
     test_e2b_backend_e2e()

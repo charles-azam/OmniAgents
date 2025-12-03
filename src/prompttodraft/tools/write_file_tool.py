@@ -15,7 +15,7 @@ from prompttodraft.outputs.outputs import (
 
 class WriteFileInput(BaseModel):
     """Input model for WriteFileTool."""
-    file_path: str = Field(description="The absolute path to the file to write to")
+    file_path: str = Field(description="The path to the file to write to, relative to the working directory (e.g., 'hello.py' or 'src/main.py')")
     content: str = Field(description="The content to write into the file")
 
 
@@ -40,12 +40,15 @@ class WriteFileTool(CoreBackendTool[WriteFileInput, TextOutputModel]):
         Returns:
             TextOutputModel with success message
         """
+        # Convert str path to Path object
+        path_obj = self.backend.convert_to_path(path=inputs.file_path)
+
         # Check if file already exists
-        file_exists = self.backend.file_exists(path=inputs.file_path)
+        file_exists = self.backend.file_exists(path=path_obj)
         is_new_file = file_exists is None
 
         # Write the file (backend handles directory creation)
-        self.backend.write_file(file_path=inputs.file_path, content=inputs.content)
+        self.backend.write_file(file_path=path_obj, content=inputs.content)
 
         # Return success message
         if is_new_file:

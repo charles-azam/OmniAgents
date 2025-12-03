@@ -17,7 +17,7 @@ from prompttodraft.outputs.outputs import (
 class GlobInput(BaseModel):
     """Input model for GlobTool."""
     pattern: str = Field(description="The glob pattern to match against (e.g., '**/*.py', 'docs/*.md').")
-    path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. If omitted, searches the root directory.")
+    path: str | None = Field(default=None, description="Optional: The path to the directory to search within, relative to the working directory. If omitted, searches the working directory.")
     case_sensitive: bool = Field(default=False, description="Optional: Whether the search should be case-sensitive. Defaults to false (case-insensitive).")
     respect_git_ignore: bool = Field(default=True, description="Optional: Whether to respect .gitignore patterns when finding files. Only available in git repositories. Defaults to true.")
 
@@ -112,11 +112,14 @@ class GlobTool(CoreBackendTool[GlobInput, ToolOutputModel]):
         Returns:
             FileListOutputModel with matching files
         """
+        # Convert str path to Path if provided
+        path_obj = self.backend.convert_to_path(path=inputs.path) if inputs.path else None
+
         # Get matched file paths
-        matched_paths = self.backend.glob_files(pattern=inputs.pattern, path=inputs.path)
+        matched_paths = self.backend.glob_files(pattern=inputs.pattern, path=path_obj)
 
         # Determine search path for filtering
-        search_path = inputs.path if inputs.path else self.backend.get_working_directory()
+        search_path = inputs.path if inputs.path else str(self.backend.get_working_directory())
 
         # Apply case sensitivity filtering if needed
         if inputs.case_sensitive:
@@ -133,6 +136,8 @@ class GlobTool(CoreBackendTool[GlobInput, ToolOutputModel]):
             )
 
         # Get file modification times
+        from prompttodraft.outputs.outputs import FileInfo as OutputFileInfo
+
         file_infos = []
         for file_path in matched_paths:
             # Get file modification time using stat command
@@ -150,7 +155,7 @@ class GlobTool(CoreBackendTool[GlobInput, ToolOutputModel]):
                     mtime = 0
 
             file_infos.append(
-                FileInfo(
+                OutputFileInfo(
                     name=Path(file_path).name,
                     path=file_path,
                     is_dir=False,
