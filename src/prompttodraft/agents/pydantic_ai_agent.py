@@ -25,22 +25,19 @@ from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
 import logfire
 
-logfire.configure(console=logfire.ConsoleOptions(verbose=True, colors="auto"))
-logfire.instrument_pydantic_ai(
 
-)
-
-
-# MODEL EXAMPLES
-GPT_5_MINI_OPENAI_PYDANTIC_AI = OpenAIChatModel(model_name="gpt-5-mini")
-
-hf_client = AsyncOpenAI(
-    base_url="https://router.huggingface.co/v1",
-    api_key=os.getenv("HF_TOKEN"),
-)
-hf_provider = OpenAIProvider(openai_client=hf_client)
-GPT_OSS_120B_HF_PYDANTIC_AI = OpenAIChatModel(model_name="openai/gpt-oss-120b:cerebras", provider=hf_provider)
-
+def get_pydantic_ai_model_example(model_name: str = "openai/gpt-oss-120b:cerebras") -> OpenAIChatModel:
+    if "gpt-5" in model_name:
+        return OpenAIChatModel(model_name=model_name)
+    elif "gpt-oss-120b" in model_name:
+        hf_client = AsyncOpenAI(
+            base_url="https://router.huggingface.co/v1",
+            api_key=os.getenv("HF_TOKEN"),
+        )
+        hf_provider = OpenAIProvider(openai_client=hf_client)
+        return OpenAIChatModel(model_name=model_name, provider=hf_provider)
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
 
 
 
@@ -83,7 +80,7 @@ class PydanticAIAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model: OpenAIChatModel = GPT_OSS_120B_HF_PYDANTIC_AI,
+        model: OpenAIChatModel = get_pydantic_ai_model_example(),
         additional_tools: list | None = None,
     ) -> None:
         """
@@ -94,6 +91,9 @@ class PydanticAIAgent:
             model: Pydantic AI model
             additional_tools: Optional additional pydantic_ai tools to add
         """
+        logfire.configure(console=logfire.ConsoleOptions(verbose=True, colors="auto"))
+        logfire.instrument_pydantic_ai(
+        )
         self.backend = backend
         self.model = model
 
@@ -129,7 +129,7 @@ class PydanticAIAgent:
         self.backend.start()
 
         if reset_history:
-            self.backend.clean_state_manager()
+            self.backend.clean(cleanup_state_manager=True)
             # Regenerate system prompt with updated project context
             system_prompt = get_system_prompt(backend=self.backend, model_id="pydantic_ai")
             # Recreate agent with updated system prompt

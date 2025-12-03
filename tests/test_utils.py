@@ -4,8 +4,9 @@ E2E tests for utility functions.
 Tests the initialize_project function with different backends (local, docker, e2b).
 """
 import pytest
+from pathlib import Path
 
-from conftest import cleanup_test_environment
+from prompttodraft.test_utils import cleanup_test_environment
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
@@ -28,7 +29,7 @@ def run_initialize_project_test(backend: ExecutionBackend):
         # Start backend
         backend.start()
         assert backend.get_status() == BackendStatus.RUNNING
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         # TEST 1: First run - should run uv init and uv sync
         print("\n" + "="*80)
@@ -46,10 +47,10 @@ def run_initialize_project_test(backend: ExecutionBackend):
 
         # Verify pyproject.toml was created
         pyproject_path = f"{working_dir}/pyproject.toml"
-        assert backend.file_exists(path=pyproject_path)
+        assert backend.file_exists(path=Path(pyproject_path))
 
         # Read pyproject.toml to verify it has content
-        content = backend.read_file(file_path=pyproject_path)
+        content = backend.read_file(file_path=Path(pyproject_path))
         assert len(content) > 0
         assert "[project]" in content or "name" in content
 

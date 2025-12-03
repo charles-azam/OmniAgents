@@ -23,15 +23,15 @@ from prompttodraft.tools.base_tool import CoreBackendTool
 from langsmith import traceable
 import os
 
-# MODEL EXAMPLES
-GPT_5_MINI_OPENAI_LANGCHAIN = ChatOpenAI(
-    model="gpt-5-mini",
-)
-GPT_OSS_120B_HF_LANGCHAIN = ChatOpenAI(
-    base_url="https://router.huggingface.co/v1",
-    api_key=os.environ["HF_TOKEN"],
-    model="openai/gpt-oss-120b:groq",
-)
+def get_langchain_model_example(model_name: str = "openai/gpt-oss-120b:cerebras") -> ChatOpenAI:
+    if "gpt-5" in model_name:
+        return ChatOpenAI(model=model_name)
+    elif "gpt-oss-120b" in model_name:
+        return ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=os.environ["HF_TOKEN"], model=model_name)
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
+
+
 
 
 def create_langchain_tools(backend: ExecutionBackend) -> list:
@@ -74,7 +74,7 @@ class LangChainAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model: BaseChatModel = GPT_OSS_120B_HF_LANGCHAIN,
+        model: BaseChatModel = get_langchain_model_example(),
         additional_tools: list | None = None,
     ) -> None:
         """
@@ -112,7 +112,7 @@ class LangChainAgent:
 
         # Cleanup if requested
         if reset_history:
-            self.backend.clean_state_manager()
+            self.backend.clean(cleanup_state_manager=True)
 
         # Generate system prompt with current project context
 

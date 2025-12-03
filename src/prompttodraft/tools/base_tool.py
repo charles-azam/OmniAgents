@@ -217,17 +217,39 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         """
         Convert the tool to a Pydantic-AI tool.
 
-        Uses Tool.from_schema() to create the tool with the JSON schema
-        directly from the input model, avoiding function introspection.
+        Creates a tool with strict=True to ensure:
+        1. All tools have consistent strict values (required by OpenAI API)
+        2. LLM outputs exactly match the schema (best type safety)
+        3. All our schemas are verified compatible with strict mode
+
+        When strict=None (default), pydantic-ai infers strict based on schema
+        characteristics, which can result in mixed values causing API errors.
 
         Returns:
             A Pydantic-AI tool instance.
         """
-        return PydanticAITool.from_schema(
+        from pydantic_ai.tools import _function_schema, _utils
+        from pydantic_core import SchemaValidator
+        from pydantic_core import core_schema
+
+        # Create function schema (same logic as Tool.from_schema)
+        function_schema = _function_schema.FunctionSchema(
             function=self.execute_unpacked,
+            description=self.description,
+            validator=SchemaValidator(schema=core_schema.any_schema()),
+            json_schema=self.get_input_schema(),
+            takes_ctx=False,
+            is_async=_utils.is_async_callable(self.execute_unpacked),
+        )
+
+        # Create Tool with explicit strict=True for consistency and type safety
+        return PydanticAITool(
+            function=self.execute_unpacked,
+            takes_ctx=False,
             name=self.name,
             description=self.description,
-            json_schema=self.get_input_schema(),
+            function_schema=function_schema,
+            strict=True,
         )
 
 

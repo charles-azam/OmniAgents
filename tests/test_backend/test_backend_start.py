@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from conftest import cleanup_test_environment
+from prompttodraft.test_utils import cleanup_test_environment
 from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
@@ -74,10 +74,10 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
         assert len(non_git_files) == 0, f"Expected empty directory (except .git), but found: {[f.name for f in non_git_files]}"
 
         # === CREATE FILES ===
-        test_file = f"{working_dir}/hello.py"
+        test_file = working_dir / "hello.py"
         backend.write_file(file_path=test_file, content="print('Hello from first start')")
 
-        config_file = f"{working_dir}/config.json"
+        config_file = working_dir / "config.json"
         backend.write_file(file_path=config_file, content='{"first_start": true}')
 
         # === SHUTDOWN (should create branch and commit) ===
@@ -102,8 +102,8 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
         assert len(log_result.output.strip()) > 0, "Should have at least one commit"
 
         # Verify files were loaded from git
-        test_file = f"{working_dir}/hello.py"
-        config_file = f"{working_dir}/config.json"
+        test_file = working_dir / "hello.py"
+        config_file = working_dir / "config.json"
 
         assert backend.file_exists(path=test_file) == FileType.FILE
         loaded_content = backend.read_file(file_path=test_file)

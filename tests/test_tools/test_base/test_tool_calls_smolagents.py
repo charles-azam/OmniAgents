@@ -11,6 +11,7 @@ from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
 from pydantic import Field
 import random
+from prompttodraft.agents.smolagent_agent import get_smolagents_model_example
 
 def test_smolagent_tool_created_correctly():
     """Test that CoreTool converts correctly to smolagents tool with proper attributes and execution."""
@@ -118,7 +119,7 @@ def test_smolagents_tool_backend_works_correctly():
     try:
         # Start backend
         backend.start()
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         # Create a real backend tool (WriteFileTool)
         write_tool = WriteFileTool(backend=backend)
@@ -145,8 +146,8 @@ def test_smolagents_tool_backend_works_correctly():
         assert "created" in result.content.lower() or "wrote" in result.content.lower()
 
         # Verify the file was actually written to the backend
-        assert backend.file_exists(path=test_file)
-        file_content = backend.read_file(file_path=test_file)
+        assert backend.file_exists(path=backend.convert_to_path(path=test_file))
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert content in file_content
         assert "Hello from backend!" in file_content
 
@@ -160,7 +161,7 @@ def test_smolagents_tool_backend_works_correctly():
         assert "overwrote" in result.content.lower()
 
         # Verify the file was overwritten
-        file_content = backend.read_file(file_path=test_file)
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert updated_content in file_content
         assert "Updated!" in file_content
         assert "Hello from backend!" not in file_content
@@ -168,7 +169,7 @@ def test_smolagents_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.clean_state_manager()
+        backend.cleanup_state_manager()
 
 def test_tool_schemas_extracted_correctly():
     """Test that tool schemas are correctly extracted from Generic parameters."""
@@ -343,10 +344,9 @@ def test_smolagents_agent_with_llm():
     text_joiner_tool = text_joiner.to_smolagents_tool()
 
     # Create agent with gpt-5-mini model
-    model = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")
     agent = ToolCallingAgent(
         tools=[calculator_tool, greeter_tool, text_joiner_tool],
-        model=model,
+        model=get_smolagents_model_example(),
         max_steps=2
     )
 

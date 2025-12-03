@@ -190,8 +190,11 @@ class ReadManyFilesTool(CoreBackendTool[ReadManyFilesInput, TextOutputModel]):
         output_parts = []
 
         for file_path in filtered_files:
+            # Convert str path to Path object
+            path_obj = self.backend.convert_to_path(path=file_path)
+
             # Check if file exists and is a file
-            file_type = self.backend.file_exists(path=file_path)
+            file_type = self.backend.file_exists(path=path_obj)
             if file_type != FileType.FILE:
                 continue
 
@@ -215,7 +218,7 @@ class ReadManyFilesTool(CoreBackendTool[ReadManyFilesInput, TextOutputModel]):
                     output_parts.append(f"[Error reading media file: {file_path}]")
             else:
                 # Read as text
-                content = self.backend.read_file(file_path=file_path)
+                content = self.backend.read_file(file_path=path_obj)
 
                 # Check if binary
                 if self._is_binary_file(content=content):

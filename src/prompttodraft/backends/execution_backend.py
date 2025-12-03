@@ -9,9 +9,12 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from beartype import beartype
+
 from prompttodraft.backends.state_manager import StateManager
 
 
+@beartype
 class BackendStatus(Enum):
     """Status of the execution backend."""
     UNINITIALIZED = "uninitialized"
@@ -19,6 +22,7 @@ class BackendStatus(Enum):
     STOPPED = "stopped"
 
 
+@beartype
 class FileType(Enum):
     """Type of filesystem entry."""
     FILE = "file"
@@ -27,11 +31,12 @@ class FileType(Enum):
     OTHER = "other"
 
 
+@beartype
 @dataclass
 class FileInfo:
     """Information about a file or directory."""
     name: str
-    path: str
+    path: Path
     type: FileType
 
     @property
@@ -40,6 +45,7 @@ class FileInfo:
         return self.type == FileType.DIRECTORY
 
 
+@beartype
 @dataclass
 class CommandResult:
     """Result of command execution."""
@@ -47,6 +53,7 @@ class CommandResult:
     exit_code: int
 
 
+@beartype
 class ExecutionBackend(ABC):
     """Abstract base class for execution backends."""
 
@@ -82,13 +89,16 @@ class ExecutionBackend(ABC):
         """
         pass
     
-    def clean_state_manager(self) -> None:
+    def cleanup_state_manager(self) -> None:
         """
-        Cleanup the backend environment.
+        Cleanup the backend environment and state manager.
+
+        This removes all state data from storage (GCS/Git branches/etc).
         """
         self.state_manager.cleanup(project_id=self.project_id)
 
-    def clean(self, clean_state_manager: bool = False) -> None:
+
+    def clean(self, cleanup_state_manager: bool = False) -> None:
         """
         Remove all files from working directory and save a clean snapshot.
 
@@ -101,30 +111,36 @@ class ExecutionBackend(ABC):
         After removing all files, creates an empty README.md to ensure the snapshot
         is trackable (especially important for GCS storage which discovers snapshots
         by looking at blob paths).
+
+        Args:
+            cleanup_state_manager: Whether to cleanup the state manager as well
         """
         # Get working directory
-        working_dir = Path(self.get_working_directory())
+        working_dir = self.get_working_directory()
+        
 
         # List all files and directories (non-recursive at root level)
-        items = self.list_directory(path=working_dir, recursive=False)
+        if self.file_exists(path=working_dir) is not None:
+            items = self.list_directory(path=working_dir, recursive=False)
 
-        # Delete all items except .git directory (needed for Git storage)
-        for item in items:
-            if item.name == '.git':
-                continue
+            # Delete all items except .git directory (needed for Git storage)
+            for item in items:
+                if item.name == '.git':
+                    continue
 
-            if item.is_dir:
-                self.delete_directory(path=item.path)
-            else:
-                self.delete_file(path=item.path)
+                # item.path is already a Path object
+                if item.is_dir:
+                    self.delete_directory(path=item.path)
+                else:
+                    self.delete_file(path=item.path)
 
-        # Create empty README.md to ensure snapshot is trackable
-        # This is especially important for GCS storage which discovers snapshots
-        # by looking at blob paths - without at least one file, the snapshot
-        # timestamp won't be discoverable
-        self.write_file(file_path=working_dir / "README.md", content="")
+            # Create empty README.md to ensure snapshot is trackable
+            # This is especially important for GCS storage which discovers snapshots
+            # by looking at blob paths - without at least one file, the snapshot
+            # timestamp won't be discoverable
+            self.write_file(file_path=working_dir / "README.md", content="")
 
-        if clean_state_manager:
+        if cleanup_state_manager:
             self.state_manager.cleanup(project_id=self.project_id)
 
     @abstractmethod
@@ -212,85 +228,217 @@ class ExecutionBackend(ABC):
     # === Working Directory ===
 
     @abstractmethod
-    def get_working_directory(self) -> str:
+    def get_working_directory(self) -> Path:
         """
-        Get the current working directory.
+        Get the working directory as seen by the LLM (virtual path).
+
+        For DockerBackend, this is /workspace.
+        For LocalBackend, this is also /workspace (mapped to a temp dir on host).
 
         Returns:
-            Absolute path to current working directory
+            Path object representing the root of the workspace in the LLM's view.
         """
         pass
-    
-    def convert_to_path(self, path: str | Path) -> Path:
-        """
-        Convert a string path to a Path object, relative to working directory.
 
-        If path is absolute but outside the working directory, strips the
-        leading '/' and treats it as relative to the working directory.
-        This handles cases where LLMs generate paths like '/home/sandbox/file.py'.
+    # === Internal Path Translation ===
+
+    @abstractmethod
+    def _to_system_path(self, virtual_path: Path) -> Path:
         """
-        path = Path(path)
+        Convert a virtual path (LLM view) to a system path (Host/Container/Sandbox view).
+
+        This is an internal method to standardize path resolution across backends.
+
+        Args:
+            virtual_path: Path object in the LLM's view (e.g. /workspace/file.py)
+
+        Returns:
+            Path object representing the actual location on the execution system.
+        """
+        pass
+
+    @abstractmethod
+    def _to_virtual_path(self, system_path: str | Path) -> Path:
+        """
+        Convert a system path (Host/Container/Sandbox view) to a virtual path (LLM view).
+
+        This is an internal method to standardize path resolution across backends.
+
+        Args:
+            system_path: Path or string on the execution system
+
+        Returns:
+            Path object in the LLM's view (e.g. /workspace/file.py)
+        """
+        pass
+
+    def _determine_file_type(self, system_path: Path) -> FileType | None:
+        """
+        Determine the type of a filesystem entry.
+
+        Helper method to reduce duplication across backends.
+
+        Args:
+            system_path: Path object on the execution system
+
+        Returns:
+            FileType if the path exists, None otherwise
+        """
+        if not system_path.exists():
+            return None
+        if system_path.is_symlink():
+            return FileType.SYMLINK
+        if system_path.is_file():
+            return FileType.FILE
+        if system_path.is_dir():
+            return FileType.DIRECTORY
+        return FileType.OTHER
+
+    def convert_to_path(self, path: str) -> Path:
+        """
+        Convert a string path to a normalized Path object in the LLM's view.
+
+        Enforces that the path is within the working directory.
+
+        Args:
+            path: String path from LLM tool call
+
+        Returns:
+            Path object relative to working directory (LLM view)
+
+        Raises:
+            ValueError: If path attempts to escape the working directory
+        """
+        path_obj = Path(path)
         working_dir = self.get_working_directory()
-
-        # If path is already relative to working dir, use it as-is
-        if path.is_relative_to(working_dir):
-            return path
-
-        # If path is absolute but outside working dir,
-        # strip leading '/' and treat as relative
-        if path.is_absolute():
-            path = Path(*path.parts[1:])  # Remove the root '/'
-
-        return working_dir / path
+        
+        # Normalize to resolve '..'
+        # Since we are dealing with virtual paths, we can use os.path.normpath
+        # But we need to be careful about OS differences if the host is Windows vs Posix
+        # Assuming Posix paths for LLM interaction (/workspace/...)
+        import posixpath
+        
+        str_path = str(path_obj)
+        if not path_obj.is_absolute():
+            # Join with working dir first
+            str_path = posixpath.join(str(working_dir), str_path)
+            
+        # Normalize path (resolve ..)
+        normalized_path_str = posixpath.normpath(str_path)
+        normalized_path = Path(normalized_path_str)
+        
+        # Check if it starts with working directory
+        if not str(normalized_path).startswith(str(working_dir)):
+             raise ValueError(f"Path '{path}' resolves to '{normalized_path}' which is outside the working directory '{working_dir}'")
+        
+        return normalized_path
 
     # === File Operations ===
 
     @abstractmethod
-    def read_file(self, file_path: str | Path) -> str:
-        """Read a file from the filesystem."""
+    def read_file(self, file_path: Path) -> str:
+        """Read a file from the filesystem.
+
+        Args:
+            file_path: Path object to the file to read
+
+        Returns:
+            File contents as string
+        """
         pass
 
     @abstractmethod
-    def write_file(self, file_path: str | Path, content: str) -> None:
-        """Write content to a file, creating it if it doesn't exist."""
+    def write_file(self, file_path: Path, content: str) -> None:
+        """Write content to a file, creating it if it doesn't exist.
+
+        Args:
+            file_path: Path object to the file to write
+            content: String content to write to the file
+        """
         pass
 
     @abstractmethod
-    def delete_file(self, path: str | Path) -> None:
-        """Delete a file."""
+    def delete_file(self, path: Path) -> None:
+        """Delete a file.
+
+        Args:
+            path: Path object to the file to delete
+        """
         pass
 
     @abstractmethod
-    def delete_directory(self, path: str | Path) -> None:
-        """Delete a directory recursively."""
+    def delete_directory(self, path: Path) -> None:
+        """Delete a directory recursively.
+
+        Args:
+            path: Path object to the directory to delete
+        """
         pass
 
     @abstractmethod
-    def create_directory(self, path: str | Path, parents: bool = False) -> None:
-        """Create a directory."""
+    def create_directory(self, path: Path, parents: bool = False) -> None:
+        """Create a directory.
+
+        Args:
+            path: Path object to the directory to create
+            parents: Whether to create parent directories
+        """
         pass
 
     @abstractmethod
-    def copy_file(self, src: str | Path, dst: str | Path) -> None:
-        """Copy a file from src to dst."""
+    def copy_file(self, src: Path, dst: Path) -> None:
+        """Copy a file from src to dst.
+
+        Args:
+            src: Path object to source file
+            dst: Path object to destination file
+        """
         pass
 
     @abstractmethod
-    def move_file(self, src: str | Path, dst: str | Path) -> None:
-        """Move/rename a file from src to dst."""
+    def move_file(self, src: Path, dst: Path) -> None:
+        """Move/rename a file from src to dst.
+
+        Args:
+            src: Path object to source file
+            dst: Path object to destination file
+        """
         pass
 
     @abstractmethod
-    def list_directory(self, path: str | Path, recursive: bool = False) -> list[FileInfo]:
-        """List contents of a directory."""
+    def list_directory(self, path: Path, recursive: bool = False) -> list[FileInfo]:
+        """List contents of a directory.
+
+        Args:
+            path: Path object to the directory to list
+            recursive: Whether to list recursively
+
+        Returns:
+            List of FileInfo objects
+        """
         pass
 
     @abstractmethod
-    def file_exists(self, path: str | Path) -> FileType | None:
-        """Check if a file or directory exists and return its type."""
+    def file_exists(self, path: Path) -> FileType | None:
+        """Check if a file or directory exists and return its type.
+
+        Args:
+            path: Path object to check
+
+        Returns:
+            FileType if exists, None otherwise
+        """
         pass
 
     @abstractmethod
-    def glob_files(self, pattern: str, path: str | Path | None = None) -> list[str]:
-        """Find files matching a glob pattern."""
+    def glob_files(self, pattern: str, path: Path | None = None) -> list[str]:
+        """Find files matching a glob pattern.
+
+        Args:
+            pattern: Glob pattern string (e.g., '*.py', '**/*.txt')
+            path: Optional Path object to search within
+
+        Returns:
+            List of file paths as strings
+        """
         pass

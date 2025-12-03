@@ -53,7 +53,7 @@ class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
             output_lines.append(f"Description: {inputs.description}")
 
         output_lines.append(f"Command: uv {inputs.command}")
-        output_lines.append(f"Working Directory: {self.backend.get_working_directory()}")
+        output_lines.append(f"Working Directory: {str(self.backend.get_working_directory())}")
         output_lines.append("")
 
         if result.output:

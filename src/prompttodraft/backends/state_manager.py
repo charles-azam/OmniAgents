@@ -91,7 +91,7 @@ class GCSStateManager(StateManager):
         Files are saved under project_id/timestamp/ to create immutable snapshots.
         This prevents deleted files from being restored on reload.
         """
-        working_dir = Path(backend.get_working_directory())
+        working_dir = backend.get_working_directory()
 
         # Create timestamp snapshot
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
@@ -130,7 +130,7 @@ class GCSStateManager(StateManager):
         Finds the most recent timestamp snapshot under project_id/ and loads all files
         from that snapshot. This ensures deleted files are not restored.
         """
-        working_dir = Path(backend.get_working_directory())
+        working_dir = backend.get_working_directory()
         bucket = storage_utils.get_bucket()
 
         # Find all timestamp directories for this project
@@ -262,7 +262,7 @@ class GitStateManager(StateManager):
     def _ensure_gitignore(self, backend: "ExecutionBackend") -> None:
         """Ensure .gitignore exists in working directory."""
         working_dir = backend.get_working_directory()
-        gitignore_path = f"{working_dir}/.gitignore"
+        gitignore_path = working_dir / ".gitignore"
 
         if not backend.file_exists(path=gitignore_path):
             backend.write_file(

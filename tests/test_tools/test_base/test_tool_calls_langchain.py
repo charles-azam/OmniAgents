@@ -8,6 +8,7 @@ from langchain_core.tools import StructuredTool as LangChainBaseTool
 from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
+from prompttodraft.agents.langchain_agent import get_langchain_model_example
 
 
 def test_langchain_tool_created_correctly():
@@ -108,7 +109,7 @@ def test_langchain_tool_backend_works_correctly():
     try:
         # Start backend
         backend.start()
-        working_dir = backend.get_working_directory()
+        working_dir = str(backend.get_working_directory())
 
         # Create a real backend tool (WriteFileTool)
         write_tool = WriteFileTool(backend=backend)
@@ -135,8 +136,8 @@ def test_langchain_tool_backend_works_correctly():
         assert "created" in result.content.lower() or "wrote" in result.content.lower()
 
         # Verify the file was actually written to the backend
-        assert backend.file_exists(path=test_file)
-        file_content = backend.read_file(file_path=test_file)
+        assert backend.file_exists(path=backend.convert_to_path(path=test_file))
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert content in file_content
         assert "Hello from backend!" in file_content
 
@@ -150,7 +151,7 @@ def test_langchain_tool_backend_works_correctly():
         assert "overwrote" in result.content.lower()
 
         # Verify the file was overwritten
-        file_content = backend.read_file(file_path=test_file)
+        file_content = backend.read_file(file_path=backend.convert_to_path(path=test_file))
         assert updated_content in file_content
         assert "Updated!" in file_content
         assert "Hello from backend!" not in file_content
@@ -158,7 +159,7 @@ def test_langchain_tool_backend_works_correctly():
     finally:
         # Clean up
         backend.shutdown()
-        backend.clean_state_manager()
+        backend.cleanup_state_manager()
 
 
 def test_langchain_tool_schemas_extracted_correctly():
@@ -291,7 +292,7 @@ def test_langchain_agent_with_llm():
     greeter_tool = greeter.to_langchain_tool()
 
     # Create the agent
-    agent = create_agent(model=ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=os.environ["HF_TOKEN"], model="openai/gpt-oss-120b:groq"), tools=[calculator_tool, greeter_tool])
+    agent = create_agent(model=get_langchain_model_example(), tools=[calculator_tool, greeter_tool])
 
     # Test 1: Math task
     result = agent.invoke({"messages": [("user", "What is 15 multiplied by 3?, you must use the calculator tool to answer the question")]})

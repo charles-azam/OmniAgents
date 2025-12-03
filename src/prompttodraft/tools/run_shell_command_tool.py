@@ -41,23 +41,25 @@ class RunShellCommandTool(CoreBackendTool[RunShellCommandInput, TextOutputModel]
         Returns:
             TextOutputModel with command output
         """
-        # Determine execution directory
         working_dir = self.backend.get_working_directory()
-        exec_dir = working_dir
-
+        
+        # When running locally, we need to handle the fact that shell commands run in the host temp dir
+        # but the LLM thinks it's in /workspace.
+        # If the user asks to 'cd subfolder', we can prepend 'cd subfolder &&'.
+        # If the user asks to 'cd /workspace/subfolder', we have a problem locally.
+        
+        # Current implementation assumes inputs.directory is relative to project root.
+        
+        command = inputs.command
+        
         if inputs.directory:
-            # Convert relative directory to absolute
-            exec_dir = str(Path(working_dir) / inputs.directory)
-
-        # Build the full command with directory change if needed
-        if inputs.directory:
-            full_command = f'cd "{exec_dir}" && {inputs.command}'
-        else:
-            full_command = inputs.command
-
+             # Just prepend cd relative_path
+             # We rely on inputs.directory being relative
+             command = f'cd "{inputs.directory}" && {command}'
+        
         # Execute command
         result = self.backend.execute_command(
-            command=full_command,
+            command=command,
             timeout=120000,  # 2 minutes default
         )
 
@@ -68,7 +70,10 @@ class RunShellCommandTool(CoreBackendTool[RunShellCommandInput, TextOutputModel]
             output_lines.append(f"Description: {inputs.description}")
 
         output_lines.append(f"Command: {inputs.command}")
-        output_lines.append(f"Directory: {exec_dir}")
+        if inputs.directory:
+             output_lines.append(f"Directory: {inputs.directory}")
+             
+        output_lines.append(f"Working Directory: {working_dir}")
         output_lines.append("")
 
         if result.output:

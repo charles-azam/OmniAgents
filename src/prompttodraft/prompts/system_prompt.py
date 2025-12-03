@@ -19,7 +19,7 @@ def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore
 
     Args:
         backend: ExecutionBackend instance to use for filesystem operations
-        start_path: The starting directory path
+        start_path: The starting directory path (command path, e.g., /workspace for Docker)
         ignore_patterns: List of patterns to ignore
 
     Returns:
@@ -36,8 +36,11 @@ def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore
             ".cache",
         ]
 
+    # Convert string path to Path and then use convert_to_path for proper host path resolution
+    path_for_listing = backend.convert_to_path(path=start_path)
+
     # Get all files recursively using backend
-    files = backend.list_directory(path=start_path, recursive=True)
+    files = backend.list_directory(path=path_for_listing, recursive=True)
 
     # Create formatted string
     structure = f"- {start_path}/\n"
@@ -159,8 +162,9 @@ def load_memory(backend: "ExecutionBackend") -> str:
     Returns:
         Memory content or empty string if file doesn't exist
     """
+    # Use file operations working directory (host path)
     working_dir = backend.get_working_directory()
-    memory_file = f"{working_dir}/.gemini/GEMINI.md"
+    memory_file = working_dir / ".gemini" / "GEMINI.md"
 
     if backend.file_exists(path=memory_file):
         content = backend.read_file(file_path=memory_file).strip()
@@ -180,11 +184,10 @@ def get_system_prompt(backend: "ExecutionBackend", model_id: str) -> str:
     Returns:
         Formatted system prompt string
     """
-    import os
-    cwd = backend.get_working_directory()
+    cwd = str(backend.get_working_directory())
 
     # The system message template is in the same directory as this file
-    template_path = os.path.join(os.path.dirname(__file__), "system_message.txt")
+    template_path = Path(__file__).parent / "system_message.txt"
 
     with open(template_path, "r") as f:
         system_message = f.read()
@@ -218,4 +221,5 @@ def get_system_prompt(backend: "ExecutionBackend", model_id: str) -> str:
     if memory_content:
         system_message = system_message + f'\n\n<context name="memory">User Memory (from .gemini/GEMINI.md):\n\n{memory_content}</context>\n'
 
+    # TODO: check this
     return system_message

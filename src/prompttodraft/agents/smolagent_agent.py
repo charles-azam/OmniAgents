@@ -4,10 +4,10 @@ Minimalist smolagents agent implementation.
 This module provides a simple interface to create and run a smolagents CodeAgent
 with manually defined tools, working across any execution backend.
 """
-import os
 from smolagents import ToolCallingAgent, OpenAIModel, InferenceClientModel
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
+from prompttodraft.prompts.system_prompt import get_system_prompt
 from prompttodraft.tools.write_file_tool import WriteFileTool
 from prompttodraft.tools.read_file_tool import ReadFileTool
 from prompttodraft.tools.list_directory_tool import ListDirectoryTool
@@ -19,9 +19,13 @@ from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
 
-# MODEL EXAMPLES
-GPT_5_MINI_OPENAI_SMOLAGENTS = OpenAIModel(model_id="gpt-5-mini")
-GPT_OSS_120B_HF_SMOLAGENTS = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")
+def get_smolagents_model_example(model_name: str = "openai/gpt-oss-120b") -> OpenAIModel:
+    if "gpt-5" in model_name:
+        return OpenAIModel(model_id=model_name)
+    elif "gpt-oss-120b" in model_name:
+        return InferenceClientModel(model_id=model_name, provider="cerebras")
+    else:
+        raise ValueError(f"Invalid model name: {model_name}")
 
 
 def create_smolagents_tools(backend: ExecutionBackend) -> list:
@@ -63,7 +67,7 @@ class SmolAgentAgent:
     def __init__(
         self,
         backend: ExecutionBackend,
-        model: OpenAIModel | InferenceClientModel = GPT_OSS_120B_HF_SMOLAGENTS,
+        model: OpenAIModel | InferenceClientModel = get_smolagents_model_example(),
         additional_tools: list | None = None,
         max_steps: int = 30,
     ) -> None:
@@ -78,6 +82,7 @@ class SmolAgentAgent:
         """
         self.backend = backend
         self.model = model
+        self.max_steps = max_steps
 
         # Create core tools using conversion methods
         self.tools = create_smolagents_tools(backend=backend)
@@ -86,11 +91,20 @@ class SmolAgentAgent:
         if additional_tools:
             self.tools.extend(additional_tools)
 
-        # Initialize the smolagents agent
+        # Agent will be initialized in run() with the system prompt
+        self.agent: ToolCallingAgent | None = None
+
+    def _create_agent_with_context(self) -> None:
+        """Create the agent with instructions containing working directory context."""
+        # Generate instructions with current project context
+        # Using instructions parameter instead of system_prompt to avoid Jinja2 conflicts
+        instructions = get_system_prompt(backend=self.backend, model_id="smolagents")
+
         self.agent = ToolCallingAgent(
             tools=self.tools,
             model=self.model,
-            max_steps=max_steps,
+            max_steps=self.max_steps,
+            instructions=instructions,
         )
 
     def run(self, task: str, reset_history: bool = True) -> str:
@@ -106,7 +120,10 @@ class SmolAgentAgent:
         """
         self.backend.start()
         if reset_history:
-            self.backend.clean_state_manager()
+            self.backend.clean(cleanup_state_manager=True)
+
+        # Create/recreate agent with current working directory context
+        self._create_agent_with_context()
 
         # Run the agent
         result = self.agent.run(task=task)

@@ -16,7 +16,7 @@ from prompttodraft.outputs.outputs import (
 class SearchFileContentInput(BaseModel):
     """Input model for SearchFileContentTool."""
     pattern: str = Field(description="The regular expression (regex) to search for in file contents (e.g., 'function\\s+myFunction').")
-    path: str | None = Field(default=None, description="Optional: The absolute path to the directory to search within. Defaults to the current working directory.")
+    path: str | None = Field(default=None, description="Optional: The path to the directory to search within, relative to the working directory. Defaults to the working directory.")
     include: str | None = Field(default=None, description="Optional: File pattern to include in the search (e.g., '*.js', '*.{ts,tsx}'). If omitted, searches most files.")
 
 
@@ -41,7 +41,7 @@ class SearchFileContentTool(CoreBackendTool[SearchFileContentInput, ToolOutputMo
         Returns:
             TextOutputModel with search results or ErrorOutputModel on failure
         """
-        search_path = inputs.path if inputs.path else self.backend.get_working_directory()
+        search_path = inputs.path if inputs.path else str(self.backend.get_working_directory())
 
         # Build grep command
         # Try git grep first if in a git repo, otherwise use regular grep
@@ -54,8 +54,8 @@ class SearchFileContentTool(CoreBackendTool[SearchFileContentInput, ToolOutputMo
         )
 
         if git_check.exit_code == 0:
-            # Use git grep
-            grep_cmd_parts.append(f'cd "{search_path}" && git grep -n "{inputs.pattern}"')
+            # Use git grep with --untracked to also search untracked files
+            grep_cmd_parts.append(f'cd "{search_path}" && git grep --untracked -n "{inputs.pattern}"')
             if inputs.include:
                 # Add file pattern as pathspec (git grep uses pathspec, not --glob)
                 grep_cmd_parts.append(f'-- "{inputs.include}"')
