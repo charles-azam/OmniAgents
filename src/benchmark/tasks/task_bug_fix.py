@@ -69,9 +69,9 @@ Run tests with: `python -m pytest -v`""",
         4. No new bugs introduced
         5. Tests file was not modified
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         calculator_file = self.workspace_dir / "calculator.py"
         test_file = self.workspace_dir / "tests" / "test_calculator.py"
@@ -186,9 +186,9 @@ Run tests with: `python -m pytest -v`""",
 
         # Calculate scores
         bugs_fixed = sum([
-            details.get("bug1_power_fixed", False),
-            details.get("bug2_is_even_fixed", False),
-            details.get("bug3_average_fixed", False)
+            bool(details.get("bug1_power_fixed", False)),
+            bool(details.get("bug2_is_even_fixed", False)),
+            bool(details.get("bug3_average_fixed", False))
         ])
 
         correctness_score = bugs_fixed / 3.0

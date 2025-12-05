@@ -73,9 +73,9 @@ Make sure to follow best practices and include proper imports.""",
         4. Dependencies are installed correctly
         5. Code quality (imports, structure)
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         # Check 1: Verify file structure
         app_dir = self.workspace_dir / "app"
@@ -229,11 +229,11 @@ Make sure to follow best practices and include proper imports.""",
         # Calculate scores
         structure_score = sum([
             files_exist,
-            details.get("has_fastapi", False),
-            details.get("has_hello_route", False),
-            details.get("has_json_response", False),
-            details.get("has_test_client", False),
-            details.get("has_test_function", False)
+            bool(details.get("has_fastapi", False)),
+            bool(details.get("has_hello_route", False)),
+            bool(details.get("has_json_response", False)),
+            bool(details.get("has_test_client", False)),
+            bool(details.get("has_test_function", False))
         ]) / 6.0
 
         correctness_score = structure_score if test_passed else structure_score * 0.5
@@ -242,8 +242,8 @@ Make sure to follow best practices and include proper imports.""",
         success = (
             files_exist and
             test_passed and
-            details.get("has_fastapi", False) and
-            details.get("has_hello_route", False)
+            bool(details.get("has_fastapi", False)) and
+            bool(details.get("has_hello_route", False))
         )
 
         return TaskEvaluation(

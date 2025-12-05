@@ -56,9 +56,9 @@ Run `python -m pytest` to verify the tests pass.""",
         2. Tests pass
         3. Code quality (no syntax errors)
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         # Check 1: Verify renaming
         src_dir = self.workspace_dir / "src"

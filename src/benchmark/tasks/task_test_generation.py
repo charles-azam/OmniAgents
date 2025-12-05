@@ -69,9 +69,9 @@ Install pytest-cov if needed: `uv pip install pytest pytest-cov`""",
         4. Tests cover edge cases
         5. Tests check error handling
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         test_file = self.workspace_dir / "tests" / "test_utils.py"
 

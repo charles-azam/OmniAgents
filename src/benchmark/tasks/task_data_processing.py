@@ -85,9 +85,9 @@ Run tests with: `python -m pytest -v`""",
         5. Calculations are correct
         6. Tests exist and pass
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         script_file = self.workspace_dir / "process_sales.py"
         output_file = self.workspace_dir / "output.csv"
@@ -261,7 +261,9 @@ Run tests with: `python -m pytest -v`""",
                 warnings.append(f"Error running tests: {str(e)}")
 
         # Calculate scores
-        correct_calc_ratio = details.get("correct_calculations", 0) / details.get("total_expected", 1)
+        correct_calc = details.get("correct_calculations", 0)
+        total_expected = details.get("total_expected", 1)
+        correct_calc_ratio = (correct_calc if isinstance(correct_calc, (int, float)) else 0) / (total_expected if isinstance(total_expected, (int, float)) else 1)
 
         correctness_score = correct_calc_ratio if script_ran else 0.0
         test_pass_rate = 1.0 if test_passed else 0.0

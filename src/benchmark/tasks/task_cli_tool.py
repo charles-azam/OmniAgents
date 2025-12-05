@@ -100,9 +100,9 @@ Run tests with: `python -m pytest -v`""",
         6. Tests exist and pass
         7. Help text exists
         """
-        errors = []
-        warnings = []
-        details = {}
+        errors: list[str] = []
+        warnings: list[str] = []
+        details: dict[str, str | int | float | bool] = {}
 
         wordcount_file = self.workspace_dir / "wordcount.py"
         test_file = self.workspace_dir / "tests" / "test_wordcount.py"
@@ -304,11 +304,11 @@ Run tests with: `python -m pytest -v`""",
 
         # Calculate scores
         functionality_score = sum([
-            details.get("basic_test_passed", False),
-            details.get("word_flag_passed", False),
-            details.get("line_flag_passed", False),
-            details.get("multiple_files_passed", False),
-            details.get("error_handling_passed", False)
+            bool(details.get("basic_test_passed", False)),
+            bool(details.get("word_flag_passed", False)),
+            bool(details.get("line_flag_passed", False)),
+            bool(details.get("multiple_files_passed", False)),
+            bool(details.get("error_handling_passed", False))
         ]) / 5.0
 
         correctness_score = functionality_score
@@ -324,9 +324,9 @@ Run tests with: `python -m pytest -v`""",
         code_quality_score = max(0.0, code_quality_score)
 
         success = (
-            details.get("basic_test_passed", False) and
-            details.get("word_flag_passed", False) and
-            details.get("has_argparse", False) and
+            bool(details.get("basic_test_passed", False)) and
+            bool(details.get("word_flag_passed", False)) and
+            bool(details.get("has_argparse", False)) and
             functionality_score >= 0.8
         )
 
