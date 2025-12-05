@@ -9,12 +9,12 @@ from pathlib import Path
 
 import pytest
 
-from prompttodraft.test_utils import cleanup_test_environment
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.e2b_backend import E2BBackend
-from prompttodraft.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import GitStateManager
+from anyagent.test_utils import cleanup_test_environment
+from anyagent.backends.docker_backend import DockerBackend
+from anyagent.backends.e2b_backend import E2BBackend
+from anyagent.backends.execution_backend import BackendStatus, ExecutionBackend, FileType
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.state_manager import GitStateManager
 
 
 def get_project_id(base_name: str) -> str:

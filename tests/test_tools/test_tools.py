@@ -27,29 +27,29 @@ from pathlib import Path
 
 import pytest
 
-from prompttodraft.test_utils import cleanup_test_environment
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.e2b_backend import E2BBackend
-from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.backends.state_manager import (
+from anyagent.test_utils import cleanup_test_environment
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.docker_backend import DockerBackend
+from anyagent.backends.e2b_backend import E2BBackend
+from anyagent.backends.execution_backend import ExecutionBackend, BackendStatus
+from anyagent.backends.state_manager import (
     NoOpStateManager,
     GitStateManager,
     GCSStateManager,
 )
 
-from prompttodraft.tools.list_directory_tool import ListDirectoryTool, ListDirectoryInput
-from prompttodraft.tools.read_file_tool import ReadFileTool, ReadFileInput
-from prompttodraft.tools.write_file_tool import WriteFileTool, WriteFileInput
-from prompttodraft.tools.glob_tool import GlobTool, GlobInput
-from prompttodraft.tools.search_file_content_tool import SearchFileContentTool, SearchFileContentInput
-from prompttodraft.tools.replace_tool import ReplaceTool, ReplaceInput
-from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool, RunShellCommandInput
-from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool, ReadManyFilesInput
-from prompttodraft.tools.save_memory_tool import SaveMemoryTool, SaveMemoryInput
-from prompttodraft.tools.uv_tool import UVTool, UVInput
+from anyagent.tools.list_directory_tool import ListDirectoryTool, ListDirectoryInput
+from anyagent.tools.read_file_tool import ReadFileTool, ReadFileInput
+from anyagent.tools.write_file_tool import WriteFileTool, WriteFileInput
+from anyagent.tools.glob_tool import GlobTool, GlobInput
+from anyagent.tools.search_file_content_tool import SearchFileContentTool, SearchFileContentInput
+from anyagent.tools.replace_tool import ReplaceTool, ReplaceInput
+from anyagent.tools.run_shell_command_tool import RunShellCommandTool, RunShellCommandInput
+from anyagent.tools.read_many_files_tool import ReadManyFilesTool, ReadManyFilesInput
+from anyagent.tools.save_memory_tool import SaveMemoryTool, SaveMemoryInput
+from anyagent.tools.uv_tool import UVTool, UVInput
 
-from prompttodraft.outputs.outputs import (
+from anyagent.outputs.outputs import (
     FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,
@@ -316,7 +316,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         uv_tool = UVTool(backend=backend)
 
         # Initialize project first (creates pyproject.toml)
-        from prompttodraft.presets.python import PythonUVPreset
+        from anyagent.presets.python import PythonUVPreset
         preset = PythonUVPreset()
         init_result = preset.initialize_project(backend=backend)
         assert init_result.success is True

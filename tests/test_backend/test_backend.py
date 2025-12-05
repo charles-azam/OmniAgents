@@ -1,10 +1,10 @@
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.e2b_backend import E2BBackend
-from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
-from prompttodraft.test_utils import cleanup_test_environment
-from prompttodraft.uv_utils import execute_uv_command
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.docker_backend import DockerBackend
+from anyagent.backends.e2b_backend import E2BBackend
+from anyagent.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from anyagent.backends.state_manager import GCSStateManager, GitStateManager
+from anyagent.test_utils import cleanup_test_environment
+from anyagent.uv_utils import execute_uv_command
 from pathlib import Path
 import pytest
 import os
@@ -40,7 +40,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
     from prompttodraft import storage_utils
-    from prompttodraft.common import GCP_DATA_PATH
+    from anyagent.common import GCP_DATA_PATH
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment for debugging/reloading
@@ -303,7 +303,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Test uv commands via execute_command
         # Use PythonUVPreset to initialize project (handles UV installation if needed)
-        from prompttodraft.presets.python import PythonUVPreset
+        from anyagent.presets.python import PythonUVPreset
 
         preset = PythonUVPreset()
         init_result = preset.initialize_project(backend=backend)
@@ -555,7 +555,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend: An initialized ExecutionBackend instance with StorageType.GIT
     """
     import subprocess
-    from prompttodraft.backends.state_manager import GitStateManager
+    from anyagent.backends.state_manager import GitStateManager
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment

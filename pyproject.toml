@@ -1,7 +1,7 @@
 [project]
-name = "prompttodraft"
+name = "anyagent"
 version = "0.1.0"
-description = "Add your description here"
+description = "Multi-backend execution framework for AI coding agents"
 readme = "README.md"
 authors = [
     { name = "Charles Azam", email = "azamcharles0@gmail.com" }
@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.scripts]
-prompttodraft = "prompttodraft:main"
+anyagent = "anyagent:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true
