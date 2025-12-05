@@ -291,38 +291,33 @@ class GitStateManager(StateManager):
 
         # Initialize git if not already initialized
         if not self._is_git_initialized(backend=backend):
-            backend.execute_command(command="git init")
-            backend.execute_command(command=f"git remote add origin {auth_url}")
-            backend.execute_command(command='git config user.name "PromptToDraft"')
-            backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
+            # Combine git init commands into single execution to reduce overhead
+            init_commands = (
+                f"git init && "
+                f"git remote add origin {auth_url} && "
+                f'git config user.name "PromptToDraft" && '
+                f'git config user.email "noreply@prompttodraft.ai"'
+            )
+            backend.execute_command(command=init_commands)
 
-        # Ensure we're on the correct branch
-        # Check current branch
-        current_branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD")
+        # Combine branch check and checkout into fewer commands
+        # Try to fetch and checkout in one operation
+        fetch_result = backend.execute_command(command=f"git fetch origin {branch_name} 2>/dev/null || true")
+
+        # Check if we're already on the branch
+        current_branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ''")
         current_branch = current_branch_result.output.strip()
 
-        if current_branch != branch_name:
-            # Check if branch exists locally
-            branch_exists_result = backend.execute_command(command=f"git rev-parse --verify {branch_name}")
+        if current_branch == branch_name:
+            # Already on correct branch, check if remote tracking exists
+            return fetch_result.exit_code == 0
 
-            if branch_exists_result.exit_code == 0:
-                # Branch exists locally, just checkout
-                backend.execute_command(command=f"git checkout {branch_name}")
-            else:
-                # Branch doesn't exist locally, try to fetch from remote
-                fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
+        # Try to checkout branch (will succeed if exists locally or remotely)
+        checkout_result = backend.execute_command(
+            command=f"git checkout {branch_name} 2>/dev/null || git checkout -b {branch_name} origin/{branch_name} 2>/dev/null || git checkout -b {branch_name}"
+        )
 
-                if fetch_result.exit_code == 0:
-                    # Branch exists on remote, create tracking branch
-                    backend.execute_command(command=f"git checkout -b {branch_name} origin/{branch_name}")
-                    return True
-                else:
-                    # Branch doesn't exist on remote, create new local branch
-                    backend.execute_command(command=f"git checkout -b {branch_name}")
-                    return False
-
-        # Already on correct branch, check if remote exists
-        fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
+        # Return True if remote branch existed (fetch succeeded)
         return fetch_result.exit_code == 0
 
     def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
@@ -344,28 +339,27 @@ class GitStateManager(StateManager):
         # Ensure .gitignore exists
         self._ensure_gitignore(backend=backend)
 
-        # Stage all files (gitignore handles filtering)
-        backend.execute_command(command="git add .")
-
-        # Check if there are changes to commit
-        status_result = backend.execute_command(command="git status --porcelain")
-        if not status_result.output.strip():
-            # No changes, return existing commit SHA or "no-changes"
-            sha_result = backend.execute_command(command="git rev-parse HEAD")
-            return sha_result.output.strip() if sha_result.exit_code == 0 else "no-changes"
-
-        # Commit changes
+        # Combine add, status check, and commit into fewer commands
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         commit_msg = message or f"Snapshot at {timestamp}"
-        # Use single quotes to avoid shell escaping issues
-        backend.execute_command(command=f"git commit -m '{commit_msg}'")
 
-        # Push to remote
-        backend.execute_command(command=f"git push origin {branch_name} --force")
+        # Try to add and commit in one go, get SHA if successful
+        # If nothing to commit, git commit will fail and we'll get the current SHA
+        commit_command = (
+            f"git add . && "
+            f"git diff-index --quiet HEAD || git commit -m '{commit_msg}'"
+        )
+        commit_result = backend.execute_command(command=commit_command)
 
-        # Get commit SHA
-        sha_result = backend.execute_command(command="git rev-parse HEAD")
-        return sha_result.output.strip()
+        # Get current SHA (whether we just committed or not)
+        sha_result = backend.execute_command(command="git rev-parse HEAD 2>/dev/null || echo 'no-changes'")
+        current_sha = sha_result.output.strip()
+
+        # Only push if we actually made a commit (commit_result succeeded)
+        if commit_result.exit_code == 0:
+            backend.execute_command(command=f"git push origin {branch_name} --force")
+
+        return current_sha
 
     def load_latest(self, backend: "ExecutionBackend") -> bool:
         """
