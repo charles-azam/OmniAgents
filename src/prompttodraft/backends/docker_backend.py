@@ -67,7 +67,7 @@ class DockerBackend(ExecutionBackend):
                 self._container.start()
             self._status = BackendStatus.RUNNING
             # Load latest state from state manager
-            self.state_manager.load_latest(backend=self)
+            self.load_latest_snapshot()
             return
 
         # No container exists, create new one
@@ -104,7 +104,7 @@ class DockerBackend(ExecutionBackend):
 
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
-        self.state_manager.load_latest(backend=self)
+        self.load_latest_snapshot()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown
@@ -112,7 +112,7 @@ class DockerBackend(ExecutionBackend):
             # Already shut down, nothing to do
             return
 
-        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.save_snapshot(message="Shutdown snapshot")
         self._container.stop(timeout=0)
         self._container.remove()
         self._container = None

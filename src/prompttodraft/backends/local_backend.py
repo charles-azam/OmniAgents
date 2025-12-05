@@ -44,11 +44,11 @@ class LocalBackend(ExecutionBackend):
         self._project_path.mkdir(parents=True, exist_ok=True)
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any
-        self.state_manager.load_latest(backend=self)
+        self.load_latest_snapshot()
 
     def shutdown(self) -> None:
         # Sync current state via state manager before shutdown
-        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.save_snapshot(message="Shutdown snapshot")
         self._status = BackendStatus.STOPPED
 
     def get_status(self) -> BackendStatus:

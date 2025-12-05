@@ -61,7 +61,7 @@ class E2BBackend(ExecutionBackend):
         self._status = BackendStatus.RUNNING
 
         # Load existing files from state manager if any
-        self.state_manager.load_latest(backend=self)
+        self.load_latest_snapshot()
 
     def shutdown(self) -> None:
         # Sync files via state manager and kill sandbox
@@ -70,7 +70,7 @@ class E2BBackend(ExecutionBackend):
             return
 
         # Sync before killing sandbox
-        self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
+        self.save_snapshot(message="Shutdown snapshot")
 
         self._sandbox.kill()
         self._sandbox = None

@@ -67,7 +67,12 @@ class ExecutionBackend(ABC):
                 - GCSStateManager(): Use Google Cloud Storage buckets
                 - NoOpStateManager(): No state persistence
         """
-        self.state_manager = state_manager
+        self._state_manager = state_manager
+
+    @property
+    def state_manager(self) -> StateManager:
+        """Get the state manager instance (read-only)."""
+        return self._state_manager
 
     @property
     @abstractmethod
@@ -89,13 +94,45 @@ class ExecutionBackend(ABC):
         """
         pass
     
+    def save_snapshot(self, message: str = "") -> str:
+        """
+        Save current state using the configured state manager.
+
+        Args:
+            message: Optional message describing this snapshot
+
+        Returns:
+            snapshot_id: Identifier for this snapshot (commit SHA, timestamp, etc.)
+        """
+        return self._state_manager.save_snapshot(backend=self, message=message)
+
+    def load_latest_snapshot(self) -> bool:
+        """
+        Load latest snapshot into working directory using the configured state manager.
+
+        Returns:
+            True if snapshot was loaded, False if no snapshots exist
+        """
+        return self._state_manager.load_latest(backend=self)
+
+    def list_snapshots(self) -> list[dict]:
+        """
+        List all available snapshots with metadata.
+        
+        Used only for testing.
+
+        Returns:
+            List of snapshot metadata dicts
+        """
+        return self._state_manager.list_snapshots(project_id=self.project_id)
+
     def cleanup_state_manager(self) -> None:
         """
         Cleanup the backend environment and state manager.
 
         This removes all state data from storage (GCS/Git branches/etc).
         """
-        self.state_manager.cleanup(project_id=self.project_id)
+        self._state_manager.cleanup(project_id=self.project_id)
 
 
     def clean(self, cleanup_state_manager: bool = False) -> None:
@@ -154,7 +191,7 @@ class ExecutionBackend(ABC):
                 pass
 
         if cleanup_state_manager:
-            self.state_manager.cleanup(project_id=self.project_id)
+            self._state_manager.cleanup(project_id=self.project_id)
 
     @abstractmethod
     def shutdown(self) -> None:
