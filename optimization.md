@@ -81,7 +81,47 @@ except Exception:
 
 ---
 
-### 3. GCS Network Calls in load_latest - ~19 seconds
+### 3. GCS Archive-Based Storage - ~12 seconds ✅ IMPLEMENTED
+
+**Problem**: GCS was storing individual files, requiring multiple upload/download/delete operations and complex path parsing.
+
+**Previous structure**:
+```
+project_id/timestamp/file1.py
+project_id/timestamp/file2.py
+project_id/timestamp/dir/file3.py
+```
+
+**New structure**:
+```
+project_id/timestamp.tar.gz  (single archive)
+```
+
+**Solution Implemented**:
+Refactored `GCSStateManager` to create tar.gz archives containing all files, drastically reducing GCS operations:
+- `save_snapshot`: Create tar.gz in memory, single upload instead of N uploads
+- `load_latest`: Single list + single download + extract instead of list + N downloads
+- `cleanup`: Delete archives instead of individual files
+- `list_snapshots`: Parse archive filenames instead of complex path parsing
+
+**Benefits**:
+- Fewer GCS API calls (1 upload vs N uploads, 1 download vs N downloads)
+- Simpler code (~50% reduction in state_manager.py)
+- Atomic snapshots (all files or none)
+- Compression saves bandwidth and storage
+
+**Files modified**:
+- `src/prompttodraft/backends/state_manager.py` - Complete refactor of GCSStateManager
+- `src/prompttodraft/storage_utils.py` - Added support for bytes content
+- `tests/test_backend/test_backend.py` - Updated to create test archives
+
+**Measured savings**:
+- `test_docker_backend_e2e`: 16.8s → 4.7s (~72% improvement)
+- Overall test suite: 255s → 132s (~48% improvement)
+
+---
+
+### 4. GCS Network Calls in load_latest - ~19 seconds (SUPERSEDED BY ARCHIVES)
 
 **Problem**: Every test that calls `start()` hits Google Cloud Storage to list and download blobs.
 
@@ -190,11 +230,25 @@ pytest -n auto tests/test_backend/test_backend.py
 ### Phase 3 - Advanced (Target: 15s savings)
 6. Add caching/batching for E2B operations
 
-## Expected Final Runtime
+## Progress Summary
 
-- Current: 255s
-- After Phase 1: ~50-80s (with parallelization)
-- After Phase 2: ~35-60s
-- After Phase 3: ~25-50s
+### Completed Optimizations
 
-**Target: Under 60 seconds for full test suite**
+| Optimization | Time Saved | Status |
+|--------------|------------|--------|
+| Docker container shutdown (`timeout=0`) | ~85s | ✅ Done |
+| GCS archive-based storage | ~12s | ✅ Done |
+| E2B list_directory (remove exists check) | ~10-15s | ✅ Done |
+
+### Current Performance
+
+- **Original**: 255s
+- **Current**: 132s (~48% faster)
+- **Reduction**: 123 seconds saved
+
+### Next Steps
+
+1. **Enable pytest-xdist** (easy, 2-3x speedup) → Target: ~45-65s
+2. **Git library instead of shell commands** (moderate, 5-8s saved)
+
+**Updated Target: Under 60 seconds with pytest-xdist**
