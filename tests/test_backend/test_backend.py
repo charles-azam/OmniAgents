@@ -626,9 +626,20 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
 
-        # Verify files were synced to git by checking the remote branch
-        snapshots = git_manager.list_snapshots(project_id=backend.project_id)
-        assert len(snapshots) >= 1, "No commits found on git branch"
+        # Verify files were synced to git by checking the remote branch (with retry for API propagation)
+        import time
+        max_retries = 5
+        retry_delay = 0.5
+        snapshots = []
+        for attempt in range(max_retries):
+            snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+            if len(snapshots) >= 1:
+                break
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+
+        assert len(snapshots) >= 1, f"No commits found on git branch after {max_retries} retries"
 
         # Start again and verify files were loaded
         backend.start()
@@ -655,9 +666,19 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend.write_file(file_path=test_file, content="Final state")
         backend.shutdown()
 
-        # Verify final commit exists
-        final_snapshots = git_manager.list_snapshots(project_id=backend.project_id)
-        assert len(final_snapshots) >= 2, "Should have multiple commits"
+        # Verify final commit exists (with retry for API propagation)
+        max_retries = 5
+        retry_delay = 0.5
+        final_snapshots = []
+        for attempt in range(max_retries):
+            final_snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+            if len(final_snapshots) >= 2:
+                break
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+
+        assert len(final_snapshots) >= 2, f"Should have multiple commits, found {len(final_snapshots)} after {max_retries} retries"
 
     finally:
         # Cleanup: shutdown first, then clean environment
