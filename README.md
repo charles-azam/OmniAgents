@@ -80,19 +80,23 @@ backend.shutdown()
 ### Using with AI Agents
 
 ```python
-from prompttodraft.smolagent_agent import SmolAgentAgent
+from prompttodraft.agents.smolagents_agent import SmolagentsAgent
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.presets.python import PythonUVPreset
 
 # Create backend
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
 
-# Create agent
-agent = SmolAgentAgent(
+# Create agent with Python/UV preset
+from smolagents import HfApiModel
+model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
+
+agent = SmolagentsAgent(
     backend=backend,
-    provider="huggingface",
-    model_id="Qwen/Qwen2.5-Coder-32B-Instruct"
+    model=model,
+    preset=PythonUVPreset(),
 )
 
 # Run task
@@ -201,10 +205,10 @@ uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
 
 ## Documentation
 
-- **[Agent Tools Guide](src/prompttodraft/agent/README.md)** - Tool catalog, framework integration, extension guide
-- **[Backends API Reference](src/prompttodraft/agent/backends/README.md)** - Backend interface details, state management
-- **[Core Tools API](src/prompttodraft/agent/core/README.md)** - Tool implementation patterns
-- **[Benchmark Suite](src/prompttodraft/benchmark/tasks/README.md)** - Comparing AI frameworks
+- **[Tools Guide](src/prompttodraft/README.md)** - Tool catalog, framework integration, extension guide
+- **[Backends API Reference](src/prompttodraft/backends/README.md)** - Backend interface details, state management
+- **[Tools API](src/prompttodraft/tools/README.md)** - Tool implementation patterns
+- **[Preset Architecture](docs/api-refactoring.md)** - Preset/AgentFactory design and usage
 
 ## CI/CD
 

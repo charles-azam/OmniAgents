@@ -17,7 +17,7 @@ Framework-agnostic coding tools based on Gemini CLI. Each tool uses backends for
 | **save_memory** | Persistent memory | `key`, `value` |
 | **uv** | Execute uv commands | `uv_command` |
 
-See `gemini_cli_tool.md` for complete Gemini CLI specifications.
+See `gemini_cli_tool.md` for complete Gemini CLI specifications (if available).
 
 ## Tool Design
 
@@ -25,8 +25,9 @@ See `gemini_cli_tool.md` for complete Gemini CLI specifications.
 
 All tools follow a consistent design:
 
-- **Inherit from `CoreTool`** - Base class ensures consistent interface
-- **Define metadata** - Name, description, inputs, output type
+- **Inherit from `CoreBackendTool`** - Base class ensures consistent interface
+- **Define name and description** - Tool identification
+- **Use Pydantic for inputs** - Type-safe input validation
 - **Implement `execute()`** - Business logic using backend primitives
 - **Return `ToolOutputModel`** - Structured Pydantic models, not strings
 - **Zero framework dependencies** - Works with any AI framework
@@ -34,33 +35,22 @@ All tools follow a consistent design:
 ### Tool Structure Example
 
 ```python
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.outputs.outputs import ToolOutputModel, TextOutputModel
+from prompttodraft.outputs.outputs import TextOutputModel
+from pydantic import BaseModel, Field
 
-class ExampleTool(CoreTool):
-    # Metadata for framework adapters
-    metadata = ToolMetadata(
-        name="example_tool",
-        description="What this tool does",
-        inputs={
-            "param1": {
-                "type": "string",
-                "description": "Parameter description",
-                "nullable": False
-            }
-        },
-        output_type="string"
-    )
+class ExampleToolInput(BaseModel):
+    param1: str = Field(description="Parameter description")
 
-    def __init__(self, backend: ExecutionBackend):
-        super().__init__(backend=backend)
+class ExampleTool(CoreBackendTool[ExampleToolInput, TextOutputModel]):
+    name = "example_tool"
+    description = "What this tool does"
 
-    def execute(self, param1: str) -> ToolOutputModel:
-        # 1. Validate inputs
+    def execute(self, inputs: ExampleToolInput) -> TextOutputModel:
+        # 1. Inputs are already validated by Pydantic
         # 2. Use backend for primitive operations
-        result = self.backend.execute_command(f"echo {param1}")
+        result = self.backend.execute_command(f"echo {inputs.param1}")
         # 3. Return output model
         return TextOutputModel(content=result.output)
 ```
@@ -109,32 +99,38 @@ These tools are based on Gemini CLI specifications. See `gemini_cli_tool.md` for
 
 ## Creating a New Tool
 
-1. **Create tool class** inheriting from `CoreTool`:
+1. **Create tool class** inheriting from `CoreBackendTool`:
 
 ```python
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
+from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import TextOutputModel
+from pydantic import BaseModel, Field
 
-class MyTool(CoreTool):
-    metadata = ToolMetadata(
-        name="my_tool",
-        description="Does something useful",
-        inputs={"param": {"type": "string", "description": "...", "nullable": False}},
-        output_type="string"
-    )
+class MyToolInput(BaseModel):
+    param: str = Field(description="Parameter description")
 
-    def execute(self, param: str) -> ToolOutputModel:
-        result = self.backend.execute_command(f"echo {param}")
+class MyTool(CoreBackendTool[MyToolInput, TextOutputModel]):
+    name = "my_tool"
+    description = "Does something useful"
+
+    def execute(self, inputs: MyToolInput) -> TextOutputModel:
+        result = self.backend.execute_command(f"echo {inputs.param}")
         return TextOutputModel(content=result.output)
 ```
 
-2. **Add wrappers** to framework integration files:
-   - `smolagent_agent.py` - smolagents `Tool` wrapper
-   - `pydantic_ai_agent.py` - Pydantic-AI tool definition
-   - `langchain_agent.py` - LangChain tool wrapper
+2. **Use with any agent via `extra_tool_classes`**:
+   ```python
+   from prompttodraft.agents.langchain_agent import LangChainAgent
 
-3. **Tool automatically works** in all environments (local, Docker, E2B)
+   agent = LangChainAgent(
+       backend=backend,
+       model=model,
+       preset=PythonUVPreset(),
+       extra_tool_classes=[MyTool],
+   )
+   ```
+
+3. **Tool automatically works** in all environments (local, Docker, E2B) and frameworks (LangChain, Pydantic-AI, smolagents)
 
 ## See Also
 
