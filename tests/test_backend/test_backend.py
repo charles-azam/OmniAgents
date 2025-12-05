@@ -517,7 +517,7 @@ def test_docker_backend_container_reuse():
         try:
             client = docker.from_env()
             container = client.containers.get(f"prompttodraft-{project_id}")
-            container.stop()
+            container.stop(timeout=0)
             container.remove()
         except:
             pass
@@ -673,11 +673,4 @@ def test_e2b_backend_git_storage():
 
 
 if __name__ == "__main__":
-    
-    test_local_backend_e2e()
     test_docker_backend_e2e()
-    test_e2b_backend_e2e()
-    test_docker_backend_container_reuse()
-    test_local_backend_git_storage()
-    test_docker_backend_git_storage()
-    test_e2b_backend_git_storage()

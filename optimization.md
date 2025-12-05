@@ -5,22 +5,39 @@ Test suite runtime: **255 seconds** (4+ minutes)
 
 ## Identified Bottlenecks
 
-### 1. Docker Container Shutdown - ~91 seconds (36% of total time)
+### 1. Docker Container Shutdown - ~91 seconds (36% of total time) ✅ IMPLEMENTED
 
-**Problem**: `container.stop()` waits for graceful shutdown (default 10s timeout) before killing containers.
+**Problem**: `container.stop()` waits for graceful shutdown (default 10s timeout) before killing containers. The container runs `sleep infinity`, which doesn't respond to SIGTERM quickly, causing the full timeout wait.
 
 **Locations**:
 - `test_docker_backend_e2e`: 40.4s in shutdown
 - `test_docker_backend_git_storage`: 30.4s in shutdown
 - `test_docker_backend_container_reuse`: 20.2s in shutdown
 
-**Solution**:
-Use `container.remove(force=True)` which kills and deletes in one operation, or `container.stop(timeout=0)` to skip graceful shutdown.
+**Solution Implemented (Option 1)**:
+Changed `container.stop()` to `container.stop(timeout=0)` to immediately send SIGKILL instead of waiting for graceful shutdown.
 
-**Files to modify**:
-- `prompttodraft/backends/docker_backend.py:109` - `DockerBackend.shutdown()` method
+```python
+# Before
+self._container.stop()  # Waits up to 10s for graceful shutdown
+
+# After
+self._container.stop(timeout=0)  # Immediately kills the container
+```
+
+**Files modified**:
+- `src/prompttodraft/backends/docker_backend.py:116` - `DockerBackend.shutdown()` method
 
 **Expected savings**: ~85 seconds
+
+**Alternative approaches if needed**:
+- **Option 2**: Don't remove containers, only stop them for true reuse between tests
+  - Would require updating test cleanup logic
+  - Faster container restart on subsequent `start()` calls
+- **Option 3**: Add a `remove_container` parameter to `shutdown()` method
+  - Gives control over whether to remove containers
+  - Tests could pass `remove_container=False` for speed
+  - Production could pass `remove_container=True` for cleanup
 
 ---
 
