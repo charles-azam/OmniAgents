@@ -41,9 +41,11 @@ def run_initialize_project_test(backend: ExecutionBackend):
         assert result["success"] is True
         assert result["first_run"] is True
         assert result["directory"] == working_dir
-        assert "uv init" in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
+        message = result["message"]
+        assert isinstance(message, str), f"Expected message to be str, got {type(message)}"
+        assert "uv init" in message
+        assert "uv sync" in message
+        assert "completed successfully" in message
 
         # Verify pyproject.toml was created
         pyproject_path = f"{working_dir}/pyproject.toml"
@@ -64,9 +66,11 @@ def run_initialize_project_test(backend: ExecutionBackend):
         assert result["success"] is True
         assert result["first_run"] is False
         assert result["directory"] == working_dir
-        assert "uv init" not in result["message"] or "Running 'uv init'..." not in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
+        message = result["message"]
+        assert isinstance(message, str), f"Expected message to be str, got {type(message)}"
+        assert "uv init" not in message or "Running 'uv init'..." not in message
+        assert "uv sync" in message
+        assert "completed successfully" in message
 
         print("\n" + "="*80)
         print("✅ ALL INITIALIZATION TESTS PASSED!")

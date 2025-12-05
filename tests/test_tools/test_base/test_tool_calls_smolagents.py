@@ -194,7 +194,8 @@ def test_tool_schemas_extracted_correctly():
     output_model = SchemaTool.get_output_model()
 
     assert input_model == SchemaInput
-    assert output_model == SchemaOutput
+    # Type ignore needed because output_model is typed as ToolOutputModel but can be any BaseModel
+    assert output_model == SchemaOutput  # type: ignore[comparison-overlap]
 
     # Test schema generation
     input_schema = SchemaTool.get_input_schema()
@@ -247,6 +248,7 @@ def test_smolagents_agent_with_llm():
 
         def has_been_called(self) -> bool:
             metadata["CalculatorOutput"] += 1
+            return True
 
     class CalculatorTool(CoreTool[CalculatorInput, CalculatorOutput]):
         name = "calculator"
@@ -273,7 +275,7 @@ def test_smolagents_agent_with_llm():
             )
             calculator_output.has_been_called()
 
-            return str(calculator_output)
+            return calculator_output
 
     class GreeterInput(BaseModel):
         name: str
@@ -284,6 +286,7 @@ def test_smolagents_agent_with_llm():
 
         def has_been_called(self) -> bool:
             metadata["GreeterOutput"] += 1
+            return True
 
     class GreeterTool(CoreTool[GreeterInput, GreeterOutput]):
         name = "greeter"
@@ -311,6 +314,7 @@ def test_smolagents_agent_with_llm():
 
         def has_been_called(self) -> bool:
             metadata["TextJoinerOutput"] += 1
+            return True
 
     class TextJoinerTool(CoreTool[TextJoinerInput, TextJoinerOutput]):
         name = "text_joiner"

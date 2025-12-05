@@ -23,6 +23,7 @@ from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 import logfire
 
 
@@ -51,7 +52,7 @@ def create_pydantic_ai_tools(backend: ExecutionBackend) -> list[Tool]:
     Returns:
         List of pydantic_ai Tool objects.
     """
-    tool_classes = [
+    tool_classes: list[type[CoreBackendTool]] = [
         WriteFileTool,
         ReadFileTool,
         ListDirectoryTool,

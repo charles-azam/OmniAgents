@@ -58,7 +58,8 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
     def execute_unpacked(self, **kwargs: Any) -> TOutput:
         input_model = self.get_input_model()
         pydantic_inputs = input_model.model_validate(kwargs)
-        return self.execute(inputs=pydantic_inputs)
+        # Type cast is safe because input_model is TInput
+        return self.execute(inputs=pydantic_inputs)  # type: ignore[arg-type]
     
     @classmethod
     def get_input_model(cls) -> type[BaseModel]:
@@ -78,7 +79,8 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                 if origin is CoreTool or (origin is not None and issubclass(origin, CoreTool)):
                     args = get_args(base)
                     if args and len(args) >= 1:
-                        return args[0]
+                        result: type[BaseModel] = args[0]  # type: ignore[assignment]
+                        return result
         raise TypeError(f"{cls.__name__} must specify Generic parameters: CoreTool[InputModel, OutputModel]")
 
     @classmethod
@@ -99,7 +101,8 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                 if origin is CoreTool or (origin is not None and issubclass(origin, CoreTool)):
                     args = get_args(base)
                     if args and len(args) >= 2:
-                        return args[1]
+                        result: type[ToolOutputModel] = args[1]  # type: ignore[assignment]
+                        return result
         raise TypeError(f"{cls.__name__} must specify Generic parameters: CoreTool[InputModel, OutputModel]")
 
 

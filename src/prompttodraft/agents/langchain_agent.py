@@ -7,6 +7,7 @@ with manually defined tools, working across any execution backend.
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.language_models.chat_models import BaseChatModel
+from pydantic import SecretStr
 
 from prompttodraft.backends.execution_backend import ExecutionBackend
 from prompttodraft.tools.write_file_tool import WriteFileTool
@@ -27,7 +28,8 @@ def get_langchain_model_example(model_name: str = "openai/gpt-oss-120b:cerebras"
     if "gpt-5" in model_name:
         return ChatOpenAI(model=model_name)
     elif "gpt-oss-120b" in model_name:
-        return ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=os.environ["HF_TOKEN"], model=model_name)
+        hf_token = os.environ.get("HF_TOKEN", "")
+        return ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=SecretStr(hf_token), model=model_name)
     else:
         raise ValueError(f"Invalid model name: {model_name}")
 
@@ -117,14 +119,15 @@ class LangChainAgent:
         # Generate system prompt with current project context
 
         # Create agent executor with system prompt
-        agent_executor = create_agent(
+        from langchain_core.runnables import Runnable
+        agent_executor: Runnable = create_agent(
             model=self.model,
             tools=self.tools,
         )
 
         # Run the agent
         result = agent_executor.invoke(
-            input={"messages": [("user", task)]}
+            input={"messages": [("user", task)]}  # type: ignore[arg-type]
         )
 
         # Shutdown backend
@@ -134,7 +137,8 @@ class LangChainAgent:
         if "messages" in result:
             last_message = result["messages"][-1]
             if hasattr(last_message, "content"):
-                return last_message.content
+                content: str = str(last_message.content)
+                return content
             return str(last_message)
 
         return str(result)

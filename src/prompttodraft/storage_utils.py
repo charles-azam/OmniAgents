@@ -103,7 +103,8 @@ def _read_from_bucket(blob_name: str) -> str:
     """Read a file from bucket storage."""
     bucket = get_bucket()
     blob = bucket.blob(blob_name=blob_name)
-    return blob.download_as_text()
+    result: str = blob.download_as_text()
+    return result
 
 
 def read_from_storage(file_path: Path) -> str:
@@ -149,7 +150,8 @@ def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool
     bucket = get_bucket()
     relative_path = file_path.relative_to(GCP_DATA_PATH)
     blob = bucket.blob(blob_name=relative_path.as_posix())
-    return blob.exists()
+    result: bool = blob.exists()
+    return result
 
 
 def delete_from_storage(file_path: Path) -> bool:

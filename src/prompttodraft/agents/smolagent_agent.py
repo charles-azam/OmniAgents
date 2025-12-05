@@ -18,6 +18,7 @@ from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
+from prompttodraft.tools.base_tool import CoreBackendTool
 
 def get_smolagents_model_example(model_name: str = "openai/gpt-oss-120b") -> OpenAIModel:
     if "gpt-5" in model_name:
@@ -38,7 +39,7 @@ def create_smolagents_tools(backend: ExecutionBackend) -> list:
     Returns:
         List of smolagents tool instances.
     """
-    tool_classes = [
+    tool_classes: list[type[CoreBackendTool]] = [
         WriteFileTool,
         ReadFileTool,
         ListDirectoryTool,
@@ -126,8 +127,11 @@ class SmolAgentAgent:
         self._create_agent_with_context()
 
         # Run the agent
+        if self.agent is None:
+            raise RuntimeError("Agent not initialized")
         result = self.agent.run(task=task)
 
         self.backend.shutdown()
 
-        return result
+        result_str: str = str(result)
+        return result_str

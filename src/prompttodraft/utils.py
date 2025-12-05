@@ -9,6 +9,7 @@ from prompttodraft.backends.execution_backend import ExecutionBackend
 
 
 def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
+    # Note: The return type is dict[str, bool | str] but "message" is always str
     """
     Initialize a Python project using uv package manager.
 

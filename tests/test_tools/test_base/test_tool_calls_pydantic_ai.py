@@ -47,7 +47,7 @@ def test_pydantic_ai_tool_created_correctly():
     assert pydantic_ai_tool.description == "Does something simple"
 
     # Test execution through the tool's function
-    result = pydantic_ai_tool.function(path="/test/path", count=5)
+    result = pydantic_ai_tool.function(path="/test/path", count=5)  # type: ignore[call-arg]
     assert isinstance(result, SimpleOutput)
     assert result.content == "Processed /test/path"
     assert result.processed == 10
@@ -90,7 +90,7 @@ def test_pydantic_ai_tool_backend_created_correctly():
     assert pydantic_ai_tool.description == "Tool that uses backend"
 
     # Test execution with backend
-    result = pydantic_ai_tool.function(command="ls -la")
+    result = pydantic_ai_tool.function(command="ls -la")  # type: ignore[call-arg]
     assert isinstance(result, BackendOutput)
     assert result.result == "Executed ls -la"
     assert "LocalBackend" in result.status
@@ -119,13 +119,14 @@ def test_pydantic_ai_tool_backend_works_correctly():
         # Verify tool structure
         assert isinstance(pydantic_ai_write_tool, PydanticAITool)
         assert pydantic_ai_write_tool.name == "write_file"
-        assert "write" in pydantic_ai_write_tool.description.lower()
+        description = pydantic_ai_write_tool.description
+        assert description is not None and "write" in description.lower()
 
         # Test execution with backend - write a file
         random_number = random.randint(1, 1000000)
         content = f"# Test file written by pydantic_ai tool\nprint('Hello from backend! {random_number}')\n"
         test_file = f"{working_dir}/test_backend.py"
-        result = pydantic_ai_write_tool.function(
+        result = pydantic_ai_write_tool.function(  # type: ignore[call-arg]
             file_path=test_file,
             content=content
         )
@@ -142,7 +143,7 @@ def test_pydantic_ai_tool_backend_works_correctly():
 
         # Test overwriting the file
         updated_content = f"# Updated content\nprint('Updated! {random_number}')\n"
-        result = pydantic_ai_write_tool.function(
+        result = pydantic_ai_write_tool.function(  # type: ignore[call-arg]
             file_path=test_file,
             content=updated_content
         )
@@ -184,7 +185,8 @@ def test_pydantic_ai_tool_schemas_extracted_correctly():
     output_model = SchemaTool.get_output_model()
 
     assert input_model == SchemaInput
-    assert output_model == SchemaOutput
+    # Type ignore needed because output_model is typed as ToolOutputModel but can be any BaseModel
+    assert output_model == SchemaOutput  # type: ignore[comparison-overlap]
 
     # Verify the schema itself
     schema = SchemaInput.model_json_schema()
@@ -349,8 +351,10 @@ def test_tools_strict_true_compatibility():
     compatible_tools = []
     incompatible_tools = []
 
+    from prompttodraft.tools.base_tool import CoreBackendTool
+    
     for tool_class in tool_classes:
-        tool_instance = tool_class(backend=backend)
+        tool_instance: CoreBackendTool = tool_class(backend=backend)  # type: ignore[assignment]
         tool_name = tool_instance.name
 
         # Try to create tool with strict=True

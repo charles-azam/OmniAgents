@@ -88,7 +88,7 @@ def test_tool_execution_with_correct_types():
 def test_generic_mandatory_parameters():
         
     with pytest.raises(TypeError, match="Too few arguments for"):
-        class FakeTool(CoreTool[TextOutputModel]):
+        class FakeTool(CoreTool[TextOutputModel]):  # type: ignore[type-arg]
             """Fake tool for testing Generic typing."""
             name = "fake_tool"
             description = "A fake tool for testing"

@@ -103,7 +103,8 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         # Read text file
         result = read_tool.execute(inputs=ReadFileInput(path=test_file))
         assert isinstance(result, TextOutputModel)
-        assert "def hello()" in result.content and "updated" in result.content
+        text_result: TextOutputModel = result
+        assert "def hello()" in text_result.content and "updated" in text_result.content
 
         # Read with offset and limit
         large_file = f"{working_dir}/large.txt"
@@ -111,13 +112,15 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         backend.write_file(file_path=Path(large_file), content="".join([f"Line {i}\n" for i in range(1, 101)]))
         result = read_tool.execute(inputs=ReadFileInput(path=large_file, offset=10, limit=5))
         assert isinstance(result, TextOutputModel)
-        assert "Line 11" in result.content and "Line 15" in result.content
-        assert "truncated" in result.content.lower()
+        text_result = result
+        assert "Line 11" in text_result.content and "Line 15" in text_result.content
+        assert "truncated" in text_result.content.lower()
 
         # Read non-existent file
         result = read_tool.execute(inputs=ReadFileInput(path=f"{working_dir}/nonexistent.txt"))
         assert isinstance(result, ErrorOutputModel)
-        assert "not exist" in result.error.lower()
+        error_result: ErrorOutputModel = result
+        assert "not exist" in error_result.error.lower()
 
         # TEST 3: list_directory
         print("\n" + "="*80)

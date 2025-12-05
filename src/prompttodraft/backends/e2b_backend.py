@@ -123,7 +123,8 @@ class E2BBackend(ExecutionBackend):
 
         sandbox_path = self._to_system_path(file_path)
         try:
-            return self._sandbox.files.read(path=str(sandbox_path))
+            result: str = self._sandbox.files.read(path=str(sandbox_path))
+            return result
         except NotFoundException as e:
             raise FileNotFoundError(str(e)) from e
 

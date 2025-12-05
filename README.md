@@ -199,6 +199,21 @@ uv run python -m pytest tests/test_backend.py::test_docker_backend_e2e -v
 uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
 ```
 
+## Code Coverage
+
+```bash
+# Run tests with coverage report
+uv run python -m pytest --cov=src/prompttodraft --cov-report=term-missing --cov-report=html
+
+# View HTML coverage report
+open htmlcov/index.html
+
+# Run tests with coverage and fail if below threshold (e.g., 80%)
+uv run python -m pytest --cov=src/prompttodraft --cov-report=term-missing --cov-fail-under=80
+```
+
+Coverage configuration is defined in `pyproject.toml` under `[tool.coverage.*]` sections.
+
 ## Documentation
 
 - **[Agent Tools Guide](src/prompttodraft/agent/README.md)** - Tool catalog, framework integration, extension guide

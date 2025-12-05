@@ -22,6 +22,7 @@ dependencies = [
     "openai-agents>=0.3.3",
     "litellm>=1.78.2",
     "pytest>=8.4.2",
+    "pytest-cov>=6.0.0",
     "ipykernel>=7.0.1",
     "google-api-python-client>=2.179.0",
     "google-cloud-secret-manager>=2.24.0",
@@ -44,6 +45,37 @@ allow-direct-references = true
 markers = [
     "e2b: marks tests that require E2B backend (deselect with '-m \"not e2b\"')",
 ]
+
+[tool.coverage.run]
+source = ["src/prompttodraft"]
+omit = [
+    "*/tests/*",
+    "*/test_*",
+    "*/__pycache__/*",
+    "*/benchmark/*",
+    "*/examples/*",
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+    "@property",
+    "@.*\\.setter",
+]
+precision = 2
+show_missing = true
+skip_covered = false
+fail_under = 0
+
+[tool.coverage.html]
+directory = "htmlcov"
 
 [tool.mypy]
 python_version = "3.13"

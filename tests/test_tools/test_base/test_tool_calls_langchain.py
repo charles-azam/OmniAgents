@@ -48,6 +48,8 @@ def test_langchain_tool_created_correctly():
     assert langchain_tool.args_schema == SimpleInput
 
     # Test execution through the tool
+    if langchain_tool.func is None:
+        raise ValueError("Tool function is None")
     result = langchain_tool.func(path="/test/path", count=5)
     assert isinstance(result, SimpleOutput)
     assert result.content == "Processed /test/path"
@@ -91,6 +93,8 @@ def test_langchain_tool_backend_created_correctly():
     assert langchain_tool.description == "Tool that uses backend"
 
     # Test execution with backend
+    if langchain_tool.func is None:
+        raise ValueError("Tool function is None")
     result = langchain_tool.func(command="ls -la")
     assert isinstance(result, BackendOutput)
     assert result.result == "Executed ls -la"
@@ -292,17 +296,18 @@ def test_langchain_agent_with_llm():
     greeter_tool = greeter.to_langchain_tool()
 
     # Create the agent
-    agent = create_agent(model=get_langchain_model_example(), tools=[calculator_tool, greeter_tool])
+    from langchain_core.runnables import Runnable
+    agent: Runnable = create_agent(model=get_langchain_model_example(), tools=[calculator_tool, greeter_tool])
 
     # Test 1: Math task
-    result = agent.invoke({"messages": [("user", "What is 15 multiplied by 3?, you must use the calculator tool to answer the question")]})
+    result = agent.invoke({"messages": [("user", "What is 15 multiplied by 3?, you must use the calculator tool to answer the question")]})  # type: ignore[arg-type]
     output = result["messages"][-1].content
     assert "45" in str(output) or "45.0" in str(output), f"Expected result to contain 45, got: {output}"
     # assert metadata["CalculatorOutput"] == 1
     # assert metadata["GreeterOutput"] == 0
 
     # Test 2: Greeting task
-    result = agent.invoke({"messages": [("user", "Greet Alice in Spanish")]})
+    result = agent.invoke({"messages": [("user", "Greet Alice in Spanish")]})  # type: ignore[arg-type]
     output = result["messages"][-1].content
     assert "Hola" in str(output) and "Alice" in str(output), f"Expected Spanish greeting for Alice, got: {output}"
     assert metadata["CalculatorOutput"] == 1

@@ -233,6 +233,9 @@ class GitStateManager(StateManager):
         self.repo_url = repo_url or os.getenv("PROMPTTODRAFT_GITHUB_STATE_REPO", "charlesazam/prompttodraft-states")
 
         # Normalize repo URL to full format
+        if self.repo_url is None:
+            raise ValueError("repo_url must be provided or PROMPTTODRAFT_GITHUB_STATE_REPO must be set")
+        
         if not self.repo_url.startswith("http"):
             # Convert owner/repo to full URL
             self.repo_url = f"https://github.com/{self.repo_url}.git"
@@ -254,6 +257,8 @@ class GitStateManager(StateManager):
 
     def _get_authenticated_url(self) -> str:
         """Get repo URL with token authentication."""
+        if self.repo_url is None:
+            raise ValueError("repo_url must be set")
         if self.github_token:
             # Insert token into URL: https://oauth2:TOKEN@github.com/owner/repo.git
             return self.repo_url.replace("https://", f"https://oauth2:{self.github_token}@")
