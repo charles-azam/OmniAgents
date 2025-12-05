@@ -406,7 +406,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Call clean()
         backend.clean(cleanup_state_manager=False)
-        backend.state_manager.save_snapshot(backend=backend, message="clean")
+        backend.save_snapshot(message="clean")
 
         # Verify files were removed (except .git for Git storage and README.md marker)
         files_after_clean = backend.list_directory(path=working_dir, recursive=False)
@@ -420,7 +420,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert readme_content == "", f"README.md should be empty, got: {readme_content}"
 
         # Verify snapshot was created with message "clean"
-        snapshots = backend.state_manager.list_snapshots(project_id=backend.project_id)
+        snapshots = backend.list_snapshots()
         assert len(snapshots) >= 1, "Expected at least one snapshot after clean()"
 
         # For Git storage, verify the latest commit has message "clean"
