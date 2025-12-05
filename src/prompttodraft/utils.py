@@ -8,7 +8,8 @@ from pathlib import Path
 from prompttodraft.backends.execution_backend import ExecutionBackend
 
 
-def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
+
+def initialize_python_project(backend: ExecutionBackend) -> dict[str, bool | str]:
     """
     Initialize a Python project using uv package manager.
 
@@ -63,17 +64,6 @@ def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
     if is_first_run:
         # First run: execute uv init
         messages.append("Running 'uv init'...")
-        # For LocalBackend, we are in a temp directory, but LLM sees /workspace.
-        # We need to run uv init in the current working directory of the shell.
-        # backend.execute_command runs in the project root by default.
-        # So we don't need to cd anywhere if we want to init in project root.
-        # However, previously we used 'cd "{working_dir}"'. 
-        # On Docker/E2B, working_dir is /workspace, which is correct.
-        # On Local, working_dir is /workspace, which DOES NOT EXIST.
-        
-        # Solution: Don't cd to working_dir if it's the default.
-        # Or, let the backend handle CWD.
-        # backend.execute_command already sets CWD to project root.
         
         init_command = 'export PATH="$HOME/.local/bin:$PATH" && uv init'
         result = backend.execute_command(
@@ -109,3 +99,17 @@ def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
         "success": True,
         "message": "\n".join(messages),
     }
+
+
+def initialize_project(backend: ExecutionBackend) -> dict[str, bool | str]:
+    """
+    Deprecated: Use initialize_python_project or ProjectProfile.initialize instead.
+    """
+    import warnings
+    warnings.warn(
+        "initialize_project is deprecated. Use initialize_python_project or ProjectProfile.initialize instead.",
+        DeprecationWarning,
+        stacklevel=2
+    )
+    return initialize_python_project(backend)
+

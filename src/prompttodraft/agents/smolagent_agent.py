@@ -18,6 +18,7 @@ from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
+from prompttodraft.profiles.base_profile import ProjectProfile
 
 def get_smolagents_model_example(model_name: str = "openai/gpt-oss-120b") -> OpenAIModel:
     if "gpt-5" in model_name:
@@ -28,12 +29,14 @@ def get_smolagents_model_example(model_name: str = "openai/gpt-oss-120b") -> Ope
         raise ValueError(f"Invalid model name: {model_name}")
 
 
-def create_smolagents_tools(backend: ExecutionBackend) -> list:
+
+def create_smolagents_tools(backend: ExecutionBackend, profile: ProjectProfile) -> list:
     """
     Create smolagents tools using the core tools' conversion methods.
 
     Args:
         backend: The execution backend instance.
+        profile: The project profile.
 
     Returns:
         List of smolagents tool instances.
@@ -48,10 +51,16 @@ def create_smolagents_tools(backend: ExecutionBackend) -> list:
         RunShellCommandTool,
         ReadManyFilesTool,
         SaveMemoryTool,
-        UVTool,
     ]
 
-    return [tool_class(backend=backend).to_smolagents_tool() for tool_class in tool_classes]
+    # Base tools
+    tools = [tool_class(backend=backend).to_smolagents_tool() for tool_class in tool_classes]
+    
+    # Profile tools
+    profile_tools = profile.get_tools(backend=backend)
+    tools.extend([tool.to_smolagents_tool() for tool in profile_tools])
+    
+    return tools
 
 
 class SmolAgentAgent:
@@ -70,6 +79,7 @@ class SmolAgentAgent:
         model: OpenAIModel | InferenceClientModel = get_smolagents_model_example(),
         additional_tools: list | None = None,
         max_steps: int = 30,
+        profile: ProjectProfile | None = None,
     ) -> None:
         """
         Initialize the smolagent agent.
@@ -79,13 +89,17 @@ class SmolAgentAgent:
             model: Smolagents model
             additional_tools: Optional additional smolagents tools to add
             max_steps: Maximum number of agent steps
+            profile: Project profile (defaults to PythonUVProfile)
         """
+        from prompttodraft.profiles.python_uv_profile import PythonUVProfile
+        
         self.backend = backend
         self.model = model
         self.max_steps = max_steps
+        self.profile = profile or PythonUVProfile()
 
         # Create core tools using conversion methods
-        self.tools = create_smolagents_tools(backend=backend)
+        self.tools = create_smolagents_tools(backend=backend, profile=self.profile)
 
         # Add any additional tools
         if additional_tools:
@@ -99,6 +113,11 @@ class SmolAgentAgent:
         # Generate instructions with current project context
         # Using instructions parameter instead of system_prompt to avoid Jinja2 conflicts
         instructions = get_system_prompt(backend=self.backend, model_id="smolagents")
+        
+        # Add profile instructions
+        profile_instructions = self.profile.get_system_prompt_additions()
+        if profile_instructions:
+            instructions += f"\n\n{profile_instructions}"
 
         self.agent = ToolCallingAgent(
             tools=self.tools,
@@ -121,6 +140,9 @@ class SmolAgentAgent:
         self.backend.start()
         if reset_history:
             self.backend.clean(cleanup_state_manager=True)
+            
+        # Initialize project
+        self.profile.initialize(backend=self.backend)
 
         # Create/recreate agent with current working directory context
         self._create_agent_with_context()
@@ -131,3 +153,4 @@ class SmolAgentAgent:
         self.backend.shutdown()
 
         return result
+

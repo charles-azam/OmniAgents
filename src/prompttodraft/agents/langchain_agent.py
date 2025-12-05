@@ -20,6 +20,7 @@ from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
 from prompttodraft.tools.base_tool import CoreBackendTool
+from prompttodraft.profiles.base_profile import ProjectProfile
 from langsmith import traceable
 import os
 
@@ -34,12 +35,14 @@ def get_langchain_model_example(model_name: str = "openai/gpt-oss-120b:cerebras"
 
 
 
-def create_langchain_tools(backend: ExecutionBackend) -> list:
+
+def create_langchain_tools(backend: ExecutionBackend, profile: ProjectProfile) -> list:
     """
     Create LangChain tools using the core tools' conversion methods.
 
     Args:
         backend: The execution backend instance.
+        profile: The project profile to get specific tools from.
 
     Returns:
         List of LangChain tool objects.
@@ -54,10 +57,16 @@ def create_langchain_tools(backend: ExecutionBackend) -> list:
         RunShellCommandTool,
         ReadManyFilesTool,
         SaveMemoryTool,
-        UVTool,
     ]
 
-    return [tool_class(backend=backend).to_langchain_tool() for tool_class in tool_classes]
+    # Get base tools
+    tools = [tool_class(backend=backend).to_langchain_tool() for tool_class in tool_classes]
+    
+    # Add profile specific tools
+    profile_tools = profile.get_tools(backend=backend)
+    tools.extend([tool.to_langchain_tool() for tool in profile_tools])
+    
+    return tools
 
 
 class LangChainAgent:
@@ -76,6 +85,7 @@ class LangChainAgent:
         backend: ExecutionBackend,
         model: BaseChatModel = get_langchain_model_example(),
         additional_tools: list | None = None,
+        profile: ProjectProfile | None = None,
     ) -> None:
         """
         Initialize the LangChain agent.
@@ -84,12 +94,16 @@ class LangChainAgent:
             backend: Execution backend (LocalBackend, DockerBackend, or E2BBackend)
             model: LangChain model
             additional_tools: Optional additional LangChain tools to add
+            profile: Project profile (defaults to PythonUVProfile for backward compatibility)
         """
+        from prompttodraft.profiles.python_uv_profile import PythonUVProfile
+        
         self.backend = backend
         self.model = model
+        self.profile = profile or PythonUVProfile()
 
         # Create core tools manually
-        self.tools = create_langchain_tools(backend=backend)
+        self.tools = create_langchain_tools(backend=backend, profile=self.profile)
 
         # Add any additional tools
         if additional_tools:
@@ -113,18 +127,30 @@ class LangChainAgent:
         # Cleanup if requested
         if reset_history:
             self.backend.clean(cleanup_state_manager=True)
+            
+        # Initialize project based on profile
+        self.profile.initialize(backend=self.backend)
 
         # Generate system prompt with current project context
+        # Note: We might want to inject profile instructions here if we had a way to modify system prompt easily
+        # For now, we rely on the tools being available and the model figuring it out, 
+        # or we could append to the task.
 
         # Create agent executor with system prompt
         agent_executor = create_agent(
             model=self.model,
             tools=self.tools,
         )
+        
+        # Append profile instructions to task if needed
+        full_task = task
+        profile_instructions = self.profile.get_system_prompt_additions()
+        if profile_instructions:
+            full_task = f"{profile_instructions}\n\nTask:\n{task}"
 
         # Run the agent
         result = agent_executor.invoke(
-            input={"messages": [("user", task)]}
+            input={"messages": [("user", full_task)]}
         )
 
         # Shutdown backend
@@ -138,3 +164,4 @@ class LangChainAgent:
             return str(last_message)
 
         return str(result)
+

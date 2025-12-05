@@ -23,6 +23,7 @@ from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
 from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
 from prompttodraft.tools.save_memory_tool import SaveMemoryTool
 from prompttodraft.tools.uv_tool import UVTool
+from prompttodraft.profiles.base_profile import ProjectProfile
 import logfire
 
 
@@ -41,12 +42,14 @@ def get_pydantic_ai_model_example(model_name: str = "openai/gpt-oss-120b:cerebra
 
 
 
-def create_pydantic_ai_tools(backend: ExecutionBackend) -> list[Tool]:
+
+def create_pydantic_ai_tools(backend: ExecutionBackend, profile: ProjectProfile) -> list[Tool]:
     """
     Create pydantic_ai tools using the core tools' conversion methods.
 
     Args:
         backend: The execution backend instance.
+        profile: The project profile.
 
     Returns:
         List of pydantic_ai Tool objects.
@@ -61,10 +64,16 @@ def create_pydantic_ai_tools(backend: ExecutionBackend) -> list[Tool]:
         RunShellCommandTool,
         ReadManyFilesTool,
         SaveMemoryTool,
-        UVTool,
     ]
 
-    return [tool_class(backend=backend).to_pydantic_ai_tool() for tool_class in tool_classes]
+    # Base tools
+    tools = [tool_class(backend=backend).to_pydantic_ai_tool() for tool_class in tool_classes]
+    
+    # Profile tools
+    profile_tools = profile.get_tools(backend=backend)
+    tools.extend([tool.to_pydantic_ai_tool() for tool in profile_tools])
+    
+    return tools
 
 
 class PydanticAIAgent:
@@ -82,6 +91,7 @@ class PydanticAIAgent:
         backend: ExecutionBackend,
         model: OpenAIChatModel = get_pydantic_ai_model_example(),
         additional_tools: list | None = None,
+        profile: ProjectProfile | None = None,
     ) -> None:
         """
         Initialize the pydantic_ai agent.
@@ -90,15 +100,19 @@ class PydanticAIAgent:
             backend: Execution backend (LocalBackend, DockerBackend, or E2BBackend)
             model: Pydantic AI model
             additional_tools: Optional additional pydantic_ai tools to add
+            profile: Project profile (defaults to PythonUVProfile)
         """
+        from prompttodraft.profiles.python_uv_profile import PythonUVProfile
+        
         logfire.configure(console=logfire.ConsoleOptions(verbose=True, colors="auto"))
         logfire.instrument_pydantic_ai(
         )
         self.backend = backend
         self.model = model
+        self.profile = profile or PythonUVProfile()
 
         # Create core tools
-        self.tools = create_pydantic_ai_tools(backend=backend)
+        self.tools = create_pydantic_ai_tools(backend=backend, profile=self.profile)
 
         # Add any additional tools
         if additional_tools:
@@ -107,6 +121,11 @@ class PydanticAIAgent:
         # Generate system prompt with current project context
         self.backend.start()
         system_prompt = get_system_prompt(backend=self.backend, model_id="pydantic_ai")
+        
+        # Add profile instructions
+        profile_instructions = self.profile.get_system_prompt_additions()
+        if profile_instructions:
+            system_prompt += f"\n\n{profile_instructions}"
 
         # Initialize the pydantic_ai Agent
         self.agent = Agent[str](
@@ -130,8 +149,18 @@ class PydanticAIAgent:
 
         if reset_history:
             self.backend.clean(cleanup_state_manager=True)
+            
+            # Initialize project
+            self.profile.initialize(backend=self.backend)
+            
             # Regenerate system prompt with updated project context
             system_prompt = get_system_prompt(backend=self.backend, model_id="pydantic_ai")
+            
+            # Add profile instructions
+            profile_instructions = self.profile.get_system_prompt_additions()
+            if profile_instructions:
+                system_prompt += f"\n\n{profile_instructions}"
+                
             # Recreate agent with updated system prompt
             self.agent = Agent(
                 model=self.model,
@@ -145,3 +174,4 @@ class PydanticAIAgent:
         self.backend.shutdown()
 
         return result.output
+
