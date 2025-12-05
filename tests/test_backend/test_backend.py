@@ -4,6 +4,7 @@ from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
 from prompttodraft.test_utils import cleanup_test_environment
+from prompttodraft.uv_utils import execute_uv_command
 from pathlib import Path
 import pytest
 import os
@@ -300,10 +301,13 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
-        # Test execute_uv
-        # First, initialize project with uv
-        uv_init_result = backend.execute_uv(uv_command="init", timeout=120000)
-        assert uv_init_result.exit_code == 0
+        # Test uv commands via execute_command
+        # Use PythonUVPreset to initialize project (handles UV installation if needed)
+        from prompttodraft.presets.python import PythonUVPreset
+
+        preset = PythonUVPreset()
+        init_result = preset.initialize_project(backend=backend)
+        assert init_result.success, f"Failed to initialize project with UV: {init_result.message}"
 
         # Verify pyproject.toml was created
         pyproject_path = working_dir / "pyproject.toml"
@@ -314,7 +318,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert "[project]" in initial_pyproject or "name" in initial_pyproject
 
         # Test uv add - add a package and verify pyproject.toml is modified
-        uv_add_result = backend.execute_uv(uv_command="add requests", timeout=120000)
+        uv_add_result = execute_uv_command(backend=backend, uv_command='add requests', timeout=120000)
         assert uv_add_result.exit_code == 0
 
         # Read modified pyproject.toml and verify requests was added
@@ -326,7 +330,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         uv_test_script = working_dir / "uv_test.py"
         backend.write_file(file_path=uv_test_script, content="print('UV run test successful')")
 
-        uv_run_result = backend.execute_uv(uv_command="run uv_test.py", timeout=60000)
+        uv_run_result = execute_uv_command(backend=backend, uv_command='run uv_test.py', timeout=60000)
         assert uv_run_result.exit_code == 0
         assert "UV run test successful" in uv_run_result.output
 

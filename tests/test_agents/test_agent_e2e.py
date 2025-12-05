@@ -18,7 +18,7 @@ from prompttodraft.agents.pydantic_ai_agent import (
     get_pydantic_ai_model_example,
 )
 from prompttodraft.agents.smolagent_agent import (
-    SmolAgentAgent,
+    SmolagentsAgent,
     get_smolagents_model_example,
 )
 from prompttodraft.backends.docker_backend import DockerBackend
@@ -47,7 +47,7 @@ def test_smolagent_agent_e2e_local() -> None:
 
     # Create agent with HF model
     model = get_smolagents_model_example()
-    agent = SmolAgentAgent(
+    agent = SmolagentsAgent(
         backend=backend,
         model=model,
     )
@@ -91,7 +91,7 @@ def test_smolagent_agent_e2e_docker() -> None:
 
     # Create agent with HF model
     model = get_smolagents_model_example()
-    agent = SmolAgentAgent(
+    agent = SmolagentsAgent(
         backend=backend,
         model=model,
     )

@@ -1,7 +1,7 @@
 """
-E2E tests for utility functions.
+E2E tests for preset initialization.
 
-Tests the initialize_project function with different backends (local, docker, e2b).
+Tests the PythonUVPreset.initialize_project with different backends (local, docker, e2b).
 """
 import pytest
 from pathlib import Path
@@ -12,16 +12,18 @@ from prompttodraft.backends.docker_backend import DockerBackend
 from prompttodraft.backends.e2b_backend import E2BBackend
 from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
 from prompttodraft.backends.state_manager import GCSStateManager
-from prompttodraft.utils import initialize_project
+from prompttodraft.presets.python import PythonUVPreset
 
 
 def run_initialize_project_test(backend: ExecutionBackend):
     """
-    E2E test for initialize_project with any backend implementation.
+    E2E test for PythonUVPreset.initialize_project with any backend implementation.
 
     Args:
         backend: An initialized ExecutionBackend instance (local, docker, or e2b)
     """
+    preset = PythonUVPreset()
+
     # === FRESH START CLEANUP ===
     cleanup_test_environment(backend=backend)
 
@@ -32,18 +34,18 @@ def run_initialize_project_test(backend: ExecutionBackend):
         working_dir = str(backend.get_working_directory())
 
         # TEST 1: First run - should run uv init and uv sync
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("TEST 1: First run - should initialize project")
-        print("="*80)
+        print("=" * 80)
 
-        result = initialize_project(backend=backend)
+        assert not preset.is_initialized(backend=backend)
+        result = preset.initialize_project(backend=backend)
 
-        assert result["success"] is True
-        assert result["first_run"] is True
-        assert result["directory"] == working_dir
-        assert "uv init" in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
+        assert result.success is True
+        assert result.first_run is True
+        assert "uv init" in result.message
+        assert "uv sync" in result.message
+        assert "completed successfully" in result.message
 
         # Verify pyproject.toml was created
         pyproject_path = f"{working_dir}/pyproject.toml"
@@ -55,22 +57,22 @@ def run_initialize_project_test(backend: ExecutionBackend):
         assert "[project]" in content or "name" in content
 
         # TEST 2: Second run - should only run uv sync
-        print("\n" + "="*80)
+        print("\n" + "=" * 80)
         print("TEST 2: Second run - should only sync")
-        print("="*80)
+        print("=" * 80)
 
-        result = initialize_project(backend=backend)
+        assert preset.is_initialized(backend=backend)
+        result = preset.initialize_project(backend=backend)
 
-        assert result["success"] is True
-        assert result["first_run"] is False
-        assert result["directory"] == working_dir
-        assert "uv init" not in result["message"] or "Running 'uv init'..." not in result["message"]
-        assert "uv sync" in result["message"]
-        assert "completed successfully" in result["message"]
+        assert result.success is True
+        assert result.first_run is False
+        assert "Running 'uv init'..." not in result.message
+        assert "uv sync" in result.message
+        assert "completed successfully" in result.message
 
-        print("\n" + "="*80)
-        print("✅ ALL INITIALIZATION TESTS PASSED!")
-        print("="*80)
+        print("\n" + "=" * 80)
+        print("ALL INITIALIZATION TESTS PASSED!")
+        print("=" * 80)
 
         backend.shutdown()
 
@@ -83,20 +85,25 @@ def run_initialize_project_test(backend: ExecutionBackend):
 
 
 def test_initialize_project_local_backend():
-    """Test initialize_project with LocalBackend."""
+    """Test PythonUVPreset.initialize_project with LocalBackend."""
     backend = LocalBackend(project_id="test_init_local", state_manager=GCSStateManager())
     run_initialize_project_test(backend=backend)
 
 
 def test_initialize_project_docker_backend():
-    """Test initialize_project with DockerBackend."""
-    backend = DockerBackend(project_id="test_init_docker", state_manager=GCSStateManager())
+    """Test PythonUVPreset.initialize_project with DockerBackend."""
+    preset = PythonUVPreset()
+    backend = DockerBackend(
+        project_id="test_init_docker",
+        state_manager=GCSStateManager(),
+        image=preset.docker_image,
+    )
     run_initialize_project_test(backend=backend)
 
 
 @pytest.mark.e2b
 def test_initialize_project_e2b_backend():
-    """Test initialize_project with E2BBackend."""
+    """Test PythonUVPreset.initialize_project with E2BBackend."""
     backend = E2BBackend(project_id="test_init_e2b", state_manager=GCSStateManager())
     run_initialize_project_test(backend=backend)
 

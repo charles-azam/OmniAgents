@@ -22,17 +22,32 @@ from prompttodraft.backends.state_manager import StateManager
 from prompttodraft.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
-DOCKER_IMAGE = "ghcr.io/astral-sh/uv:debian"
 CONTAINER_WORKSPACE = "/workspace"
 
 
 @beartype
 class DockerBackend(ExecutionBackend):
-    """Docker execution backend."""
+    """
+    Docker execution backend.
 
-    def __init__(self, project_id: str, state_manager: StateManager):
+    Args:
+        project_id: Unique identifier for this project
+        state_manager: State persistence manager
+        image: Docker image to use (default: "ghcr.io/astral-sh/uv:debian")
+        environment: Additional environment variables for the container
+    """
+
+    def __init__(
+        self,
+        project_id: str,
+        state_manager: StateManager,
+        image: str = "ghcr.io/astral-sh/uv:debian",
+        environment: dict[str, str] | None = None,
+    ):
         super().__init__(state_manager=state_manager)
         self._project_id = project_id
+        self._image = image
+        self._extra_environment = environment or {}
         self._status = BackendStatus.UNINITIALIZED
         self._container: Container | None = None
         self._client = docker.from_env()
@@ -73,14 +88,14 @@ class DockerBackend(ExecutionBackend):
         # No container exists, create new one
         # Pull image if not present
         try:
-            self._client.images.get(DOCKER_IMAGE)
+            self._client.images.get(self._image)
         except docker.errors.ImageNotFound:
-            self._client.images.pull(DOCKER_IMAGE)
+            self._client.images.pull(self._image)
 
         # On Linux, run container as host user to avoid permission issues
         # On macOS/Windows, Docker Desktop handles user mapping automatically
         container_kwargs = {
-            "image": DOCKER_IMAGE,
+            "image": self._image,
             "name": self._container_name,
             "command": "sleep infinity",  # Keep container running
             "volumes": {str(self._project_path): {"bind": CONTAINER_WORKSPACE, "mode": "rw"}},
@@ -89,9 +104,7 @@ class DockerBackend(ExecutionBackend):
             "remove": False,
             "environment": {
                 "HOME": CONTAINER_WORKSPACE,
-                "UV_CACHE_DIR": f"{CONTAINER_WORKSPACE}/.cache/uv",
-                "UV_TOOL_DIR": f"{CONTAINER_WORKSPACE}/.local/bin",
-                "UV_PYTHON_INSTALL_DIR": f"{CONTAINER_WORKSPACE}/.local/share/uv/python",
+                **self._extra_environment,
             },
         }
 

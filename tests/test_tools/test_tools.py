@@ -316,9 +316,10 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         uv_tool = UVTool(backend=backend)
 
         # Initialize project first (creates pyproject.toml)
-        from prompttodraft.utils import initialize_project
-        init_result = initialize_project(backend=backend)
-        assert init_result["success"] is True
+        from prompttodraft.presets.python import PythonUVPreset
+        preset = PythonUVPreset()
+        init_result = preset.initialize_project(backend=backend)
+        assert init_result.success is True
 
         # Create a simple Python script to run
         test_script = f"{working_dir}/test_script.py"

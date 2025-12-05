@@ -6,16 +6,20 @@ This tool executes uv commands in the execution environment, ensuring uv is inst
 from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.outputs.outputs import (
-    TextOutputModel,
-    ToolOutputModel,
-)
+from prompttodraft.outputs.outputs import TextOutputModel
+from prompttodraft.uv_utils import ensure_uv_installed, execute_uv_command
 
 
 class UVInput(BaseModel):
     """Input model for UVTool."""
-    command: str = Field(description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'.")
-    description: str | None = Field(default=None, description="Optional: A brief description of the command's purpose, which will be shown to the user.")
+
+    command: str = Field(
+        description="The uv command to execute (without the 'uv' prefix). Examples: 'run script.py', 'add requests', 'remove pandas', 'sync', 'run pytest tests/', 'run python -m module'."
+    )
+    description: str | None = Field(
+        default=None,
+        description="Optional: A brief description of the command's purpose, which will be shown to the user.",
+    )
 
 
 class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
@@ -40,8 +44,17 @@ class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
         Returns:
             TextOutputModel with command output
         """
-        # Execute the uv command using the backend's execute_uv method
-        result = self.backend.execute_uv(
+        # Ensure uv is installed
+        success, message = ensure_uv_installed(backend=self.backend)
+        if not success:
+            return TextOutputModel(
+                content=f"Failed to install uv package manager: {message}",
+                metadata={"exit_code": 1, "command": f"uv {inputs.command}"},
+            )
+
+        # Execute the uv command
+        result = execute_uv_command(
+            backend=self.backend,
             uv_command=inputs.command,
             timeout=300000,  # 5 minutes default for potentially long operations
         )
@@ -63,7 +76,6 @@ class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
 
         output_lines.append(f"Exit Code: {result.exit_code}")
 
-        # Check for non-zero exit code
         if result.exit_code != 0:
             output_lines.append("")
             output_lines.append(f"Warning: Command exited with non-zero status code {result.exit_code}")

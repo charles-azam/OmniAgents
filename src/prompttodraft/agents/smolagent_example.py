@@ -1,11 +1,12 @@
 """
-Example usage of the SmolAgentAgent.
+Example usage of the SmolagentsAgent.
 
-This demonstrates how to use the smolagent agent with different backends.
+This demonstrates how to use the smolagent agent with different backends and presets.
 """
-from prompttodraft.agents.smolagent_agent import SmolAgentAgent, get_smolagents_model_example
+from prompttodraft.agents.smolagent_agent import SmolagentsAgent, get_smolagents_model_example
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.presets.python import PythonUVPreset
 
 
 def main() -> None:
@@ -18,13 +19,14 @@ def main() -> None:
         state_manager=state_manager,
     )
 
-    # Start the backend (loads from git if exists)
-    backend.start()
+    # Create the model
     model = get_smolagents_model_example()
-    # Create the agent
-    agent = SmolAgentAgent(
+
+    # Create the agent with Python UV preset
+    agent = SmolagentsAgent(
         backend=backend,
         model=model,
+        preset=PythonUVPreset(),
     )
 
     # Run a task
@@ -36,7 +38,6 @@ def main() -> None:
     print("Running task...")
     result = agent.run(task=task)
     print(f"Result: {result}")
-
 
 
 if __name__ == "__main__":
