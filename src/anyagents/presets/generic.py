@@ -1,12 +1,12 @@
 """
 Generic preset with no special tools or initialization.
 """
-from prompttodraft.presets.base import Preset, InitResult
+from anyagents.presets.base import Preset, InitResult
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompttodraft.backends.execution_backend import ExecutionBackend
+    from anyagents.backends.execution_backend import ExecutionBackend
 
 
 class GenericPreset(Preset):

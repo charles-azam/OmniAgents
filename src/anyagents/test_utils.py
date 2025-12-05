@@ -6,7 +6,7 @@ available to all test files in the tests directory.
 """
 from pathlib import Path
 
-from prompttodraft.backends.execution_backend import ExecutionBackend
+from anyagents.backends.execution_backend import ExecutionBackend
 def cleanup_test_environment(backend: ExecutionBackend) -> None:
     """
     Clean all test artifacts for a backend instance.
@@ -21,9 +21,9 @@ def cleanup_test_environment(backend: ExecutionBackend) -> None:
     Args:
         backend: ExecutionBackend instance (can be UNINITIALIZED)
     """
-    from prompttodraft.backends.docker_backend import DockerBackend
-    from prompttodraft.backends.local_backend import LocalBackend
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
+    from anyagents.backends.docker_backend import DockerBackend
+    from anyagents.backends.local_backend import LocalBackend
+    from anyagents.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
     import shutil
 
     # 1. Clean storage layer (GCS/Git)
@@ -34,7 +34,7 @@ def cleanup_test_environment(backend: ExecutionBackend) -> None:
         import docker
         try:
             client = docker.from_env()
-            container_name = f"prompttodraft-{backend.project_id}"
+            container_name = f"anyagents-{backend.project_id}"
             container = client.containers.get(container_name)
             container.stop(timeout=0)
             container.remove()
@@ -52,10 +52,10 @@ def cleanup_test_environment(backend: ExecutionBackend) -> None:
         shutil.rmtree(working_dir_path)
 
 if __name__ == "__main__":
-    from prompttodraft.backends.local_backend import LocalBackend
-    from prompttodraft.backends.execution_backend import ExecutionBackend
-    from prompttodraft.backends.state_manager import GCSStateManager
-    from prompttodraft.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
+    from anyagents.backends.local_backend import LocalBackend
+    from anyagents.backends.execution_backend import ExecutionBackend
+    from anyagents.backends.state_manager import GCSStateManager
+    from anyagents.common import LOCAL_BACKEND_PATH, DOCKER_BACKEND_PATH, GCP_DATA_PATH
 
     backend = LocalBackend(project_id="test-project2", state_manager=GCSStateManager())
     cleanup_test_environment(backend=backend)

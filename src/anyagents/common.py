@@ -6,7 +6,7 @@ PROMPT_TO_DRAFT_PATH = Path(__file__).parent
 PROMPT_TO_DRAFT_REPO_PATH = PROMPT_TO_DRAFT_PATH.parent.parent
 
 # Backend-specific local storage paths
-LOCAL_BACKEND_PATH = Path(tempfile.gettempdir()) / "prompttodraft"  # LocalBackend: /tmp to avoid nested projects
+LOCAL_BACKEND_PATH = Path(tempfile.gettempdir()) / "anyagents"  # LocalBackend: /tmp to avoid nested projects
 DOCKER_BACKEND_PATH = PROMPT_TO_DRAFT_REPO_PATH / "data"  # DockerBackend: in repo for easier monitoring
 
 # GCP staging area for bucket operations (used by storage_utils)

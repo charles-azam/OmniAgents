@@ -11,7 +11,7 @@ from pathlib import Path
 
 from beartype import beartype
 
-from prompttodraft.backends.state_manager import StateManager
+from anyagents.backends.state_manager import StateManager
 
 
 @beartype

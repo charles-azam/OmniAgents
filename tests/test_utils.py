@@ -6,13 +6,13 @@ Tests the PythonUVPreset.initialize_project with different backends (local, dock
 import pytest
 from pathlib import Path
 
-from prompttodraft.test_utils import cleanup_test_environment
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.e2b_backend import E2BBackend
-from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus
-from prompttodraft.backends.state_manager import GCSStateManager
-from prompttodraft.presets.python import PythonUVPreset
+from anyagents.test_utils import cleanup_test_environment
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.docker_backend import DockerBackend
+from anyagents.backends.e2b_backend import E2BBackend
+from anyagents.backends.execution_backend import ExecutionBackend, BackendStatus
+from anyagents.backends.state_manager import GCSStateManager
+from anyagents.presets.python import PythonUVPreset
 
 
 def run_initialize_project_test(backend: ExecutionBackend):

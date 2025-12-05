@@ -9,15 +9,15 @@ from pathlib import Path
 
 from beartype import beartype
 
-from prompttodraft.backends.execution_backend import (
+from anyagents.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from prompttodraft.backends.state_manager import StateManager
-from prompttodraft.common import LOCAL_BACKEND_PATH
+from anyagents.backends.state_manager import StateManager
+from anyagents.common import LOCAL_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 

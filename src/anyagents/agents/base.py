@@ -4,20 +4,20 @@ Abstract base class for framework-specific coding agents.
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.presets.base import Preset
-from prompttodraft.presets.generic import GenericPreset
-from prompttodraft.tools.base_tool import CoreBackendTool
+from anyagents.backends.execution_backend import ExecutionBackend
+from anyagents.presets.base import Preset
+from anyagents.presets.generic import GenericPreset
+from anyagents.tools.base_tool import CoreBackendTool
 
-from prompttodraft.tools.write_file_tool import WriteFileTool
-from prompttodraft.tools.read_file_tool import ReadFileTool
-from prompttodraft.tools.list_directory_tool import ListDirectoryTool
-from prompttodraft.tools.glob_tool import GlobTool
-from prompttodraft.tools.search_file_content_tool import SearchFileContentTool
-from prompttodraft.tools.replace_tool import ReplaceTool
-from prompttodraft.tools.run_shell_command_tool import RunShellCommandTool
-from prompttodraft.tools.read_many_files_tool import ReadManyFilesTool
-from prompttodraft.tools.save_memory_tool import SaveMemoryTool
+from anyagents.tools.write_file_tool import WriteFileTool
+from anyagents.tools.read_file_tool import ReadFileTool
+from anyagents.tools.list_directory_tool import ListDirectoryTool
+from anyagents.tools.glob_tool import GlobTool
+from anyagents.tools.search_file_content_tool import SearchFileContentTool
+from anyagents.tools.replace_tool import ReplaceTool
+from anyagents.tools.run_shell_command_tool import RunShellCommandTool
+from anyagents.tools.read_many_files_tool import ReadManyFilesTool
+from anyagents.tools.save_memory_tool import SaveMemoryTool
 
 
 CORE_TOOLS: tuple[type[CoreBackendTool], ...] = (

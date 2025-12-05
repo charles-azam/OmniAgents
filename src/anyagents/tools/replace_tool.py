@@ -5,9 +5,9 @@ This tool replaces text within a file with precise, targeted changes.
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.backends.execution_backend import FileType
-from prompttodraft.outputs.outputs import (
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.backends.execution_backend import FileType
+from anyagents.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,

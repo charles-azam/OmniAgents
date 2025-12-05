@@ -9,21 +9,21 @@ from dotenv import load_dotenv
 import pytest
 from smolagents.utils import AgentGenerationError
 
-from prompttodraft.agents.langchain_agent import (
+from anyagents.agents.langchain_agent import (
     LangChainAgent,
     get_langchain_model_example,
 )
-from prompttodraft.agents.pydantic_ai_agent import (
+from anyagents.agents.pydantic_ai_agent import (
     PydanticAIAgent,
     get_pydantic_ai_model_example,
 )
-from prompttodraft.agents.smolagent_agent import (
+from anyagents.agents.smolagent_agent import (
     SmolagentsAgent,
     get_smolagents_model_example,
 )
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import NoOpStateManager
+from anyagents.backends.docker_backend import DockerBackend
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.state_manager import NoOpStateManager
 
 load_dotenv()
 

@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from prompttodraft!")
+    print("Hello from anyagents!")

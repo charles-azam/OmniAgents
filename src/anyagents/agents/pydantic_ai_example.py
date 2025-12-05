@@ -3,10 +3,10 @@ Example usage of the PydanticAIAgent.
 
 This demonstrates how to use the pydantic_ai agent with different backends and presets.
 """
-from prompttodraft.agents.pydantic_ai_agent import PydanticAIAgent, get_pydantic_ai_model_example
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.state_manager import GitStateManager
-from prompttodraft.presets.python import PythonUVPreset
+from anyagents.agents.pydantic_ai_agent import PydanticAIAgent, get_pydantic_ai_model_example
+from anyagents.backends.docker_backend import DockerBackend
+from anyagents.backends.state_manager import GitStateManager
+from anyagents.presets.python import PythonUVPreset
 from dotenv import load_dotenv
 
 load_dotenv()

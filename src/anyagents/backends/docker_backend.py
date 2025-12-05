@@ -11,15 +11,15 @@ from beartype import beartype
 import docker
 from docker.models.containers import Container
 
-from prompttodraft.backends.execution_backend import (
+from anyagents.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from prompttodraft.backends.state_manager import StateManager
-from prompttodraft.common import DOCKER_BACKEND_PATH
+from anyagents.backends.state_manager import StateManager
+from anyagents.common import DOCKER_BACKEND_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 CONTAINER_WORKSPACE = "/workspace"
@@ -62,7 +62,7 @@ class DockerBackend(ExecutionBackend):
 
     @property
     def _container_name(self) -> str:
-        return f"prompttodraft-{self._project_id}"
+        return f"anyagents-{self._project_id}"
 
     def start(self) -> None:
         # Create project directory if it doesn't exist

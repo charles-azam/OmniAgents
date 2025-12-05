@@ -6,8 +6,8 @@ This tool executes shell commands in the execution environment.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.outputs.outputs import (
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )

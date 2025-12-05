@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompttodraft.backends.execution_backend import ExecutionBackend
-    from prompttodraft.tools.base_tool import CoreBackendTool
+    from anyagents.backends.execution_backend import ExecutionBackend
+    from anyagents.tools.base_tool import CoreBackendTool
 
 
 @dataclass(frozen=True)

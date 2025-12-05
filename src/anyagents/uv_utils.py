@@ -4,7 +4,7 @@ Utility functions for UV package manager.
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from prompttodraft.backends.execution_backend import ExecutionBackend, CommandResult
+    from anyagents.backends.execution_backend import ExecutionBackend, CommandResult
 
 # UV installation path - where UV is installed by the install script
 UV_PATH_EXPORT = 'export PATH="$HOME/.local/bin:$PATH"'

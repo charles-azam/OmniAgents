@@ -7,10 +7,10 @@ using fake tools created just for testing.
 from pydantic import BaseModel, Field
 import pytest
 
-from prompttodraft.tools.base_tool import CoreTool, CoreBackendTool
-from prompttodraft.outputs.outputs import TextOutputModel, ToolOutputModel
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import NoOpStateManager
+from anyagents.tools.base_tool import CoreTool, CoreBackendTool
+from anyagents.outputs.outputs import TextOutputModel, ToolOutputModel
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.state_manager import NoOpStateManager
 
 
 # =============================================================================

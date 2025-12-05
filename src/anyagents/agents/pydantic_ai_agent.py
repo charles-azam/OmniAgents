@@ -8,10 +8,10 @@ from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.openai import OpenAIProvider
 from openai import AsyncOpenAI
 
-from prompttodraft.agents.base import AgentFactory
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.presets.base import Preset
+from anyagents.agents.base import AgentFactory
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.backends.execution_backend import ExecutionBackend
+from anyagents.presets.base import Preset
 
 
 def get_pydantic_ai_model_example(model_name: str = "openai/gpt-oss-120b:cerebras") -> OpenAIChatModel:
@@ -33,9 +33,9 @@ class PydanticAIAgent(AgentFactory[OpenAIChatModel, PydanticAITool]):
     Pydantic-AI based coding agent.
 
     Example:
-        from prompttodraft.backends.local_backend import LocalBackend
-        from prompttodraft.backends.state_manager import NoOpStateManager
-        from prompttodraft.presets.python import PythonUVPreset
+        from anyagents.backends.local_backend import LocalBackend
+        from anyagents.backends.state_manager import NoOpStateManager
+        from anyagents.presets.python import PythonUVPreset
 
         backend = LocalBackend(project_id="my-app", state_manager=NoOpStateManager())
         model = get_pydantic_ai_model_example()
@@ -70,7 +70,7 @@ class PydanticAIAgent(AgentFactory[OpenAIChatModel, PydanticAITool]):
         return tool.to_pydantic_ai_tool()
 
     def _run_agent(self, task: str) -> str:
-        from prompttodraft.prompts.system_prompt import get_system_prompt
+        from anyagents.prompts.system_prompt import get_system_prompt
 
         if self._enable_logfire:
             import logfire

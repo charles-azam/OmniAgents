@@ -5,9 +5,9 @@ This tool executes uv commands in the execution environment, ensuring uv is inst
 """
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.outputs.outputs import TextOutputModel
-from prompttodraft.uv_utils import ensure_uv_installed, execute_uv_command
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.outputs.outputs import TextOutputModel
+from anyagents.uv_utils import ensure_uv_installed, execute_uv_command
 
 
 class UVInput(BaseModel):

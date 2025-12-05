@@ -6,8 +6,8 @@ This tool finds files matching specific glob patterns.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.outputs.outputs import (
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
     ToolOutputModel,
@@ -136,7 +136,7 @@ class GlobTool(CoreBackendTool[GlobInput, ToolOutputModel]):
             )
 
         # Get file modification times
-        from prompttodraft.outputs.outputs import FileInfo as OutputFileInfo
+        from anyagents.outputs.outputs import FileInfo as OutputFileInfo
 
         file_infos = []
         for file_path in matched_paths:

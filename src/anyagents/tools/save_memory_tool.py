@@ -6,8 +6,8 @@ This tool saves and recalls information across sessions by appending to a memory
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from prompttodraft.tools.base_tool import CoreBackendTool
-from prompttodraft.outputs.outputs import (
+from anyagents.tools.base_tool import CoreBackendTool
+from anyagents.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )

@@ -7,12 +7,12 @@ from smolagents import Tool as SmolagentsTool
 from smolagents import ToolCallingAgent
 from smolagents.models import OpenAIModel, InferenceClientModel
 
-from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import NoOpStateManager
+from anyagents.tools.base_tool import CoreBackendTool, CoreTool
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.state_manager import NoOpStateManager
 from pydantic import Field
 import random
-from prompttodraft.agents.smolagent_agent import get_smolagents_model_example
+from anyagents.agents.smolagent_agent import get_smolagents_model_example
 
 def test_smolagent_tool_created_correctly():
     """Test that CoreTool converts correctly to smolagents tool with proper attributes and execution."""
@@ -110,8 +110,8 @@ def test_smolagent_tool_backend_created_correctly():
     
 def test_smolagents_tool_backend_works_correctly():
     """Test that CoreBackendTool converts correctly to smolagents tool and can use backend to write files."""
-    from prompttodraft.tools.write_file_tool import WriteFileTool
-    from prompttodraft.outputs.outputs import TextOutputModel
+    from anyagents.tools.write_file_tool import WriteFileTool
+    from anyagents.outputs.outputs import TextOutputModel
 
     # Create local backend with NoOp state manager for testing
     state_manager = NoOpStateManager()

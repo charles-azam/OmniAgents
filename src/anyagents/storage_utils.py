@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from dotenv import load_dotenv
 from loguru import logger
 
-from prompttodraft.common import GCP_DATA_PATH
+from anyagents.common import GCP_DATA_PATH
 
 if TYPE_CHECKING:
     from google.cloud import storage

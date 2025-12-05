@@ -8,8 +8,8 @@ from langchain_core.tools import BaseTool as LangChainTool
 from langsmith import traceable
 import os
 
-from prompttodraft.agents.base import AgentFactory
-from prompttodraft.tools.base_tool import CoreBackendTool
+from anyagents.agents.base import AgentFactory
+from anyagents.tools.base_tool import CoreBackendTool
 
 
 def get_langchain_model_example(model_name: str = "openai/gpt-oss-120b:cerebras") -> ChatOpenAI:
@@ -26,9 +26,9 @@ class LangChainAgent(AgentFactory[BaseChatModel, LangChainTool]):
     LangChain-based coding agent.
 
     Example:
-        from prompttodraft.backends.local_backend import LocalBackend
-        from prompttodraft.backends.state_manager import NoOpStateManager
-        from prompttodraft.presets.python import PythonUVPreset
+        from anyagents.backends.local_backend import LocalBackend
+        from anyagents.backends.state_manager import NoOpStateManager
+        from anyagents.presets.python import PythonUVPreset
 
         backend = LocalBackend(project_id="my-app", state_manager=NoOpStateManager())
         model = ChatOpenAI(model="gpt-4")
