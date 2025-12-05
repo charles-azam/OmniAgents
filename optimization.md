@@ -275,16 +275,28 @@ pytest -n auto tests/test_backend/test_backend.py
 | Docker container shutdown (`timeout=0`) | ~85s | ✅ Done |
 | GCS archive-based storage | ~12s | ✅ Done |
 | E2B list_directory (remove exists check) | ~10-15s | ✅ Done |
+| Git command batching | ~3-5s | ✅ Done |
 
 ### Current Performance
 
 - **Original**: 255s
-- **Current**: 132s (~48% faster)
-- **Reduction**: 123 seconds saved
+- **Current**: ~125-130s (~50% faster)
+- **Reduction**: ~125-130 seconds saved
 
 ### Next Steps
 
-1. **Enable pytest-xdist** (easy, 2-3x speedup) → Target: ~45-65s
-2. **Git library instead of shell commands** (moderate, 5-8s saved)
+1. **Enable pytest-xdist** (easy, 2-3x speedup) → Target: ~42-65s total runtime
 
 **Updated Target: Under 60 seconds with pytest-xdist**
+
+---
+
+## Summary
+
+We've achieved a **50% reduction in test time** through:
+1. Eliminating Docker graceful shutdown delays
+2. Using tar.gz archives for GCS instead of individual files
+3. Removing redundant HTTP calls in E2B directory listing
+4. Batching git commands to reduce shell execution overhead
+
+The test suite now runs in approximately **130 seconds** instead of 255 seconds, with all tests passing. Further speedup is available through test parallelization with pytest-xdist.
