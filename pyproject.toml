@@ -30,6 +30,8 @@ dependencies = [
     "docker>=7.1.0",
     "pygithub>=2.5.0",
     "beartype>=0.22.7",
+    "mypy>=1.11.0",
+    "ruff>=0.6.0",
 ]
 
 [project.scripts]
@@ -42,6 +44,58 @@ allow-direct-references = true
 markers = [
     "e2b: marks tests that require E2B backend (deselect with '-m \"not e2b\"')",
 ]
+
+[tool.mypy]
+python_version = "3.13"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+strict_equality = true
+show_error_codes = true
+show_error_context = true
+pretty = true
+exclude = [
+    "src/prompttodraft/benchmark/tasks/.*",
+]
+
+[[tool.mypy.overrides]]
+module = [
+    "cadquery.*",
+    "smolagents.*",
+    "e2b.*",
+    "pydantic_ai.*",
+    "langchain.*",
+    "langchain_openai.*",
+    "langchain_huggingface.*",
+    "langchain_xai.*",
+    "langsmith.*",
+    "huggingface_hub.*",
+    "openai_agents.*",
+    "litellm.*",
+    "google.*",
+    "googleapiclient.*",
+    "google.cloud.*",
+    "docker.*",
+    "github.*",
+    "beartype.*",
+]
+ignore_missing_imports = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
 
 [tool.uv.workspace]
 members = [
