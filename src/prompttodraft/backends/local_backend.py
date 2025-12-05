@@ -106,6 +106,26 @@ class LocalBackend(ExecutionBackend):
             return self.get_working_directory() / rel
         return system_path_obj
 
+    def _determine_file_type(self, system_path: Path) -> FileType | None:
+        """
+        Determine the type of a filesystem entry on the host.
+
+        Args:
+            system_path: Path object on the host filesystem
+
+        Returns:
+            FileType if the path exists, None otherwise
+        """
+        if not system_path.exists():
+            return None
+        if system_path.is_symlink():
+            return FileType.SYMLINK
+        if system_path.is_file():
+            return FileType.FILE
+        if system_path.is_dir():
+            return FileType.DIRECTORY
+        return FileType.OTHER
+
     def read_file(self, file_path: Path) -> str:
         host_path = self._to_system_path(file_path)
         return host_path.read_text()
