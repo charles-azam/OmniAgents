@@ -45,17 +45,20 @@ output = result.handle()  # Automatically formats based on DISPLAY_MODE
 #### smolagents
 
 ```python
-from prompttodraft.smolagent_agent import SmolAgentAgent
+from prompttodraft.agents.smolagents_agent import SmolagentsAgent
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import GitStateManager
+from prompttodraft.presets.python import PythonUVPreset
+from smolagents import HfApiModel
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
 
-agent = SmolAgentAgent(
+model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
+agent = SmolagentsAgent(
     backend=backend,
-    provider="huggingface",
-    model_id="Qwen/Qwen2.5-Coder-32B-Instruct"
+    model=model,
+    preset=PythonUVPreset(),
 )
 
 result = agent.run("List all Python files")
@@ -64,29 +67,32 @@ result = agent.run("List all Python files")
 #### Pydantic-AI
 
 ```python
-from prompttodraft.pydantic_ai_agent import PydanticAIAgent
+from prompttodraft.agents.pydantic_ai_agent import PydanticAIAgent
+from pydantic_ai.models.openai import OpenAIModel
 
-agent = PydanticAIAgent(backend=backend, model="openai:gpt-4")
+model = OpenAIModel("gpt-4")
+agent = PydanticAIAgent(backend=backend, model=model, preset=PythonUVPreset())
 result = agent.run("Create a FastAPI server")
 ```
 
 #### LangChain
 
 ```python
-from prompttodraft.langchain_agent import create_langchain_tools
-from langchain.agents import create_react_agent
+from prompttodraft.agents.langchain_agent import LangChainAgent
+from langchain_openai import ChatOpenAI
 
-tools = create_langchain_tools(backend=backend)
-agent = create_react_agent(llm, tools, prompt)
+model = ChatOpenAI(model="gpt-4")
+agent = LangChainAgent(backend=backend, model=model, preset=PythonUVPreset())
+result = agent.run("Create a FastAPI server")
 ```
 
 ## Framework Comparison
 
 | Framework | File | Integration Style | Best For |
 |-----------|------|------------------|----------|
-| **smolagents** | `smolagent_agent.py` | Manual `Tool` wrappers | HuggingFace models |
-| **Pydantic-AI** | `pydantic_ai_agent.py` | Type-safe tool definitions | OpenAI, Anthropic |
-| **LangChain** | `langchain_agent.py` | LangChain tool format | Complex chains |
+| **smolagents** | `agents/smolagents_agent.py` | AgentFactory with Tool wrappers | HuggingFace models |
+| **Pydantic-AI** | `agents/pydantic_ai_agent.py` | AgentFactory with type-safe tools | OpenAI, Anthropic |
+| **LangChain** | `agents/langchain_agent.py` | AgentFactory with LangChain tools | Complex chains |
 
 ## Output Models
 
@@ -175,72 +181,82 @@ backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager()
 ## Directory Structure
 
 ```
-agent/
+prompttodraft/
+├── agents/                # AI framework integrations (AgentFactory implementations)
 ├── backends/              # Execution environments (Local, Docker, E2B)
-├── core/                  # Framework-agnostic tools
+├── presets/               # Language/runtime presets (Python, generic, etc.)
+├── tools/                 # Framework-agnostic tools
 ├── outputs/               # Output models (Text, Code, FileList, etc.)
-├── smolagent_agent.py     # smolagents integration
-├── pydantic_ai_agent.py   # Pydantic-AI integration
-└── langchain_agent.py     # LangChain integration
+└── uv_utils.py            # UV utilities (installation, execution)
 ```
 
 ## Extension Guide
 
 ### Adding a New Tool
 
-1. **Create tool file** in `core/`:
+1. **Create tool file** in `tools/`:
 
 ```python
-from prompttodraft.tools.base_tool import CoreTool
-from prompttodraft.tools.metadata import ToolMetadata
+from prompttodraft.tools.base_tool import CoreBackendTool
+from pydantic import BaseModel, Field
 from prompttodraft.outputs.outputs import TextOutputModel
 
-class MyTool(CoreTool):
-    metadata = ToolMetadata(
-        name="my_tool",
-        description="Does something useful",
-        inputs={"param": {"type": "string", "description": "...", "nullable": False}},
-        output_type="string"
-    )
+class MyToolInput(BaseModel):
+    param: str = Field(description="Parameter description")
 
-    def execute(self, param: str) -> ToolOutputModel:
+class MyTool(CoreBackendTool[MyToolInput, TextOutputModel]):
+    name = "my_tool"
+    description = "Does something useful"
+
+    def execute(self, inputs: MyToolInput) -> TextOutputModel:
         # Business logic using self.backend
-        result = self.backend.execute_command(f"echo {param}")
+        result = self.backend.execute_command(f"echo {inputs.param}")
         return TextOutputModel(content=result.output)
 ```
 
-2. **Add wrappers** to framework integration files:
-   - Add to `smolagent_agent.py` as a `Tool` class
-   - Add to `pydantic_ai_agent.py` as a Pydantic-AI tool
-   - Add to `langchain_agent.py` as a LangChain tool
+2. **Add to preset** or use with `extra_tool_classes`:
+   ```python
+   agent = LangChainAgent(
+       backend=backend,
+       model=model,
+       preset=PythonUVPreset(),
+       extra_tool_classes=[MyTool],
+   )
+   ```
 
-3. **Tool automatically works** in all execution environments (local, Docker, E2B)
+3. **Tool automatically works** in all execution environments (local, Docker, E2B) and frameworks
 
 ### Adding a New Framework
 
 To integrate a new AI framework:
 
-1. **Create agent file** (e.g., `myframework_agent.py`)
-
-2. **Wrap each of the 10 core tools** in framework-specific format:
+1. **Create agent class** inheriting from `AgentFactory`:
 
 ```python
-from prompttodraft.tools.read_file_tool import ReadFileTool
+from prompttodraft.agents.base import AgentFactory
+from typing import TypeVar
 
-class MyFrameworkReadFileTool:
-    """Framework-specific wrapper for ReadFileTool"""
-    def __init__(self, backend):
-        self.core_tool = ReadFileTool(backend=backend)
+TModel = TypeVar("TModel")  # Your framework's model type
+TNativeTool = TypeVar("TNativeTool")  # Your framework's tool type
 
-    def __call__(self, absolute_path: str):
-        result = self.core_tool.execute(absolute_path=absolute_path)
-        # Convert ToolOutputModel to framework-specific format
-        return result.handle()
+class MyFrameworkAgent(AgentFactory[TModel, TNativeTool]):
+    def _convert_tool(self, tool: CoreBackendTool) -> TNativeTool:
+        """Convert CoreBackendTool to framework-specific tool"""
+        # Implement conversion logic
+        pass
+
+    def _run_agent(self, task: str) -> str:
+        """Run the framework-specific agent logic"""
+        # Implement agent execution
+        pass
 ```
 
-3. **See reference**: `smolagent_agent.py` for complete example
+2. **See references**:
+   - `agents/langchain_agent.py` for LangChain example
+   - `agents/smolagents_agent.py` for smolagents example
+   - `agents/pydantic_ai_agent.py` for Pydantic-AI example
 
-**Pattern**: Each framework integration wraps core tools and handles framework-specific calling conventions.
+**Pattern**: AgentFactory handles common logic (preset, tool conversion), subclasses implement framework-specific behavior.
 
 ## Design Patterns
 
@@ -272,5 +288,6 @@ Framework Response
 ## See Also
 
 - [backends/README.md](backends/README.md) - Backend API reference, creating custom backends
-- [core/README.md](core/README.md) - Core tools implementation details
+- [tools/README.md](tools/README.md) - Core tools implementation details
 - [outputs/README.md](outputs/README.md) - Output models documentation
+- [../docs/api-refactoring.md](../docs/api-refactoring.md) - Preset/AgentFactory architecture

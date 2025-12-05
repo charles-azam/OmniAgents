@@ -71,12 +71,11 @@ def get_status() -> BackendStatus:
 ```python
 def execute_command(command: str, timeout: int | None = None) -> CommandResult:
     """Execute bash command, return output + exit code"""
-
-def execute_uv(uv_command: str, timeout: int | None = None) -> CommandResult:
-    """Execute uv command (installs uv if needed)"""
 ```
 
 Returns: `CommandResult(output: str, exit_code: int)` with merged stdout/stderr.
+
+**Note**: For UV commands, use `prompttodraft.uv_utils.execute_uv_command()` which handles PATH setup automatically.
 
 ### File Operations
 
@@ -202,10 +201,11 @@ def convert_to_path(self, path: str | Path) -> Path:
 - File operations: Python's `pathlib` and `shutil`
 
 ### DockerBackend
-- Image: `ghcr.io/astral-sh/uv:debian`
+- Default image: `ghcr.io/astral-sh/uv:debian` (includes UV and git)
 - Working directory: `/workspace` (mounted to local)
 - Command execution: `container.exec_run()` with `/bin/bash`
 - File operations: Volume-mounted, uses local filesystem
+- Environment: PATH includes `$HOME/.local/bin` for UV support
 
 ### E2BBackend
 - Sandbox: Ephemeral E2B cloud sandbox
