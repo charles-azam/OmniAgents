@@ -25,7 +25,7 @@ The original codebase had Python/UV hardcoded in multiple places, making it diff
 A `Preset` defines the development environment: **tools** and **project initialization**.
 
 ```
-src/prompttodraft/presets/
+src/anyagent/presets/
 ├── base.py       # Preset ABC + InitResult dataclass
 ├── python.py     # PythonUVPreset, PythonPipPreset
 ├── generic.py    # GenericPreset (no special tools)
@@ -103,10 +103,10 @@ class AgentFactory(ABC, Generic[TModel, TNativeTool]):
 ### Basic Usage
 
 ```python
-from prompttodraft.agents.langchain_agent import LangChainAgent
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import NoOpStateManager
-from prompttodraft.presets.python import PythonUVPreset
+from anyagent.agents.langchain_agent import LangChainAgent
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.state_manager import NoOpStateManager
+from anyagent.presets.python import PythonUVPreset
 
 backend = LocalBackend(project_id="my-app", state_manager=NoOpStateManager())
 
@@ -122,8 +122,8 @@ agent.run("Create a FastAPI server")
 ### Docker with Preset's Suggested Image
 
 ```python
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.presets.python import PythonUVPreset
+from anyagent.backends.docker_backend import DockerBackend
+from anyagent.presets.python import PythonUVPreset
 
 preset = PythonUVPreset()
 
@@ -139,7 +139,7 @@ agent = LangChainAgent(backend=backend, model=model, preset=preset)
 ### Custom Docker Image
 
 ```python
-from prompttodraft.presets.generic import GenericPreset
+from anyagent.presets.generic import GenericPreset
 
 backend = DockerBackend(
     project_id="my-rust-app",
@@ -179,7 +179,7 @@ agent = LangChainAgent(
 ### Using Just Backend + Preset (No Agent)
 
 ```python
-from prompttodraft.presets.python import PythonUVPreset
+from anyagent.presets.python import PythonUVPreset
 
 backend = DockerBackend(...)
 preset = PythonUVPreset()
@@ -238,7 +238,7 @@ backend.shutdown()
 
 ```python
 # presets/node.py
-from prompttodraft.presets.base import Preset, InitResult
+from anyagent.presets.base import Preset, InitResult
 
 class NodeNPMPreset(Preset):
     name = "node-npm"

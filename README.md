@@ -1,4 +1,4 @@
-# PromptToDraft
+# AnyAgent
 
 A multi-backend execution framework for AI coding agents. Run the same tools across local, Docker, or E2B environments with any AI framework (smolagents, Pydantic-AI, LangChain).
 
@@ -8,7 +8,7 @@ A multi-backend execution framework for AI coding agents. Run the same tools acr
 
 ## Architecture
 
-PromptToDraft uses a **3-layer architecture**:
+AnyAgent uses a **3-layer architecture**:
 
 ```
 ┌─────────────────────────────────────────┐
@@ -59,8 +59,8 @@ uv sync
 ### Basic Usage
 
 ```python
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import GitStateManager
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.state_manager import GitStateManager
 
 # Create backend with Git storage
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -80,10 +80,10 @@ backend.shutdown()
 ### Using with AI Agents
 
 ```python
-from prompttodraft.agents.smolagents_agent import SmolagentsAgent
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import GitStateManager
-from prompttodraft.presets.python import PythonUVPreset
+from anyagent.agents.smolagents_agent import SmolagentsAgent
+from anyagent.backends.local_backend import LocalBackend
+from anyagent.backends.state_manager import GitStateManager
+from anyagent.presets.python import PythonUVPreset
 
 # Create backend
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -114,7 +114,7 @@ result = agent.run("Create a FastAPI server with a /hello endpoint")
 ### Docker Backend
 
 ```python
-from prompttodraft.backends.docker_backend import DockerBackend
+from anyagent.backends.docker_backend import DockerBackend
 
 backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates container
@@ -125,7 +125,7 @@ backend.shutdown()  # Stops container
 ### E2B Backend
 
 ```python
-from prompttodraft.backends.e2b_backend import E2BBackend
+from anyagent.backends.e2b_backend import E2BBackend
 
 backend = E2BBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates sandbox
@@ -138,7 +138,7 @@ backend.shutdown()  # Destroys sandbox
 ### Git Storage (Default)
 
 ```python
-from prompttodraft.backends.state_manager import GitStateManager
+from anyagent.backends.state_manager import GitStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ```
@@ -150,7 +150,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ### Google Cloud Storage
 
 ```python
-from prompttodraft.backends.state_manager import GCSStateManager
+from anyagent.backends.state_manager import GCSStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ```
@@ -162,7 +162,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ### No Persistence
 
 ```python
-from prompttodraft.backends.state_manager import NoOpStateManager
+from anyagent.backends.state_manager import NoOpStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
@@ -174,15 +174,15 @@ backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager()
 Set up GitHub personal access token with `repo` scope:
 
 ```bash
-export PROMPTTODRAFT_GITHUB_API_KEY="ghp_your_token_here"
-export PROMPTTODRAFT_GITHUB_STATE_REPO="your-org/your-repo"  # Optional
+export ANYAGENT_GITHUB_API_KEY="ghp_your_token_here"
+export ANYAGENT_GITHUB_STATE_REPO="your-org/your-repo"  # Optional
 ```
 
 ### Google Cloud Storage
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/gcp-credentials.json"
-export BUCKET_PROMPT_TO_DRAFT="your-bucket-name"
+export BUCKET_ANYAGENT="your-bucket-name"
 ```
 
 ### E2B API Key
@@ -205,9 +205,9 @@ uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
 
 ## Documentation
 
-- **[Tools Guide](src/prompttodraft/README.md)** - Tool catalog, framework integration, extension guide
-- **[Backends API Reference](src/prompttodraft/backends/README.md)** - Backend interface details, state management
-- **[Tools API](src/prompttodraft/tools/README.md)** - Tool implementation patterns
+- **[Tools Guide](src/anyagent/README.md)** - Tool catalog, framework integration, extension guide
+- **[Backends API Reference](src/anyagent/backends/README.md)** - Backend interface details, state management
+- **[Tools API](src/anyagent/tools/README.md)** - Tool implementation patterns
 - **[Preset Architecture](docs/api-refactoring.md)** - Preset/AgentFactory design and usage
 
 ## CI/CD
