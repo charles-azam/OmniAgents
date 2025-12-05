@@ -41,26 +41,43 @@ self._container.stop(timeout=0)  # Immediately kills the container
 
 ---
 
-### 2. E2B Recursive Directory Listing - ~21 seconds
+### 2. E2B Recursive Directory Listing - ~21 seconds ✅ OPTIMIZED
 
-**Problem**: `GCSStateManager.save_snapshot()` calls `list_directory()` recursively, making individual HTTP requests for each subdirectory and file existence check.
+**Problem**: `E2BBackend.list_directory()` was calling `exists()` before every `list()` call, making double HTTP requests for each directory.
 
 **Location**:
-- `prompttodraft/backends/state_manager.py:87` - `GCSStateManager.save_snapshot()`
 - `prompttodraft/backends/e2b_backend.py:186` - `E2BBackend.list_directory()`
 
-**Current behavior**:
+**Current behavior was**:
 ```
-list_directory (HTTP call)
-  └─ for each item:
-       ├─ exists check (HTTP call)
-       └─ if directory: list_directory (recursive HTTP call)
+list_directory
+  ├─ exists check (HTTP call) ← REMOVED
+  ├─ list directory (HTTP call)
+  └─ for each subdirectory:
+       └─ exists check (HTTP call) ← REMOVED
+       └─ list directory (HTTP call)
 ```
 
-**Solution**:
-Batch operations or use a single recursive filesystem walk API if E2B supports it. Alternatively, cache directory structure during the walk.
+**Solution Implemented**:
+Removed unnecessary `exists()` check - now directly calls `list()` and catches exceptions if directory doesn't exist.
 
-**Expected savings**: ~15-18 seconds
+```python
+# Before
+if not self._sandbox.files.exists(path=str(sandbox_path)):
+    raise FileNotFoundError(f"Directory {path} does not exist")
+entries = self._sandbox.files.list(path=str(sandbox_path))
+
+# After
+try:
+    entries = self._sandbox.files.list(path=str(sandbox_path))
+except Exception:
+    raise FileNotFoundError(f"Directory {path} does not exist")
+```
+
+**Files modified**:
+- `src/prompttodraft/backends/e2b_backend.py:186-197` - `E2BBackend.list_directory()` method
+
+**Expected savings**: ~10-15 seconds on E2B tests with deep directory structures
 
 ---
 

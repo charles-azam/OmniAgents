@@ -691,4 +691,4 @@ def test_e2b_backend_git_storage():
 
 
 if __name__ == "__main__":
-    test_docker_backend_e2e()
+    test_e2b_backend_git_storage()
