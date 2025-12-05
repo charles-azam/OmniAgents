@@ -9,6 +9,7 @@ from pathlib import Path
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from enum import Enum
+from functools import cached_property
 import os
 import tarfile
 import io
@@ -386,18 +387,28 @@ class GitStateManager(StateManager):
             # New branch, no files to load
             return False
 
+    @cached_property
+    def _github_client(self):
+        """Get cached GitHub client."""
+        from github import Github, Auth
+        return Github(auth=Auth.Token(token=self.github_token))
+
+    @cached_property
+    def _github_repo(self):
+        """Get cached GitHub repository."""
+        return self._github_client.get_repo(full_name_or_id=self.repo_path)
+
     def cleanup(self, project_id: str) -> None:
         """Delete the branch for this project."""
         if not self.github_token:
             # No token, cannot delete branch
             return
 
-        from github import Github, GithubException, Auth
+        from github import GithubException
 
         branch_name = self._get_branch_name(project_id=project_id)
 
-        gh = Github(auth=Auth.Token(token=self.github_token))
-        repo = gh.get_repo(full_name_or_id=self.repo_path)
+        repo = self._github_repo
 
         # Try to get and delete the branch
         try:
@@ -413,12 +424,11 @@ class GitStateManager(StateManager):
             # No token, cannot list commits
             return []
 
-        from github import Github, GithubException, Auth
+        from github import GithubException
 
         branch_name = self._get_branch_name(project_id=project_id)
 
-        gh = Github(auth=Auth.Token(token=self.github_token))
-        repo = gh.get_repo(full_name_or_id=self.repo_path)
+        repo = self._github_repo
 
         # Try to get the branch and its commits
         try:

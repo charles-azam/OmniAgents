@@ -9,19 +9,22 @@ import os
 import uuid
 from functools import cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from dotenv import load_dotenv
-from google.cloud import storage
 from loguru import logger
 
 from prompttodraft.common import GCP_DATA_PATH
+
+if TYPE_CHECKING:
+    from google.cloud import storage
 
 load_dotenv()
 
 BUCKET_ENV_VAR = "BUCKET_PROMPT_TO_DRAFT"
 
 
-def _initialize_and_validate_storage() -> tuple[storage.Client, storage.Bucket]:
+def _initialize_and_validate_storage() -> tuple["storage.Client", "storage.Bucket"]:
     """
     Initialize storage client and validate read/write access to bucket.
 
@@ -32,6 +35,8 @@ def _initialize_and_validate_storage() -> tuple[storage.Client, storage.Bucket]:
         RuntimeError: If bucket is not configured or credentials are invalid
         Exception: If read/write access validation fails
     """
+    from google.cloud import storage
+
     if BUCKET_ENV_VAR not in os.environ:
         raise RuntimeError(f"Bucket not configured. Set {BUCKET_ENV_VAR} environment variable.")
 
@@ -63,13 +68,17 @@ def _initialize_and_validate_storage() -> tuple[storage.Client, storage.Bucket]:
     return client, bucket
 
 
-STORAGE_CLIENT, BUCKET = _initialize_and_validate_storage()
+_STORAGE_CLIENT = None
+_BUCKET = None
 
 
 @cache
-def get_bucket() -> storage.Bucket:
-    """Get the GCS bucket."""
-    return BUCKET
+def get_bucket() -> "storage.Bucket":
+    """Get the GCS bucket (lazy initialization)."""
+    global _STORAGE_CLIENT, _BUCKET
+    if _BUCKET is None:
+        _STORAGE_CLIENT, _BUCKET = _initialize_and_validate_storage()
+    return _BUCKET
 
 
 
@@ -186,4 +195,5 @@ def delete_from_storage(file_path: Path) -> bool:
 
 
 if __name__ == "__main__":
-    print(f"Storage initialized: {BUCKET.name}")
+    bucket = get_bucket()
+    print(f"Storage initialized: {bucket.name}")
