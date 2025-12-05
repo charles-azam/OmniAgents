@@ -61,7 +61,7 @@ jobs:
 
     - name: Run E2B tests
       env:
-        BUCKET_ANYAGENTS: ${{ secrets.BUCKET_ANYAGENTS }}
+        ANYAGENTS_BUCKET_NAME: ${{ secrets.ANYAGENTS_BUCKET_NAME }}
         E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
         ANYAGENTS_GITHUB_API_KEY: ${{ secrets.ANYAGENTS_GITHUB_API_KEY }}
         ANYAGENTS_GITHUB_STATE_REPO: ${{ secrets.ANYAGENTS_GITHUB_STATE_REPO }}
