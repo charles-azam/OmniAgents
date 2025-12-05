@@ -2,6 +2,7 @@
 # test that the framework works as expected
 import os
 import random
+import pytest
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool as LangChainBaseTool
 
@@ -200,6 +201,7 @@ def test_langchain_tool_schemas_extracted_correctly():
     assert schema["properties"]["active"]["description"] == "Whether the person is active"
 
 
+@pytest.mark.llm
 def test_langchain_agent_with_llm():
     """
     E2E test: Run a complete LangChain agent with gpt-4o-mini.

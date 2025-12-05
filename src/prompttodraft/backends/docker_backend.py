@@ -113,7 +113,7 @@ class DockerBackend(ExecutionBackend):
             return
 
         self.state_manager.save_snapshot(backend=self, message="Shutdown snapshot")
-        self._container.stop()
+        self._container.stop(timeout=0)
         self._container.remove()
         self._container = None
         self._status = BackendStatus.STOPPED

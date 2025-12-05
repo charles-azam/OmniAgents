@@ -46,23 +46,39 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     cleanup_test_environment(backend=backend)
 
     try:
-        # Pre-populate bucket with test files to verify load_from_bucket works
-        # Use timestamp format: project_id/timestamp/file.py
+        # Pre-populate bucket with test archive to verify load_from_bucket works
         from datetime import datetime, timezone
-        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = GCP_DATA_PATH / backend.project_id / timestamp
+        import tarfile
+        import io
 
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
+
+        # Create tar.gz archive with test files
+        tar_buffer = io.BytesIO()
+        with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar:
+            # Add preloaded.py
+            content = "# This file was preloaded from bucket"
+            tarinfo = tarfile.TarInfo(name="preloaded.py")
+            tarinfo.size = len(content.encode('utf-8'))
+            tar.addfile(tarinfo=tarinfo, fileobj=io.BytesIO(content.encode('utf-8')))
+
+            # Add config.json
+            content = '{"preloaded": true}'
+            tarinfo = tarfile.TarInfo(name="config.json")
+            tarinfo.size = len(content.encode('utf-8'))
+            tar.addfile(tarinfo=tarinfo, fileobj=io.BytesIO(content.encode('utf-8')))
+
+            # Add config_2.json
+            content = '{"preloaded": true}'
+            tarinfo = tarfile.TarInfo(name="config_2.json")
+            tarinfo.size = len(content.encode('utf-8'))
+            tar.addfile(tarinfo=tarinfo, fileobj=io.BytesIO(content.encode('utf-8')))
+
+        # Upload archive to bucket
+        archive_path = GCP_DATA_PATH / backend.project_id / f"{timestamp}.tar.gz"
         storage_utils.write_to_storage(
-            file_path=project_data_path / "preloaded.py",
-            content="# This file was preloaded from bucket"
-        )
-        storage_utils.write_to_storage(
-            file_path=project_data_path / "config.json",
-            content='{"preloaded": true}'
-        )
-        storage_utils.write_to_storage(
-            file_path=project_data_path / "config_2.json",
-            content='{"preloaded": true}'
+            file_path=archive_path,
+            content=tar_buffer.getvalue()
         )
 
         # Test status before start
@@ -325,33 +341,35 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         sync_test_file = working_dir / "sync_test.py"
         backend.write_file(file_path=sync_test_file, content="# File created before shutdown")
 
-        # Test shutdown (should sync files to bucket)
+        # Test shutdown (should sync files to bucket as archive)
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
 
-        # Verify files were synced to bucket under a timestamp directory
+        # Verify archive was created in bucket
         bucket = storage_utils.get_bucket()
         prefix = f"{backend.project_id}/"
 
-        # Find the latest timestamp (there should be at least one from the shutdown)
-        timestamps = set()
-        for blob in bucket.list_blobs(prefix=prefix):
-            parts = blob.name.split('/')
-            if len(parts) >= 2:
-                timestamps.add(parts[1])
+        # Find archives (there should be at least one from the shutdown)
+        archives = [blob for blob in bucket.list_blobs(prefix=prefix) if blob.name.endswith('.tar.gz')]
 
-        assert len(timestamps) > 0, "No timestamp directories found in bucket"
-        latest_timestamp = max(timestamps)
+        assert len(archives) > 0, "No archives found in bucket"
+        latest_archive = max(archives, key=lambda b: b.name)
 
-        # Verify test.txt was synced
-        test_txt_blob = bucket.blob(blob_name=f"{backend.project_id}/{latest_timestamp}/test.txt")
-        assert test_txt_blob.exists(), f"test.txt not found in {backend.project_id}/{latest_timestamp}/"
-        assert test_txt_blob.download_as_text() == "Modified content for sync test"
+        # Download and verify archive contents
+        archive_bytes = latest_archive.download_as_bytes()
+        tar_buffer = io.BytesIO(archive_bytes)
+        with tarfile.open(fileobj=tar_buffer, mode='r:gz') as tar:
+            member_names = tar.getnames()
 
-        # Verify sync_test.py was synced
-        sync_test_blob = bucket.blob(blob_name=f"{backend.project_id}/{latest_timestamp}/sync_test.py")
-        assert sync_test_blob.exists(), f"sync_test.py not found in {backend.project_id}/{latest_timestamp}/"
-        assert sync_test_blob.download_as_text() == "# File created before shutdown"
+            # Verify test.txt is in archive
+            assert "test.txt" in member_names, f"test.txt not found in archive"
+            test_txt_content = tar.extractfile("test.txt").read().decode('utf-8')
+            assert test_txt_content == "Modified content for sync test"
+
+            # Verify sync_test.py is in archive
+            assert "sync_test.py" in member_names, f"sync_test.py not found in archive"
+            sync_test_content = tar.extractfile("sync_test.py").read().decode('utf-8')
+            assert sync_test_content == "# File created before shutdown"
 
         # Test start (should load files from bucket)
         backend.start()
@@ -517,7 +535,7 @@ def test_docker_backend_container_reuse():
         try:
             client = docker.from_env()
             container = client.containers.get(f"prompttodraft-{project_id}")
-            container.stop()
+            container.stop(timeout=0)
             container.remove()
         except:
             pass
@@ -608,9 +626,20 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
 
-        # Verify files were synced to git by checking the remote branch
-        snapshots = git_manager.list_snapshots(project_id=backend.project_id)
-        assert len(snapshots) >= 1, "No commits found on git branch"
+        # Verify files were synced to git by checking the remote branch (with retry for API propagation)
+        import time
+        max_retries = 5
+        retry_delay = 0.5
+        snapshots = []
+        for attempt in range(max_retries):
+            snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+            if len(snapshots) >= 1:
+                break
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+
+        assert len(snapshots) >= 1, f"No commits found on git branch after {max_retries} retries"
 
         # Start again and verify files were loaded
         backend.start()
@@ -637,9 +666,19 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend.write_file(file_path=test_file, content="Final state")
         backend.shutdown()
 
-        # Verify final commit exists
-        final_snapshots = git_manager.list_snapshots(project_id=backend.project_id)
-        assert len(final_snapshots) >= 2, "Should have multiple commits"
+        # Verify final commit exists (with retry for API propagation)
+        max_retries = 5
+        retry_delay = 0.5
+        final_snapshots = []
+        for attempt in range(max_retries):
+            final_snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+            if len(final_snapshots) >= 2:
+                break
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+
+        assert len(final_snapshots) >= 2, f"Should have multiple commits, found {len(final_snapshots)} after {max_retries} retries"
 
     finally:
         # Cleanup: shutdown first, then clean environment
@@ -673,9 +712,4 @@ def test_e2b_backend_git_storage():
 
 
 if __name__ == "__main__":
-    test_docker_backend_e2e()
-    test_docker_backend_container_reuse()
-    test_e2b_backend_e2e()
-    test_local_backend_git_storage()
-    test_docker_backend_git_storage()
     test_e2b_backend_git_storage()

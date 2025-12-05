@@ -189,12 +189,16 @@ class E2BBackend(ExecutionBackend):
 
         sandbox_path = self._to_system_path(path)
         files = []
-        if not self._sandbox.files.exists(path=str(sandbox_path)):
+
+        # Try to list directory - if it fails, directory doesn't exist
+        try:
+            entries = self._sandbox.files.list(path=str(sandbox_path))
+        except Exception:
             raise FileNotFoundError(f"Directory {path} does not exist")
 
-        entries = self._sandbox.files.list(path=str(sandbox_path))
         if not entries:
             return []
+
         for entry in sorted(entries, key=lambda x: x.name):
             file_type = FileType.DIRECTORY if entry.type == E2BFileType.DIR else FileType.FILE
             entry_path = sandbox_path / entry.name

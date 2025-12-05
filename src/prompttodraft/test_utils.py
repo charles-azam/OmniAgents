@@ -36,7 +36,7 @@ def cleanup_test_environment(backend: ExecutionBackend) -> None:
             client = docker.from_env()
             container_name = f"prompttodraft-{backend.project_id}"
             container = client.containers.get(container_name)
-            container.stop()
+            container.stop(timeout=0)
             container.remove()
         except:
             pass  # Container doesn't exist or already cleaned

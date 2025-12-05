@@ -1,6 +1,7 @@
 # Test tool calling with the different frameworks, huggingface and openai
 # test that each framework as expected
 import os
+import pytest
 from pydantic import BaseModel
 from smolagents import Tool as SmolagentsTool
 from smolagents import ToolCallingAgent
@@ -221,6 +222,7 @@ def test_tool_schemas_extracted_correctly():
     assert tool_def["input_schema"] == input_schema
     assert tool_def["output_schema"] == output_schema
 
+@pytest.mark.llm
 def test_smolagents_agent_with_llm():
     """
     E2E test: Run a complete smolagents CodeAgent with gpt-5-mini.

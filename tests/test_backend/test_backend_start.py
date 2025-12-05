@@ -83,9 +83,21 @@ def run_backend_git_first_start_test(backend: ExecutionBackend):
         # === SHUTDOWN (should create branch and commit) ===
         backend.shutdown()
         assert backend.get_status() == BackendStatus.STOPPED
-        
-        snapshots = git_manager.list_snapshots(project_id=backend.project_id)
-        assert len(snapshots) == 1, f"Branch should have 1 commit, but found {len(snapshots)} commits"
+
+        # Verify via GitHub API with retry logic (may have propagation delay)
+        import time
+        max_retries = 5
+        retry_delay = 0.5
+        snapshots = []
+        for attempt in range(max_retries):
+            snapshots = git_manager.list_snapshots(project_id=backend.project_id)
+            if len(snapshots) == 1:
+                break
+            if attempt < max_retries - 1:
+                time.sleep(retry_delay)
+                retry_delay *= 1.5
+
+        assert len(snapshots) == 1, f"Branch should have 1 commit, but found {len(snapshots)} commits after {max_retries} retries"
         assert snapshots[0]["message"] == "Shutdown snapshot", f"Commit message should be 'Shutdown snapshot', but found {snapshots[0]['message']}"
 
         # === RESTART AND VERIFY FILES LOADED ===

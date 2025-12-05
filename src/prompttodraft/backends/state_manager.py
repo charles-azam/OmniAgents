@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from enum import Enum
 import os
+import tarfile
+import io
 
 from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft import storage_utils
@@ -86,125 +88,116 @@ class GCSStateManager(StateManager):
 
     def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
         """
-        Sync all files from working directory to bucket with timestamp.
+        Create a tar.gz archive of all files and upload to bucket.
 
-        Files are saved under project_id/timestamp/ to create immutable snapshots.
-        This prevents deleted files from being restored on reload.
+        Archive is saved as project_id/timestamp.tar.gz for immutable snapshots.
         """
         working_dir = backend.get_working_directory()
-
-        # Create timestamp snapshot
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_%f")
-        project_data_path = GCP_DATA_PATH / backend.project_id / timestamp
 
-        # List all files recursively
-        files = backend.list_directory(path=working_dir, recursive=True)
+        # Create tar.gz archive in memory
+        tar_buffer = io.BytesIO()
+        with tarfile.open(fileobj=tar_buffer, mode='w:gz') as tar:
+            files = backend.list_directory(path=working_dir, recursive=True)
 
-        for file_info in files:
-            if file_info.is_dir:
-                continue
+            for file_info in files:
+                if file_info.is_dir:
+                    continue
 
-            # Get relative path from working directory
-            file_path = Path(file_info.path)
-            relative_path = file_path.relative_to(working_dir)
+                # Get relative path from working directory
+                file_path = Path(file_info.path)
+                relative_path = file_path.relative_to(working_dir)
 
-            # Skip hidden files and common build artifacts
-            if any(part.startswith('.') for part in relative_path.parts):
-                continue
-            if any(part in ('__pycache__', 'node_modules') for part in relative_path.parts):
-                continue
+                # Skip hidden files and common build artifacts
+                if any(part.startswith('.') for part in relative_path.parts):
+                    continue
+                if any(part in ('__pycache__', 'node_modules') for part in relative_path.parts):
+                    continue
 
-            # Read file content
-            content = backend.read_file(file_path=file_path)
+                # Read file content
+                content = backend.read_file(file_path=file_path)
+                content_bytes = content.encode('utf-8')
 
-            # Write to bucket with timestamp (storage_utils expects path relative to GCP_DATA_PATH)
-            bucket_path = project_data_path / relative_path
-            storage_utils.write_to_storage(file_path=bucket_path, content=content)
+                # Add to tar archive
+                tarinfo = tarfile.TarInfo(name=str(relative_path))
+                tarinfo.size = len(content_bytes)
+                tar.addfile(tarinfo=tarinfo, fileobj=io.BytesIO(content_bytes))
+
+        # Upload single archive to bucket
+        archive_path = GCP_DATA_PATH / backend.project_id / f"{timestamp}.tar.gz"
+        storage_utils.write_to_storage(file_path=archive_path, content=tar_buffer.getvalue())
 
         return timestamp
 
     def load_latest(self, backend: "ExecutionBackend") -> bool:
         """
-        Load all files from the latest snapshot in bucket into the working directory.
-
-        Finds the most recent timestamp snapshot under project_id/ and loads all files
-        from that snapshot. This ensures deleted files are not restored.
+        Download and extract the latest tar.gz archive into the working directory.
         """
         working_dir = backend.get_working_directory()
         bucket = storage_utils.get_bucket()
 
-        # Find all timestamp directories for this project
+        # List only tar.gz archives for this project
         prefix = f"{backend.project_id}/"
-        timestamps = set()
+        archives = [blob for blob in bucket.list_blobs(prefix=prefix) if blob.name.endswith('.tar.gz')]
 
-        for blob in bucket.list_blobs(prefix=prefix):
-            # Extract timestamp from blob path: project_id/timestamp/file/path
-            blob_path = Path(blob.name)
-            parts = blob_path.parts
-
-            if len(parts) >= 2 and parts[0] == backend.project_id:
-                timestamps.add(parts[1])
-
-        if not timestamps:
-            # No snapshots exist yet
+        if not archives:
             return False
 
-        # Get the latest timestamp (lexicographically sorted due to timestamp format)
-        latest_timestamp = max(timestamps)
+        # Get latest archive (max by filename due to timestamp format)
+        latest_archive = max(archives, key=lambda b: b.name)
 
-        # Load files from latest snapshot
-        snapshot_prefix = f"{backend.project_id}/{latest_timestamp}/"
-        project_data_path = GCP_DATA_PATH / backend.project_id / latest_timestamp
+        # Download archive as bytes
+        archive_path = GCP_DATA_PATH / latest_archive.name
+        archive_bytes = storage_utils.read_from_storage(file_path=archive_path, as_bytes=True)
 
-        for blob in bucket.list_blobs(prefix=snapshot_prefix):
-            # Get relative path from snapshot directory
-            blob_path = Path(blob.name)
-            # Remove project_id/timestamp/ prefix to get file relative path
-            relative_path = blob_path.relative_to(backend.project_id).relative_to(latest_timestamp)
-
-            # Read from bucket
-            bucket_file_path = project_data_path / relative_path
-            content = storage_utils.read_from_storage(file_path=bucket_file_path)
-
-            # Write to working directory
-            dest_path = working_dir / relative_path
-            backend.write_file(file_path=dest_path, content=content)
+        # Extract archive to working directory
+        tar_buffer = io.BytesIO(archive_bytes)
+        with tarfile.open(fileobj=tar_buffer, mode='r:gz') as tar:
+            for member in tar.getmembers():
+                if member.isfile():
+                    file_content = tar.extractfile(member).read().decode('utf-8')
+                    dest_path = working_dir / member.name
+                    backend.write_file(file_path=dest_path, content=file_content)
 
         return True
 
     def cleanup(self, project_id: str) -> None:
-        """Delete all bucket files for this project."""
+        """Delete all archive files for this project."""
         bucket = storage_utils.get_bucket()
         prefix = f"{project_id}/"
 
-        for blob in bucket.list_blobs(prefix=prefix):
+        # List and delete all archives
+        archives = [blob for blob in bucket.list_blobs(prefix=prefix) if blob.name.endswith('.tar.gz')]
+
+        if not archives:
+            return
+
+        # Delete archives individually
+        for blob in archives:
             try:
                 blob.delete()
             except Exception:
-                # Ignore errors if blob already deleted (eventual consistency)
                 pass
 
     def list_snapshots(self, project_id: str) -> list[dict]:
-        """List all timestamp snapshots for this project."""
+        """List all archive snapshots for this project."""
         bucket = storage_utils.get_bucket()
         prefix = f"{project_id}/"
-        timestamps = set()
 
-        for blob in bucket.list_blobs(prefix=prefix):
-            blob_path = Path(blob.name)
-            parts = blob_path.parts
+        # List all archives and extract timestamps from filenames
+        archives = [blob for blob in bucket.list_blobs(prefix=prefix) if blob.name.endswith('.tar.gz')]
 
-            if len(parts) >= 2 and parts[0] == project_id:
-                timestamps.add(parts[1])
-
-        # Convert timestamps to metadata format
         snapshots = []
-        for ts in sorted(timestamps, reverse=True):
-            # Parse timestamp: YYYYMMDD_HHMMSS_ffffff
+        for archive in archives:
+            # Extract timestamp from filename: project_id/timestamp.tar.gz
+            # archive.name is like "project_id/20251205_165713_634291.tar.gz"
+            filename = archive.name.split('/')[-1]  # Get "20251205_165713_634291.tar.gz"
+            timestamp_str = filename.replace('.tar.gz', '')  # Get "20251205_165713_634291"
+
             try:
-                dt = datetime.strptime(ts, "%Y%m%d_%H%M%S_%f")
+                dt = datetime.strptime(timestamp_str, "%Y%m%d_%H%M%S_%f")
                 snapshots.append({
-                    "id": ts,
+                    "id": timestamp_str,
                     "timestamp": int(dt.timestamp()),
                     "message": f"Snapshot at {dt.strftime('%Y-%m-%d %H:%M:%S UTC')}"
                 })
@@ -212,7 +205,8 @@ class GCSStateManager(StateManager):
                 # Skip malformed timestamps
                 continue
 
-        return snapshots
+        # Sort by timestamp, most recent first
+        return sorted(snapshots, key=lambda s: s["timestamp"], reverse=True)
 
 
 class GitStateManager(StateManager):
@@ -297,38 +291,33 @@ class GitStateManager(StateManager):
 
         # Initialize git if not already initialized
         if not self._is_git_initialized(backend=backend):
-            backend.execute_command(command="git init")
-            backend.execute_command(command=f"git remote add origin {auth_url}")
-            backend.execute_command(command='git config user.name "PromptToDraft"')
-            backend.execute_command(command='git config user.email "noreply@prompttodraft.ai"')
+            # Combine git init commands into single execution to reduce overhead
+            init_commands = (
+                f"git init && "
+                f"git remote add origin {auth_url} && "
+                f'git config user.name "PromptToDraft" && '
+                f'git config user.email "noreply@prompttodraft.ai"'
+            )
+            backend.execute_command(command=init_commands)
 
-        # Ensure we're on the correct branch
-        # Check current branch
-        current_branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD")
+        # Combine branch check and checkout into fewer commands
+        # Try to fetch and checkout in one operation
+        fetch_result = backend.execute_command(command=f"git fetch origin {branch_name} 2>/dev/null || true")
+
+        # Check if we're already on the branch
+        current_branch_result = backend.execute_command(command="git rev-parse --abbrev-ref HEAD 2>/dev/null || echo ''")
         current_branch = current_branch_result.output.strip()
 
-        if current_branch != branch_name:
-            # Check if branch exists locally
-            branch_exists_result = backend.execute_command(command=f"git rev-parse --verify {branch_name}")
+        if current_branch == branch_name:
+            # Already on correct branch, check if remote tracking exists
+            return fetch_result.exit_code == 0
 
-            if branch_exists_result.exit_code == 0:
-                # Branch exists locally, just checkout
-                backend.execute_command(command=f"git checkout {branch_name}")
-            else:
-                # Branch doesn't exist locally, try to fetch from remote
-                fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
+        # Try to checkout branch (will succeed if exists locally or remotely)
+        checkout_result = backend.execute_command(
+            command=f"git checkout {branch_name} 2>/dev/null || git checkout -b {branch_name} origin/{branch_name} 2>/dev/null || git checkout -b {branch_name}"
+        )
 
-                if fetch_result.exit_code == 0:
-                    # Branch exists on remote, create tracking branch
-                    backend.execute_command(command=f"git checkout -b {branch_name} origin/{branch_name}")
-                    return True
-                else:
-                    # Branch doesn't exist on remote, create new local branch
-                    backend.execute_command(command=f"git checkout -b {branch_name}")
-                    return False
-
-        # Already on correct branch, check if remote exists
-        fetch_result = backend.execute_command(command=f"git fetch origin {branch_name}")
+        # Return True if remote branch existed (fetch succeeded)
         return fetch_result.exit_code == 0
 
     def save_snapshot(self, backend: "ExecutionBackend", message: str = "") -> str:
@@ -350,28 +339,27 @@ class GitStateManager(StateManager):
         # Ensure .gitignore exists
         self._ensure_gitignore(backend=backend)
 
-        # Stage all files (gitignore handles filtering)
-        backend.execute_command(command="git add .")
-
-        # Check if there are changes to commit
-        status_result = backend.execute_command(command="git status --porcelain")
-        if not status_result.output.strip():
-            # No changes, return existing commit SHA or "no-changes"
-            sha_result = backend.execute_command(command="git rev-parse HEAD")
-            return sha_result.output.strip() if sha_result.exit_code == 0 else "no-changes"
-
-        # Commit changes
+        # Combine add, status check, and commit into fewer commands
         timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
         commit_msg = message or f"Snapshot at {timestamp}"
-        # Use single quotes to avoid shell escaping issues
-        backend.execute_command(command=f"git commit -m '{commit_msg}'")
 
-        # Push to remote
-        backend.execute_command(command=f"git push origin {branch_name} --force")
+        # Try to add and commit in one go, get SHA if successful
+        # If nothing to commit, git commit will fail and we'll get the current SHA
+        commit_command = (
+            f"git add . && "
+            f"git diff-index --quiet HEAD || git commit -m '{commit_msg}'"
+        )
+        commit_result = backend.execute_command(command=commit_command)
 
-        # Get commit SHA
-        sha_result = backend.execute_command(command="git rev-parse HEAD")
-        return sha_result.output.strip()
+        # Get current SHA (whether we just committed or not)
+        sha_result = backend.execute_command(command="git rev-parse HEAD 2>/dev/null || echo 'no-changes'")
+        current_sha = sha_result.output.strip()
+
+        # Only push if we actually made a commit (commit_result succeeded)
+        if commit_result.exit_code == 0:
+            backend.execute_command(command=f"git push origin {branch_name} --force")
+
+        return current_sha
 
     def load_latest(self, backend: "ExecutionBackend") -> bool:
         """
