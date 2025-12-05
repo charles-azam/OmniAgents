@@ -172,14 +172,12 @@ class GCSStateManager(StateManager):
         if not archives:
             return
 
-        # Use batch API for faster deletion
-        with bucket.client.batch():
-            for blob in archives:
-                try:
-                    blob.delete()
-                except Exception:
-                    # Ignore errors if blob already deleted (eventual consistency)
-                    pass
+        # Delete archives individually
+        for blob in archives:
+            try:
+                blob.delete()
+            except Exception:
+                pass
 
     def list_snapshots(self, project_id: str) -> list[dict]:
         """List all archive snapshots for this project."""
