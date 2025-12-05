@@ -643,13 +643,13 @@ save_memory(fact="The project I'm currently working on is called 'gemini-cli'.")
 
 
 ok if you look at this code, 
-'/Users/charlesazam/charloupioupiou/prompttodraft/src/prompttodraft/tools/backends/execution_backend.py''/Users/charlesazam/charloupioupiou/prompttodraft/src/prompttodraft/tools/backends/docker_backend.py''/Users/charlesazam/charloupioupiou/prompttodraft/src/prompttodraft/tools/backends/local_backend.py' you can see that I successfully wrote the backend to create tools for an AI coding agent, these tools can work in 3 kind of environments, locally, docker and e2b. What I want you to do is to write the tools from '/Users/charlesazam/charloupioupiou/prompttodraft/src/prompttodraft/tools/implementation/gemini_cli_tool.md' but in python. Write the tools here '/Users/charlesazam/charloupioupiou/prompttodraft/src/prompttodraft/tools/implementation' 
+'/Users/charlesazam/charloupioupiou/anyagents/src/anyagents/tools/backends/execution_backend.py''/Users/charlesazam/charloupioupiou/anyagents/src/anyagents/tools/backends/docker_backend.py''/Users/charlesazam/charloupioupiou/anyagents/src/anyagents/tools/backends/local_backend.py' you can see that I successfully wrote the backend to create tools for an AI coding agent, these tools can work in 3 kind of environments, locally, docker and e2b. What I want you to do is to write the tools from '/Users/charlesazam/charloupioupiou/anyagents/src/anyagents/tools/implementation/gemini_cli_tool.md' but in python. Write the tools here '/Users/charlesazam/charloupioupiou/anyagents/src/anyagents/tools/implementation' 
 
 The tools must follow this structure, with the execute function and the metadata class so that they could be converted to smolagents, openai, pydantic-ai, autogen, etc. tools: 
 
-from prompttodraft.tools.metadata import ToolMetadata
-from prompttodraft.backends.execution_backend import ExecutionBackend
-from prompttodraft.outputs.outputs import (
+from anyagents.tools.metadata import ToolMetadata
+from anyagents.backends.execution_backend import ExecutionBackend
+from anyagents.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
     TextOutputModel,

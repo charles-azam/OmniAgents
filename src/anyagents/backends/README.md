@@ -18,8 +18,8 @@ Execution backends provide primitive operations (execute commands, read/write fi
 ### LocalBackend
 
 ```python
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import GitStateManager
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.state_manager import GitStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
@@ -30,7 +30,7 @@ backend.shutdown()
 ### DockerBackend
 
 ```python
-from prompttodraft.backends.docker_backend import DockerBackend
+from anyagents.backends.docker_backend import DockerBackend
 
 backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates/starts container
@@ -41,7 +41,7 @@ backend.shutdown()  # Stops and removes container
 ### E2BBackend
 
 ```python
-from prompttodraft.backends.e2b_backend import E2BBackend
+from anyagents.backends.e2b_backend import E2BBackend
 
 backend = E2BBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Creates sandbox
@@ -75,7 +75,7 @@ def execute_command(command: str, timeout: int | None = None) -> CommandResult:
 
 Returns: `CommandResult(output: str, exit_code: int)` with merged stdout/stderr.
 
-**Note**: For UV commands, use `prompttodraft.uv_utils.execute_uv_command()` which handles PATH setup automatically.
+**Note**: For UV commands, use `anyagents.uv_utils.execute_uv_command()` which handles PATH setup automatically.
 
 ### File Operations
 
@@ -119,7 +119,7 @@ class StateManager(ABC):
 #### Git Storage (Default)
 
 ```python
-from prompttodraft.backends.state_manager import GitStateManager
+from anyagents.backends.state_manager import GitStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 ```
@@ -132,7 +132,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 #### GCS Storage
 
 ```python
-from prompttodraft.backends.state_manager import GCSStateManager
+from anyagents.backends.state_manager import GCSStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ```
@@ -145,7 +145,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 #### No Persistence
 
 ```python
-from prompttodraft.backends.state_manager import NoOpStateManager
+from anyagents.backends.state_manager import NoOpStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
@@ -220,8 +220,8 @@ To add a new execution environment:
 1. **Implement ExecutionBackend interface**:
 
 ```python
-from prompttodraft.backends.execution_backend import ExecutionBackend, CommandResult
-from prompttodraft.backends.state_manager import StateManager
+from anyagents.backends.execution_backend import ExecutionBackend, CommandResult
+from anyagents.backends.state_manager import StateManager
 
 class MyBackend(ExecutionBackend):
     def __init__(self, project_id: str, state_manager: StateManager):
@@ -258,7 +258,7 @@ class MyBackend(ExecutionBackend):
 3. **Use with any framework**:
 
 ```python
-from prompttodraft.smolagent_agent import SmolAgentAgent
+from anyagents.smolagent_agent import SmolAgentAgent
 
 backend = MyBackend(project_id="test", state_manager=GitStateManager())
 backend.start()

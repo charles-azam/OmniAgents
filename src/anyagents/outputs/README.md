@@ -5,7 +5,7 @@ All tool outputs inherit from `ToolOutputModel` and handle their own display log
 ## Quick Start
 
 ```python
-from prompttodraft.outputs.outputs import TextOutputModel
+from anyagents.outputs.outputs import TextOutputModel
 
 # Create an output
 output = TextOutputModel(content="Hello, world!")
@@ -50,7 +50,7 @@ class ReadFileTool:
 ## Usage in CLI
 
 ```python
-from prompttodraft.tools.read_file_tool import ReadFileTool
+from anyagents.tools.read_file_tool import ReadFileTool
 
 tool = ReadFileTool(backend=backend)
 result = tool.execute(absolute_path="/path/to/file.py")
