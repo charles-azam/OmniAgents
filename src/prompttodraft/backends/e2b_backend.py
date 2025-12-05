@@ -189,7 +189,13 @@ class E2BBackend(ExecutionBackend):
 
         sandbox_path = self._to_system_path(path)
         files = []
-        entries = self._sandbox.files.list(path=str(sandbox_path))
+
+        try:
+            entries = self._sandbox.files.list(path=str(sandbox_path))
+        except Exception as e:
+            # E2B raises ConnectException for non-existent directories
+            raise FileNotFoundError(f"Directory {path} does not exist") from e
+
         if not entries:
             raise FileNotFoundError(f"Directory {path} does not exist")
 

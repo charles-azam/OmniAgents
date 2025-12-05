@@ -114,31 +114,44 @@ class ExecutionBackend(ABC):
 
         Args:
             cleanup_state_manager: Whether to cleanup the state manager as well
+
+        Note:
+            For E2BBackend, this requires the backend to be started (sandbox must be running).
+            If the backend is not started, only state manager cleanup will be performed.
         """
-        # Get working directory
-        working_dir = self.get_working_directory()
-        
+        # For backends that require initialization (like E2B), gracefully handle uninitialized state
+        backend_is_running = self.get_status() == BackendStatus.RUNNING
 
-        # List all files and directories (non-recursive at root level)
-        if self.file_exists(path=working_dir) is not None:
-            items = self.list_directory(path=working_dir, recursive=False)
+        if backend_is_running:
+            # Get working directory
+            working_dir = self.get_working_directory()
 
-            # Delete all items except .git directory (needed for Git storage)
-            for item in items:
-                if item.name == '.git':
-                    continue
+            # List all files and directories (non-recursive at root level)
+            # Check if working directory exists (may not exist for fresh E2B backend)
+            try:
+                if self.file_exists(path=working_dir) is not None:
+                    items = self.list_directory(path=working_dir, recursive=False)
 
-                # item.path is already a Path object
-                if item.is_dir:
-                    self.delete_directory(path=item.path)
-                else:
-                    self.delete_file(path=item.path)
+                    # Delete all items except .git directory (needed for Git storage)
+                    for item in items:
+                        if item.name == '.git':
+                            continue
 
-            # Create empty README.md to ensure snapshot is trackable
-            # This is especially important for GCS storage which discovers snapshots
-            # by looking at blob paths - without at least one file, the snapshot
-            # timestamp won't be discoverable
-            self.write_file(file_path=working_dir / "README.md", content="")
+                        # item.path is already a Path object
+                        if item.is_dir:
+                            self.delete_directory(path=item.path)
+                        else:
+                            self.delete_file(path=item.path)
+
+                    # Create empty README.md to ensure snapshot is trackable
+                    # This is especially important for GCS storage which discovers snapshots
+                    # by looking at blob paths - without at least one file, the snapshot
+                    # timestamp won't be discoverable
+                    self.write_file(file_path=working_dir / "README.md", content="")
+            except RuntimeError:
+                # Backend not initialized (e.g., E2B sandbox not created yet)
+                # Skip file operations, only do state manager cleanup if requested
+                pass
 
         if cleanup_state_manager:
             self.state_manager.cleanup(project_id=self.project_id)
@@ -271,28 +284,6 @@ class ExecutionBackend(ABC):
             Path object in the LLM's view (e.g. /workspace/file.py)
         """
         pass
-
-    def _determine_file_type(self, system_path: Path) -> FileType | None:
-        """
-        Determine the type of a filesystem entry.
-
-        Helper method to reduce duplication across backends.
-
-        Args:
-            system_path: Path object on the execution system
-
-        Returns:
-            FileType if the path exists, None otherwise
-        """
-        if not system_path.exists():
-            return None
-        if system_path.is_symlink():
-            return FileType.SYMLINK
-        if system_path.is_file():
-            return FileType.FILE
-        if system_path.is_dir():
-            return FileType.DIRECTORY
-        return FileType.OTHER
 
     def convert_to_path(self, path: str) -> Path:
         """
