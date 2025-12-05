@@ -21,7 +21,7 @@ if TYPE_CHECKING:
 
 load_dotenv()
 
-BUCKET_ENV_VAR = "BUCKET_PROMPT_TO_DRAFT"
+BUCKET_ENV_VAR = "ANYAGENTS_BUCKET_NAME"
 
 
 def _initialize_and_validate_storage() -> tuple["storage.Client", "storage.Bucket"]:
