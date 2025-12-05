@@ -73,7 +73,7 @@ def get_bucket() -> storage.Bucket:
 
 
 
-def _write_to_bucket(content: str, blob_name: str) -> None:
+def _write_to_bucket(content: str | bytes, blob_name: str) -> None:
     """Write content to bucket storage."""
     bucket = get_bucket()
     blob = bucket.blob(blob_name=blob_name)
@@ -81,13 +81,13 @@ def _write_to_bucket(content: str, blob_name: str) -> None:
     logger.info(f"Uploaded {blob_name} to bucket")
 
 
-def write_to_storage(file_path: Path, content: str) -> None:
+def write_to_storage(file_path: Path, content: str | bytes) -> None:
     """
     Write content to a file in bucket storage.
 
     Args:
         file_path: Path object that must be relative to GCP_DATA_PATH
-        content: Content to write to the file
+        content: Content to write to the file (string or bytes)
 
     Raises:
         ValueError: If the path is not relative to GCP_DATA_PATH
@@ -99,22 +99,25 @@ def write_to_storage(file_path: Path, content: str) -> None:
     _write_to_bucket(content=content, blob_name=relative_path.as_posix())
 
 
-def _read_from_bucket(blob_name: str) -> str:
+def _read_from_bucket(blob_name: str, as_bytes: bool = False) -> str | bytes:
     """Read a file from bucket storage."""
     bucket = get_bucket()
     blob = bucket.blob(blob_name=blob_name)
+    if as_bytes:
+        return blob.download_as_bytes()
     return blob.download_as_text()
 
 
-def read_from_storage(file_path: Path) -> str:
+def read_from_storage(file_path: Path, as_bytes: bool = False) -> str | bytes:
     """
     Read a file from bucket storage.
 
     Args:
         file_path: Path object that must be relative to GCP_DATA_PATH
+        as_bytes: If True, return bytes instead of string
 
     Returns:
-        Content of the file as string
+        Content of the file as string or bytes
 
     Raises:
         ValueError: If the path is not relative to GCP_DATA_PATH
@@ -123,7 +126,7 @@ def read_from_storage(file_path: Path) -> str:
         raise ValueError(f"Path {file_path} is not relative to GCP_DATA_PATH {GCP_DATA_PATH}")
 
     relative_path = file_path.relative_to(GCP_DATA_PATH)
-    return _read_from_bucket(blob_name=relative_path.as_posix())
+    return _read_from_bucket(blob_name=relative_path.as_posix(), as_bytes=as_bytes)
 
 
 def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool:
