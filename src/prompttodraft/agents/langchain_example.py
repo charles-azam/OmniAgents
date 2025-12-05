@@ -1,11 +1,12 @@
 """
 Example usage of the LangChainAgent.
 
-This demonstrates how to use the LangChain agent with different backends.
+This demonstrates how to use the LangChain agent with different backends and presets.
 """
 from prompttodraft.agents.langchain_agent import LangChainAgent, get_langchain_model_example
 from prompttodraft.backends.local_backend import LocalBackend
 from prompttodraft.backends.state_manager import NoOpStateManager
+from prompttodraft.presets.python import PythonUVPreset
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -13,7 +14,7 @@ load_dotenv()
 
 def main() -> None:
     """Run a simple coding task with the agent."""
-    # Create a backend with git storage
+    # Create a backend with no state persistence
     project_id = "example-project-langchain"
     state_manager = NoOpStateManager()
     backend = LocalBackend(
@@ -21,13 +22,14 @@ def main() -> None:
         state_manager=state_manager,
     )
 
-    # Start the backend (loads from git if exists)
-    backend.start()
+    # Create the model
     model = get_langchain_model_example()
-    # Create the agent
+
+    # Create the agent with Python UV preset
     agent = LangChainAgent(
         backend=backend,
         model=model,
+        preset=PythonUVPreset(),
     )
 
     # Run a task

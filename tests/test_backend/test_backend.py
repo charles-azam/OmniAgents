@@ -300,9 +300,12 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         backend.delete_directory(path=test_subdir)
         assert backend.file_exists(path=test_subdir) is None
 
-        # Test execute_uv
+        # Test uv commands via execute_command
         # First, initialize project with uv
-        uv_init_result = backend.execute_uv(uv_command="init", timeout=120000)
+        uv_init_result = backend.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && uv init',
+            timeout=120000,
+        )
         assert uv_init_result.exit_code == 0
 
         # Verify pyproject.toml was created
@@ -314,7 +317,10 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert "[project]" in initial_pyproject or "name" in initial_pyproject
 
         # Test uv add - add a package and verify pyproject.toml is modified
-        uv_add_result = backend.execute_uv(uv_command="add requests", timeout=120000)
+        uv_add_result = backend.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && uv add requests',
+            timeout=120000,
+        )
         assert uv_add_result.exit_code == 0
 
         # Read modified pyproject.toml and verify requests was added
@@ -326,7 +332,10 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         uv_test_script = working_dir / "uv_test.py"
         backend.write_file(file_path=uv_test_script, content="print('UV run test successful')")
 
-        uv_run_result = backend.execute_uv(uv_command="run uv_test.py", timeout=60000)
+        uv_run_result = backend.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && uv run uv_test.py',
+            timeout=60000,
+        )
         assert uv_run_result.exit_code == 0
         assert "UV run test successful" in uv_run_result.output
 
