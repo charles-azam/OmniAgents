@@ -301,7 +301,22 @@ def run_backend_e2e_test(backend: ExecutionBackend):
         assert backend.file_exists(path=test_subdir) is None
 
         # Test uv commands via execute_command
-        # First, initialize project with uv
+        # First, check if uv is installed, install if not (needed for E2B and other backends)
+        uv_check = backend.execute_command(
+            command='export PATH="$HOME/.local/bin:$PATH" && command -v uv',
+            timeout=10000,
+        )
+
+        if uv_check.exit_code != 0:
+            # Install uv
+            install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
+            install_result = backend.execute_command(
+                command=install_command,
+                timeout=120000,
+            )
+            assert install_result.exit_code == 0, f"Failed to install uv: {install_result.output}"
+
+        # Initialize project with uv
         uv_init_result = backend.execute_command(
             command='export PATH="$HOME/.local/bin:$PATH" && uv init',
             timeout=120000,

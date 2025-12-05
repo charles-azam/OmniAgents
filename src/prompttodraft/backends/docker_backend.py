@@ -33,7 +33,7 @@ class DockerBackend(ExecutionBackend):
     Args:
         project_id: Unique identifier for this project
         state_manager: State persistence manager
-        image: Docker image to use (default: "ubuntu:24.04")
+        image: Docker image to use (default: "ghcr.io/astral-sh/uv:debian")
         environment: Additional environment variables for the container
     """
 
@@ -41,7 +41,7 @@ class DockerBackend(ExecutionBackend):
         self,
         project_id: str,
         state_manager: StateManager,
-        image: str = "ubuntu:24.04",
+        image: str = "ghcr.io/astral-sh/uv:debian",
         environment: dict[str, str] | None = None,
     ):
         super().__init__(state_manager=state_manager)
