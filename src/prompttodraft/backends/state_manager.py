@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from enum import Enum
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from prompttodraft.common import GCP_DATA_PATH
 from prompttodraft import storage_utils
@@ -133,11 +134,17 @@ class GCSStateManager(StateManager):
         working_dir = backend.get_working_directory()
         bucket = storage_utils.get_bucket()
 
-        # Find all timestamp directories for this project
+        # Single list_blobs call - collect all blobs at once
         prefix = f"{backend.project_id}/"
-        timestamps = set()
+        all_blobs = list(bucket.list_blobs(prefix=prefix))
 
-        for blob in bucket.list_blobs(prefix=prefix):
+        if not all_blobs:
+            # No snapshots exist yet
+            return False
+
+        # Find all timestamp directories from collected blobs
+        timestamps = set()
+        for blob in all_blobs:
             # Extract timestamp from blob path: project_id/timestamp/file/path
             blob_path = Path(blob.name)
             parts = blob_path.parts
@@ -145,18 +152,17 @@ class GCSStateManager(StateManager):
             if len(parts) >= 2 and parts[0] == backend.project_id:
                 timestamps.add(parts[1])
 
-        if not timestamps:
-            # No snapshots exist yet
-            return False
-
         # Get the latest timestamp (lexicographically sorted due to timestamp format)
         latest_timestamp = max(timestamps)
 
-        # Load files from latest snapshot
+        # Load files from latest snapshot using already-collected blobs
         snapshot_prefix = f"{backend.project_id}/{latest_timestamp}/"
         project_data_path = GCP_DATA_PATH / backend.project_id / latest_timestamp
 
-        for blob in bucket.list_blobs(prefix=snapshot_prefix):
+        # Filter blobs for latest snapshot
+        snapshot_blobs = [blob for blob in all_blobs if blob.name.startswith(snapshot_prefix)]
+
+        def download_and_write_blob(blob):
             # Get relative path from snapshot directory
             blob_path = Path(blob.name)
             # Remove project_id/timestamp/ prefix to get file relative path
@@ -170,6 +176,12 @@ class GCSStateManager(StateManager):
             dest_path = working_dir / relative_path
             backend.write_file(file_path=dest_path, content=content)
 
+        # Download files in parallel
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(download_and_write_blob, blob) for blob in snapshot_blobs]
+            for future in as_completed(futures):
+                future.result()  # Raise any exceptions that occurred
+
         return True
 
     def cleanup(self, project_id: str) -> None:
@@ -177,12 +189,20 @@ class GCSStateManager(StateManager):
         bucket = storage_utils.get_bucket()
         prefix = f"{project_id}/"
 
-        for blob in bucket.list_blobs(prefix=prefix):
-            try:
-                blob.delete()
-            except Exception:
-                # Ignore errors if blob already deleted (eventual consistency)
-                pass
+        # Collect all blobs first, then batch delete
+        blobs_to_delete = list(bucket.list_blobs(prefix=prefix))
+
+        if not blobs_to_delete:
+            return
+
+        # Use batch API for faster deletion
+        with bucket.client.batch():
+            for blob in blobs_to_delete:
+                try:
+                    blob.delete()
+                except Exception:
+                    # Ignore errors if blob already deleted (eventual consistency)
+                    pass
 
     def list_snapshots(self, project_id: str) -> list[dict]:
         """List all timestamp snapshots for this project."""
