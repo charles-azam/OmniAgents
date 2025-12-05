@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from prompttodraft.tools.base_tool import CoreBackendTool
 from prompttodraft.outputs.outputs import TextOutputModel
+from prompttodraft.uv_utils import ensure_uv_installed, execute_uv_command
 
 
 class UVInput(BaseModel):
@@ -33,30 +34,6 @@ class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
     name = "uv"
     description = "Executes uv package manager commands in the execution environment. Automatically ensures uv is installed before running commands. Use this to: run Python files (uv run script.py), install packages (uv add package-name), remove packages (uv remove package-name), sync dependencies (uv sync), run pytest (uv run pytest), or any other uv command. Returns detailed information about the execution including stdout, stderr, and exit code."
 
-    def _ensure_uv_installed(self) -> bool:
-        """
-        Ensure uv is installed, installing it if necessary.
-
-        Returns:
-            True if uv is available, False if installation failed
-        """
-        uv_check = self.backend.execute_command(
-            command='export PATH="$HOME/.local/bin:$PATH" && command -v uv',
-            timeout=10000,
-        )
-
-        if uv_check.exit_code == 0:
-            return True
-
-        # Install uv
-        install_command = "curl -LsSf https://astral.sh/uv/install.sh | sh"
-        install_result = self.backend.execute_command(
-            command=install_command,
-            timeout=120000,
-        )
-
-        return install_result.exit_code == 0
-
     def execute(self, inputs: UVInput) -> TextOutputModel:
         """
         Execute the uv tool.
@@ -68,16 +45,17 @@ class UVTool(CoreBackendTool[UVInput, TextOutputModel]):
             TextOutputModel with command output
         """
         # Ensure uv is installed
-        if not self._ensure_uv_installed():
+        success, message = ensure_uv_installed(backend=self.backend)
+        if not success:
             return TextOutputModel(
-                content="Failed to install uv package manager",
+                content=f"Failed to install uv package manager: {message}",
                 metadata={"exit_code": 1, "command": f"uv {inputs.command}"},
             )
 
-        # Execute the uv command with PATH set
-        full_command = f'export PATH="$HOME/.local/bin:$PATH" && uv {inputs.command}'
-        result = self.backend.execute_command(
-            command=full_command,
+        # Execute the uv command
+        result = execute_uv_command(
+            backend=self.backend,
+            uv_command=inputs.command,
             timeout=300000,  # 5 minutes default for potentially long operations
         )
 
