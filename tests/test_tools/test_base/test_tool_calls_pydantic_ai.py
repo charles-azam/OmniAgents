@@ -2,6 +2,7 @@
 # test that the framework works as expected
 import os
 import random
+import pytest
 from pydantic import BaseModel, Field
 from pydantic_ai import Agent, Tool as PydanticAITool
 from pydantic_ai.models.huggingface import HuggingFaceModel
@@ -197,6 +198,7 @@ def test_pydantic_ai_tool_schemas_extracted_correctly():
     assert schema["properties"]["active"]["description"] == "Whether the person is active"
 
 
+@pytest.mark.llm
 def test_pydantic_ai_agent_with_llm():
     """
     E2E test: Run a complete Pydantic AI agent with gpt-4o-mini.

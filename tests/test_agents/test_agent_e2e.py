@@ -34,6 +34,7 @@ Then list the files in the directory to verify it was created.
 """
 
 
+@pytest.mark.llm
 def test_smolagent_agent_e2e_local() -> None:
     """Test SmolAgents agent end-to-end with file creation task."""
     # Setup
@@ -77,6 +78,7 @@ def test_smolagent_agent_e2e_local() -> None:
 
 
 
+@pytest.mark.llm
 def test_smolagent_agent_e2e_docker() -> None:
     """Test SmolAgents agent end-to-end with file creation task."""
     # Setup
@@ -120,6 +122,7 @@ def test_smolagent_agent_e2e_docker() -> None:
 
 
 
+@pytest.mark.llm
 def test_pydantic_ai_agent_e2e_local() -> None:
     """Test Pydantic AI agent end-to-end with file creation task."""
     # Setup
@@ -163,6 +166,7 @@ def test_pydantic_ai_agent_e2e_local() -> None:
 
 
 
+@pytest.mark.llm
 def test_pydantic_ai_agent_e2e_docker() -> None:
     """Test Pydantic AI agent end-to-end with file creation task."""
     # Setup
@@ -206,6 +210,7 @@ def test_pydantic_ai_agent_e2e_docker() -> None:
 
 
 
+@pytest.mark.llm
 def test_langchain_agent_e2e_local() -> None:
     """Test LangChain agent end-to-end with file creation task."""
     # Setup
@@ -249,6 +254,7 @@ def test_langchain_agent_e2e_local() -> None:
 
 
 
+@pytest.mark.llm
 def test_langchain_agent_e2e_docker() -> None:
     """Test LangChain agent end-to-end with file creation task."""
     # Setup

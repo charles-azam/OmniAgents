@@ -1,4 +1,4 @@
-name: Test Local and Docker Backends
+name: Test LLM
 
 on:
   push:
@@ -50,7 +50,7 @@ jobs:
       run: |
         docker pull ghcr.io/astral-sh/uv:debian
 
-    - name: Run tests (local and docker)
+    - name: Run LLM tests
       env:
         BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
         PROMPTTODRAFT_GITHUB_API_KEY: ${{ secrets.PROMPTTODRAFT_GITHUB_API_KEY }}
@@ -58,4 +58,4 @@ jobs:
         CI_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |
-          uv run pytest tests -vvvv -m "not e2b and not llm"
+          uv run pytest tests -vvvv -m "llm"

@@ -44,6 +44,7 @@ allow-direct-references = true
 [tool.pytest.ini_options]
 markers = [
     "e2b: marks tests that require E2B backend (deselect with '-m \"not e2b\"')",
+    "llm: marks tests that call LLM APIs (deselect with '-m \"not llm\"')",
 ]
 
 [tool.uv.workspace]
