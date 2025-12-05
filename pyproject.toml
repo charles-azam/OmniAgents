@@ -1,7 +1,7 @@
 [project]
-name = "prompttodraft"
+name = "anyagents"
 version = "0.1.0"
-description = "Add your description here"
+description = "A multi-backend execution framework for AI coding agents"
 readme = "README.md"
 authors = [
     { name = "Charles Azam", email = "azamcharles0@gmail.com" }
@@ -36,10 +36,13 @@ dependencies = [
 ]
 
 [project.scripts]
-prompttodraft = "prompttodraft:main"
+anyagents = "anyagents:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anyagents"]
 
 [tool.pytest.ini_options]
 markers = [

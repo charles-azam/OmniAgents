@@ -6,10 +6,10 @@ import pytest
 from pydantic import BaseModel, Field
 from langchain_core.tools import StructuredTool as LangChainBaseTool
 
-from prompttodraft.tools.base_tool import CoreBackendTool, CoreTool
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.state_manager import NoOpStateManager
-from prompttodraft.agents.langchain_agent import get_langchain_model_example
+from anyagents.tools.base_tool import CoreBackendTool, CoreTool
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.state_manager import NoOpStateManager
+from anyagents.agents.langchain_agent import get_langchain_model_example
 
 
 def test_langchain_tool_created_correctly():
@@ -100,8 +100,8 @@ def test_langchain_tool_backend_created_correctly():
 
 def test_langchain_tool_backend_works_correctly():
     """Test that CoreBackendTool converts correctly to langchain tool and can use backend to write files."""
-    from prompttodraft.tools.write_file_tool import WriteFileTool
-    from prompttodraft.outputs.outputs import TextOutputModel
+    from anyagents.tools.write_file_tool import WriteFileTool
+    from anyagents.outputs.outputs import TextOutputModel
 
     # Create local backend with NoOp state manager for testing
     state_manager = NoOpStateManager()

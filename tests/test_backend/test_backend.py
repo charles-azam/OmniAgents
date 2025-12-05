@@ -1,10 +1,10 @@
-from prompttodraft.backends.local_backend import LocalBackend
-from prompttodraft.backends.docker_backend import DockerBackend
-from prompttodraft.backends.e2b_backend import E2BBackend
-from prompttodraft.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from prompttodraft.backends.state_manager import GCSStateManager, GitStateManager
-from prompttodraft.test_utils import cleanup_test_environment
-from prompttodraft.uv_utils import execute_uv_command
+from anyagents.backends.local_backend import LocalBackend
+from anyagents.backends.docker_backend import DockerBackend
+from anyagents.backends.e2b_backend import E2BBackend
+from anyagents.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from anyagents.backends.state_manager import GCSStateManager, GitStateManager
+from anyagents.test_utils import cleanup_test_environment
+from anyagents.uv_utils import execute_uv_command
 from pathlib import Path
 import pytest
 import os
@@ -39,8 +39,8 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     Args:
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
-    from prompttodraft import storage_utils
-    from prompttodraft.common import GCP_DATA_PATH
+    from anyagents import storage_utils
+    from anyagents.common import GCP_DATA_PATH
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment for debugging/reloading
@@ -303,7 +303,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Test uv commands via execute_command
         # Use PythonUVPreset to initialize project (handles UV installation if needed)
-        from prompttodraft.presets.python import PythonUVPreset
+        from anyagents.presets.python import PythonUVPreset
 
         preset = PythonUVPreset()
         init_result = preset.initialize_project(backend=backend)
@@ -538,7 +538,7 @@ def test_docker_backend_container_reuse():
         # Ensure cleanup even if test fails
         try:
             client = docker.from_env()
-            container = client.containers.get(f"prompttodraft-{project_id}")
+            container = client.containers.get(f"anyagents-{project_id}")
             container.stop(timeout=0)
             container.remove()
         except:
@@ -555,7 +555,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend: An initialized ExecutionBackend instance with StorageType.GIT
     """
     import subprocess
-    from prompttodraft.backends.state_manager import GitStateManager
+    from anyagents.backends.state_manager import GitStateManager
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment

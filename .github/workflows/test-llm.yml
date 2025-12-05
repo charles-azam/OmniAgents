@@ -52,9 +52,9 @@ jobs:
 
     - name: Run LLM tests
       env:
-        BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
-        PROMPTTODRAFT_GITHUB_API_KEY: ${{ secrets.PROMPTTODRAFT_GITHUB_API_KEY }}
-        PROMPTTODRAFT_GITHUB_STATE_REPO: ${{ secrets.PROMPTTODRAFT_GITHUB_STATE_REPO }}
+        ANYAGENTS_BUCKET_NAME: ${{ secrets.ANYAGENTS_BUCKET_NAME }}
+        ANYAGENTS_GITHUB_API_KEY: ${{ secrets.ANYAGENTS_GITHUB_API_KEY }}
+        ANYAGENTS_GITHUB_STATE_REPO: ${{ secrets.ANYAGENTS_GITHUB_STATE_REPO }}
         CI_BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
         HF_TOKEN: ${{ secrets.HF_TOKEN }}
       run: |

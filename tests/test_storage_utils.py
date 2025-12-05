@@ -1,5 +1,5 @@
-from prompttodraft.common import GCP_DATA_PATH
-from prompttodraft.storage_utils import write_to_storage, read_from_storage
+from anyagents.common import GCP_DATA_PATH
+from anyagents.storage_utils import write_to_storage, read_from_storage
 from pathlib import Path
 
 def test_storage_utils():
