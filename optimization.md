@@ -178,18 +178,54 @@ Batch operations where possible, or accept this as inherent cost of E2B's remote
 
 ---
 
-### 5. Git Operations in GitStateManager - ~12 seconds
+### 5. Git Operations in GitStateManager - ~12 seconds ✅ OPTIMIZED
 
-**Problem**: Git commands (`git add`, `git commit`, `git checkout`) executed via backend's `execute_command()` have overhead.
+**Problem**: Git commands executed via `backend.execute_command()` had overhead from multiple separate shell invocations, especially on remote backends like E2B.
 
 **Locations**:
-- `GitStateManager._ensure_git_initialized()`: 7.6s
+- `GitStateManager._ensure_git_initialized()`: 7.6s (E2B), 2.5s (Docker)
 - `GitStateManager.save_snapshot()`: 3-5s per call
 
-**Solution**:
-Use `pygit2` or `gitpython` library for direct git operations instead of shelling out to git commands.
+**Solution Implemented**:
+Combined multiple git commands into single shell invocations using `&&` operators, reducing the number of remote command executions:
 
-**Expected savings**: ~5-8 seconds
+**Before** (_ensure_git_initialized):
+```python
+backend.execute_command("git init")                    # Command 1
+backend.execute_command("git remote add origin ...")   # Command 2
+backend.execute_command('git config user.name ...')    # Command 3
+backend.execute_command('git config user.email ...')   # Command 4
+# Then 3-5 more commands for branch checking/checkout
+```
+
+**After**:
+```python
+backend.execute_command("git init && git remote add origin ... && git config user.name ... && git config user.email ...")  # Single command
+# Reduced branch operations from 5 to 3 commands
+```
+
+**Before** (save_snapshot):
+```python
+backend.execute_command("git add .")               # Command 1
+backend.execute_command("git status --porcelain")  # Command 2
+backend.execute_command("git commit -m '...'")     # Command 3
+backend.execute_command("git push ...")            # Command 4
+backend.execute_command("git rev-parse HEAD")      # Command 5
+```
+
+**After**:
+```python
+backend.execute_command("git add . && git diff-index --quiet HEAD || git commit -m '...'")  # Combined
+backend.execute_command("git rev-parse HEAD")  # Get SHA
+backend.execute_command("git push ...")        # Push only if committed
+# 5 commands → 3 commands
+```
+
+**Files modified**:
+- `src/prompttodraft/backends/state_manager.py:272-321` - `_ensure_git_initialized()`
+- `src/prompttodraft/backends/state_manager.py:323-362` - `save_snapshot()`
+
+**Expected savings**: ~3-5 seconds on git-based tests, especially E2B
 
 ---
 
