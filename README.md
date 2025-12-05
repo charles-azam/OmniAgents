@@ -182,7 +182,7 @@ export PROMPTTODRAFT_GITHUB_STATE_REPO="your-org/your-repo"  # Optional
 
 ```bash
 export GOOGLE_APPLICATION_CREDENTIALS="/path/to/gcp-credentials.json"
-export BUCKET_PROMPT_TO_DRAFT="your-bucket-name"
+export BUCKET_ANYAGENTS="your-bucket-name"
 ```
 
 ### E2B API Key

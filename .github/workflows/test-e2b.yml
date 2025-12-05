@@ -61,7 +61,7 @@ jobs:
 
     - name: Run E2B tests
       env:
-        BUCKET_PROMPT_TO_DRAFT: ${{ secrets.BUCKET_PROMPT_TO_DRAFT }}
+        BUCKET_ANYAGENTS: ${{ secrets.BUCKET_ANYAGENTS }}
         E2B_API_KEY: ${{ secrets.E2B_API_KEY }}
         PROMPTTODRAFT_GITHUB_API_KEY: ${{ secrets.PROMPTTODRAFT_GITHUB_API_KEY }}
         PROMPTTODRAFT_GITHUB_STATE_REPO: ${{ secrets.PROMPTTODRAFT_GITHUB_STATE_REPO }}
