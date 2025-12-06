@@ -25,7 +25,7 @@ The original codebase had Python/UV hardcoded in multiple places, making it diff
 A `Preset` defines the development environment: **tools** and **project initialization**.
 
 ```
-src/anyagents/presets/
+src/omniagents/presets/
 ├── base.py       # Preset ABC + InitResult dataclass
 ├── python.py     # PythonUVPreset, PythonPipPreset
 ├── generic.py    # GenericPreset (no special tools)
@@ -103,10 +103,10 @@ class AgentFactory(ABC, Generic[TModel, TNativeTool]):
 ### Basic Usage
 
 ```python
-from anyagents.agents.langchain_agent import LangChainAgent
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import NoOpStateManager
-from anyagents.presets.python import PythonUVPreset
+from omniagents.agents.langchain_agent import LangChainAgent
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import NoOpStateManager
+from omniagents.presets.python import PythonUVPreset
 
 backend = LocalBackend(project_id="my-app", state_manager=NoOpStateManager())
 
@@ -122,8 +122,8 @@ agent.run("Create a FastAPI server")
 ### Docker with Preset's Suggested Image
 
 ```python
-from anyagents.backends.docker_backend import DockerBackend
-from anyagents.presets.python import PythonUVPreset
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.presets.python import PythonUVPreset
 
 preset = PythonUVPreset()
 
@@ -139,7 +139,7 @@ agent = LangChainAgent(backend=backend, model=model, preset=preset)
 ### Custom Docker Image
 
 ```python
-from anyagents.presets.generic import GenericPreset
+from omniagents.presets.generic import GenericPreset
 
 backend = DockerBackend(
     project_id="my-rust-app",
@@ -179,7 +179,7 @@ agent = LangChainAgent(
 ### Using Just Backend + Preset (No Agent)
 
 ```python
-from anyagents.presets.python import PythonUVPreset
+from omniagents.presets.python import PythonUVPreset
 
 backend = DockerBackend(...)
 preset = PythonUVPreset()
@@ -238,7 +238,7 @@ backend.shutdown()
 
 ```python
 # presets/node.py
-from anyagents.presets.base import Preset, InitResult
+from omniagents.presets.base import Preset, InitResult
 
 class NodeNPMPreset(Preset):
     name = "node-npm"

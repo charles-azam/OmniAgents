@@ -27,29 +27,29 @@ from pathlib import Path
 
 import pytest
 
-from anyagents.test_utils import cleanup_test_environment
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.docker_backend import DockerBackend
-from anyagents.backends.e2b_backend import E2BBackend
-from anyagents.backends.execution_backend import ExecutionBackend, BackendStatus
-from anyagents.backends.state_manager import (
+from omniagents.test_utils import cleanup_test_environment
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.backends.e2b_backend import E2BBackend
+from omniagents.backends.execution_backend import ExecutionBackend, BackendStatus
+from omniagents.backends.state_manager import (
     NoOpStateManager,
     GitStateManager,
     GCSStateManager,
 )
 
-from anyagents.tools.list_directory_tool import ListDirectoryTool, ListDirectoryInput
-from anyagents.tools.read_file_tool import ReadFileTool, ReadFileInput
-from anyagents.tools.write_file_tool import WriteFileTool, WriteFileInput
-from anyagents.tools.glob_tool import GlobTool, GlobInput
-from anyagents.tools.search_file_content_tool import SearchFileContentTool, SearchFileContentInput
-from anyagents.tools.replace_tool import ReplaceTool, ReplaceInput
-from anyagents.tools.run_shell_command_tool import RunShellCommandTool, RunShellCommandInput
-from anyagents.tools.read_many_files_tool import ReadManyFilesTool, ReadManyFilesInput
-from anyagents.tools.save_memory_tool import SaveMemoryTool, SaveMemoryInput
-from anyagents.tools.uv_tool import UVTool, UVInput
+from omniagents.tools.list_directory_tool import ListDirectoryTool, ListDirectoryInput
+from omniagents.tools.read_file_tool import ReadFileTool, ReadFileInput
+from omniagents.tools.write_file_tool import WriteFileTool, WriteFileInput
+from omniagents.tools.glob_tool import GlobTool, GlobInput
+from omniagents.tools.search_file_content_tool import SearchFileContentTool, SearchFileContentInput
+from omniagents.tools.replace_tool import ReplaceTool, ReplaceInput
+from omniagents.tools.run_shell_command_tool import RunShellCommandTool, RunShellCommandInput
+from omniagents.tools.read_many_files_tool import ReadManyFilesTool, ReadManyFilesInput
+from omniagents.tools.save_memory_tool import SaveMemoryTool, SaveMemoryInput
+from omniagents.tools.uv_tool import UVTool, UVInput
 
-from anyagents.outputs.outputs import (
+from omniagents.outputs.outputs import (
     FileListOutputModel,
     TextOutputModel,
     ErrorOutputModel,
@@ -304,7 +304,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         assert isinstance(result, TextOutputModel)
         assert "saved" in result.content.lower()
 
-        result = memory_tool.execute(inputs=SaveMemoryInput(fact="Project name is anyagents"))
+        result = memory_tool.execute(inputs=SaveMemoryInput(fact="Project name is omniagents"))
         assert isinstance(result, TextOutputModel)
         assert "saved" in result.content.lower()
 
@@ -316,7 +316,7 @@ def run_tools_e2e_test(backend: ExecutionBackend):
         uv_tool = UVTool(backend=backend)
 
         # Initialize project first (creates pyproject.toml)
-        from anyagents.presets.python import PythonUVPreset
+        from omniagents.presets.python import PythonUVPreset
         preset = PythonUVPreset()
         init_result = preset.initialize_project(backend=backend)
         assert init_result.success is True

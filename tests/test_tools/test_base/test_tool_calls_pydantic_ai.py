@@ -8,10 +8,10 @@ from pydantic_ai import Agent, Tool as PydanticAITool
 from pydantic_ai.models.huggingface import HuggingFaceModel
 from pydantic_ai.providers.huggingface import HuggingFaceProvider
 
-from anyagents.tools.base_tool import CoreBackendTool, CoreTool
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import NoOpStateManager
-from anyagents.agents.pydantic_ai_agent import get_pydantic_ai_model_example
+from omniagents.tools.base_tool import CoreBackendTool, CoreTool
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import NoOpStateManager
+from omniagents.agents.pydantic_ai_agent import get_pydantic_ai_model_example
 
 
 def test_pydantic_ai_tool_created_correctly():
@@ -99,8 +99,8 @@ def test_pydantic_ai_tool_backend_created_correctly():
 
 def test_pydantic_ai_tool_backend_works_correctly():
     """Test that CoreBackendTool converts correctly to pydantic_ai tool and can use backend to write files."""
-    from anyagents.tools.write_file_tool import WriteFileTool
-    from anyagents.outputs.outputs import TextOutputModel
+    from omniagents.tools.write_file_tool import WriteFileTool
+    from omniagents.outputs.outputs import TextOutputModel
 
     # Create local backend with NoOp state manager for testing
     state_manager = NoOpStateManager()
@@ -313,16 +313,16 @@ def test_tools_strict_true_compatibility():
     This test tries to create tools with strict=True and checks if
     any of them fail or cause issues.
     """
-    from anyagents.tools.write_file_tool import WriteFileTool
-    from anyagents.tools.read_file_tool import ReadFileTool
-    from anyagents.tools.list_directory_tool import ListDirectoryTool
-    from anyagents.tools.glob_tool import GlobTool
-    from anyagents.tools.search_file_content_tool import SearchFileContentTool
-    from anyagents.tools.replace_tool import ReplaceTool
-    from anyagents.tools.run_shell_command_tool import RunShellCommandTool
-    from anyagents.tools.read_many_files_tool import ReadManyFilesTool
-    from anyagents.tools.save_memory_tool import SaveMemoryTool
-    from anyagents.tools.uv_tool import UVTool
+    from omniagents.tools.write_file_tool import WriteFileTool
+    from omniagents.tools.read_file_tool import ReadFileTool
+    from omniagents.tools.list_directory_tool import ListDirectoryTool
+    from omniagents.tools.glob_tool import GlobTool
+    from omniagents.tools.search_file_content_tool import SearchFileContentTool
+    from omniagents.tools.replace_tool import ReplaceTool
+    from omniagents.tools.run_shell_command_tool import RunShellCommandTool
+    from omniagents.tools.read_many_files_tool import ReadManyFilesTool
+    from omniagents.tools.save_memory_tool import SaveMemoryTool
+    from omniagents.tools.uv_tool import UVTool
     from pydantic_ai.tools import _function_schema, _utils
     from pydantic_core import SchemaValidator
     from pydantic_core import core_schema
