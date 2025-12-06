@@ -89,7 +89,7 @@ class SearchFileContentTool(CoreBackendTool[SearchFileContentInput, ToolOutputMo
 
         # Parse grep output and format it
         lines = result.output.strip().split("\n")
-        matches_by_file = {}
+        matches_by_file: dict[str, list[tuple[str, str]]] = {}
 
         for line in lines:
             # Parse grep output: file:line:content or file-line-content

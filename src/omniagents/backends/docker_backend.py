@@ -113,7 +113,7 @@ class DockerBackend(ExecutionBackend):
             container_kwargs["user"] = f"{os.getuid()}:{os.getgid()}"
 
         # Create and start container with volume mount
-        self._container = self._client.containers.run(**container_kwargs)
+        self._container = self._client.containers.run(**container_kwargs)  # type: ignore[call-overload]
 
         self._status = BackendStatus.RUNNING
         # Load existing files from state manager if any

@@ -20,7 +20,7 @@ from omniagents.tools.read_many_files_tool import ReadManyFilesTool
 from omniagents.tools.save_memory_tool import SaveMemoryTool
 
 
-CORE_TOOLS: tuple[type[CoreBackendTool], ...] = (
+CORE_TOOLS: tuple[type[CoreBackendTool], ...] = (  # type: ignore[type-arg]
     WriteFileTool,
     ReadFileTool,
     ListDirectoryTool,
@@ -80,7 +80,7 @@ class AgentFactory(ABC, Generic[TModel, TNativeTool]):
         backend: ExecutionBackend,
         model: TModel,
         preset: Preset | None = None,
-        extra_tool_classes: list[type[CoreBackendTool]] | None = None,
+        extra_tool_classes: list[type[CoreBackendTool]] | None = None,  # type: ignore[type-arg]
         native_tools: list[TNativeTool] | None = None,
     ) -> None:
         self.backend = backend
@@ -91,9 +91,9 @@ class AgentFactory(ABC, Generic[TModel, TNativeTool]):
 
         self.tools: list[TNativeTool] = self._build_tools()
 
-    def _get_all_tool_classes(self) -> list[type[CoreBackendTool]]:
+    def _get_all_tool_classes(self) -> list[type[CoreBackendTool]]:  # type: ignore[type-arg]
         """Collect all CoreBackendTool classes: core + preset + extra."""
-        classes: list[type[CoreBackendTool]] = list(CORE_TOOLS)
+        classes: list[type[CoreBackendTool]] = list(CORE_TOOLS)  # type: ignore[type-arg]
         classes.extend(self.preset.tool_classes)
         classes.extend(self._extra_tool_classes)
         return classes
@@ -111,7 +111,7 @@ class AgentFactory(ABC, Generic[TModel, TNativeTool]):
         return tools
 
     @abstractmethod
-    def _convert_tool(self, tool: CoreBackendTool) -> TNativeTool:
+    def _convert_tool(self, tool: CoreBackendTool) -> TNativeTool:  # type: ignore[type-arg]
         """
         Convert a CoreBackendTool instance to native framework format.
 

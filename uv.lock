@@ -3049,6 +3049,75 @@ wheels = [
 ]
 
 [[package]]
+name = "omniagents"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "beartype" },
+    { name = "cadquery" },
+    { name = "docker" },
+    { name = "e2b-code-interpreter" },
+    { name = "google-api-python-client" },
+    { name = "google-cloud-secret-manager" },
+    { name = "google-cloud-storage" },
+    { name = "huggingface-hub" },
+    { name = "ipykernel" },
+    { name = "langchain" },
+    { name = "langchain-huggingface" },
+    { name = "langchain-openai" },
+    { name = "langchain-xai" },
+    { name = "langsmith" },
+    { name = "litellm" },
+    { name = "loguru" },
+    { name = "mypy" },
+    { name = "openai-agents" },
+    { name = "pydantic" },
+    { name = "pydantic-ai", extra = ["examples"] },
+    { name = "pygithub" },
+    { name = "pyinstrument" },
+    { name = "pytest" },
+    { name = "ruff" },
+    { name = "smolagents", extra = ["telemetry", "toolkit"] },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "types-docker" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "beartype", specifier = ">=0.22.7" },
+    { name = "cadquery", specifier = ">=2.6.0" },
+    { name = "docker", specifier = ">=7.1.0" },
+    { name = "e2b-code-interpreter", specifier = ">=1.0.0" },
+    { name = "google-api-python-client", specifier = ">=2.179.0" },
+    { name = "google-cloud-secret-manager", specifier = ">=2.24.0" },
+    { name = "google-cloud-storage", specifier = ">=3.3.0" },
+    { name = "huggingface-hub", specifier = ">=0.20.0" },
+    { name = "ipykernel", specifier = ">=7.0.1" },
+    { name = "langchain", specifier = ">=1.1" },
+    { name = "langchain-huggingface", specifier = ">=0.1.0" },
+    { name = "langchain-openai", specifier = ">=0.2.0" },
+    { name = "langchain-xai", specifier = ">=0.2.0" },
+    { name = "langsmith", specifier = ">=0.2.0" },
+    { name = "litellm", specifier = ">=1.78.2" },
+    { name = "loguru", specifier = ">=0.7.3" },
+    { name = "mypy", specifier = ">=1.11.0" },
+    { name = "openai-agents", specifier = ">=0.3.3" },
+    { name = "pydantic", specifier = ">=2.12.0" },
+    { name = "pydantic-ai", extras = ["examples"], specifier = ">=1.25" },
+    { name = "pygithub", specifier = ">=2.5.0" },
+    { name = "pyinstrument", specifier = ">=5.1.1" },
+    { name = "pytest", specifier = ">=8.4.2" },
+    { name = "ruff", specifier = ">=0.6.0" },
+    { name = "smolagents", extras = ["telemetry", "toolkit"] },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "types-docker", specifier = ">=7.1.0.20251202" }]
+
+[[package]]
 name = "openai"
 version = "2.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3533,7 +3602,7 @@ name = "pexpect"
 version = "4.9.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "ptyprocess" },
+    { name = "ptyprocess", marker = "sys_platform != 'win32'" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz", hash = "sha256:ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f", size = 166450 }
 wheels = [
@@ -3660,67 +3729,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/a1/96/06e01a7b38dce6fe1db213e061a4602dd6032a8a97ef6c1a862537732421/prompt_toolkit-3.0.52.tar.gz", hash = "sha256:28cde192929c8e7321de85de1ddbe736f1375148b02f2e17edd840042b1be855", size = 434198 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/84/03/0d3ce49e2505ae70cf43bc5bb3033955d2fc9f932163e84dc0779cc47f48/prompt_toolkit-3.0.52-py3-none-any.whl", hash = "sha256:9aac639a3bbd33284347de5ad8d68ecc044b91a762dc39b7c21095fcd6a19955", size = 391431 },
-]
-
-[[package]]
-name = "omniagents"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "beartype" },
-    { name = "cadquery" },
-    { name = "docker" },
-    { name = "e2b-code-interpreter" },
-    { name = "google-api-python-client" },
-    { name = "google-cloud-secret-manager" },
-    { name = "google-cloud-storage" },
-    { name = "huggingface-hub" },
-    { name = "ipykernel" },
-    { name = "langchain" },
-    { name = "langchain-huggingface" },
-    { name = "langchain-openai" },
-    { name = "langchain-xai" },
-    { name = "langsmith" },
-    { name = "litellm" },
-    { name = "loguru" },
-    { name = "mypy" },
-    { name = "openai-agents" },
-    { name = "pydantic" },
-    { name = "pydantic-ai", extra = ["examples"] },
-    { name = "pygithub" },
-    { name = "pyinstrument" },
-    { name = "pytest" },
-    { name = "ruff" },
-    { name = "smolagents", extra = ["telemetry", "toolkit"] },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "beartype", specifier = ">=0.22.7" },
-    { name = "cadquery", specifier = ">=2.6.0" },
-    { name = "docker", specifier = ">=7.1.0" },
-    { name = "e2b-code-interpreter", specifier = ">=1.0.0" },
-    { name = "google-api-python-client", specifier = ">=2.179.0" },
-    { name = "google-cloud-secret-manager", specifier = ">=2.24.0" },
-    { name = "google-cloud-storage", specifier = ">=3.3.0" },
-    { name = "huggingface-hub", specifier = ">=0.20.0" },
-    { name = "ipykernel", specifier = ">=7.0.1" },
-    { name = "langchain", specifier = ">=1.1" },
-    { name = "langchain-huggingface", specifier = ">=0.1.0" },
-    { name = "langchain-openai", specifier = ">=0.2.0" },
-    { name = "langchain-xai", specifier = ">=0.2.0" },
-    { name = "langsmith", specifier = ">=0.2.0" },
-    { name = "litellm", specifier = ">=1.78.2" },
-    { name = "loguru", specifier = ">=0.7.3" },
-    { name = "mypy", specifier = ">=1.11.0" },
-    { name = "openai-agents", specifier = ">=0.3.3" },
-    { name = "pydantic", specifier = ">=2.12.0" },
-    { name = "pydantic-ai", extras = ["examples"], specifier = ">=1.25" },
-    { name = "pygithub", specifier = ">=2.5.0" },
-    { name = "pyinstrument", specifier = ">=5.1.1" },
-    { name = "pytest", specifier = ">=8.4.2" },
-    { name = "ruff", specifier = ">=0.6.0" },
-    { name = "smolagents", extras = ["telemetry", "toolkit"] },
 ]
 
 [[package]]
@@ -5265,6 +5273,32 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/52/68/943c3aeaf14624712a0357c4a67814dba5cea36d194f5c764dad7959a00c/types-certifi-2021.10.8.3.tar.gz", hash = "sha256:72cf7798d165bc0b76e1c10dd1ea3097c7063c42c21d664523b928e88b554a4f", size = 2095 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b5/63/2463d89481e811f007b0e1cd0a91e52e141b47f9de724d20db7b861dcfec/types_certifi-2021.10.8.3-py3-none-any.whl", hash = "sha256:b2d1e325e69f71f7c78e5943d410e650b4707bb0ef32e4ddf3da37f54176e88a", size = 2136 },
+]
+
+[[package]]
+name = "types-docker"
+version = "7.1.0.20251202"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "types-paramiko" },
+    { name = "types-requests" },
+    { name = "urllib3" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/01/ca/99810ea0f5eb76033bccf76c393e6576dcdaacdf4fe222fc72cb2bc36e12/types_docker-7.1.0.20251202.tar.gz", hash = "sha256:eeaead73e4b1de072f812a1fa70bfbe0cce23004e660b764d1a57cf22f6e1d00", size = 32437 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/cd/86a247ef8ed4316fd305d2f625583800b2a4632ced78911c210c4cf41b52/types_docker-7.1.0.20251202-py3-none-any.whl", hash = "sha256:f8295e284b31319afe0457b768b5c26508c61ddedab4adcb754dfbb1d23433a1", size = 47120 },
+]
+
+[[package]]
+name = "types-paramiko"
+version = "4.0.0.20250822"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b7/b8/c6ff3b10c2f7b9897650af746f0dc6c5cddf054db857bc79d621f53c7d22/types_paramiko-4.0.0.20250822.tar.gz", hash = "sha256:1b56b0cbd3eec3d2fd123c9eb2704e612b777e15a17705a804279ea6525e0c53", size = 28730 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/79/a1/b3774ed924a66ee2c041224d89c36f0c21f4f6cf75036d6ee7698bf8a4b9/types_paramiko-4.0.0.20250822-py3-none-any.whl", hash = "sha256:55bdb14db75ca89039725ec64ae3fa26b8d57b6991cfb476212fa8f83a59753c", size = 38833 },
 ]
 
 [[package]]

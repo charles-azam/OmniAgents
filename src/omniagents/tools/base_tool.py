@@ -14,7 +14,7 @@ from pydantic import BaseModel
 
 from omniagents.backends.execution_backend import ExecutionBackend
 from omniagents.outputs.outputs import ToolOutputModel
-from smolagents.tools import Tool as SmolagentsTool
+from smolagents.tools import Tool as SmolagentsTool  # type: ignore[import-untyped]
 from langchain_core.tools import StructuredTool as LangChainTool
 from pydantic_ai import Tool as PydanticAITool
 
@@ -58,7 +58,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
     def execute_unpacked(self, **kwargs: Any) -> TOutput:
         input_model = self.get_input_model()
         pydantic_inputs = input_model.model_validate(kwargs)
-        return self.execute(inputs=pydantic_inputs)
+        return self.execute(inputs=pydantic_inputs)  # type: ignore[arg-type]
     
     @classmethod
     def get_input_model(cls) -> type[BaseModel]:
@@ -78,7 +78,8 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                 if origin is CoreTool or (origin is not None and issubclass(origin, CoreTool)):
                     args = get_args(base)
                     if args and len(args) >= 1:
-                        return args[0]
+                        result: type[BaseModel] = args[0]
+                        return result
         raise TypeError(f"{cls.__name__} must specify Generic parameters: CoreTool[InputModel, OutputModel]")
 
     @classmethod
@@ -99,12 +100,13 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                 if origin is CoreTool or (origin is not None and issubclass(origin, CoreTool)):
                     args = get_args(base)
                     if args and len(args) >= 2:
-                        return args[1]
+                        result: type[ToolOutputModel] = args[1]
+                        return result
         raise TypeError(f"{cls.__name__} must specify Generic parameters: CoreTool[InputModel, OutputModel]")
 
 
     @classmethod
-    def get_input_schema(cls) -> dict:
+    def get_input_schema(cls) -> dict[str, Any]:
         """
         Get JSON Schema for this tool's inputs.
 
@@ -114,7 +116,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         return cls.get_input_model().model_json_schema()
 
     @classmethod
-    def get_output_schema(cls) -> dict:
+    def get_output_schema(cls) -> dict[str, Any]:
         """
         Get JSON Schema for this tool's outputs.
 
@@ -124,7 +126,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         return cls.get_output_model().model_json_schema()
 
     @classmethod
-    def get_tool_definition(cls) -> dict:
+    def get_tool_definition(cls) -> dict[str, Any]:
         """
         Get complete tool definition for adapter generation.
 
@@ -184,7 +186,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
                             param_def["description"] = f"Parameter {param_name}"
                     smolagents_inputs[param_name] = param_def
 
-        class CustomSmolagentsTool(SmolagentsTool):
+        class CustomSmolagentsTool(SmolagentsTool):  # type: ignore[misc]
             name = main_class_self.name
             description = main_class_self.description
             inputs = smolagents_inputs
@@ -228,7 +230,7 @@ class CoreTool(ABC, Generic[TInput, TOutput]):
         Returns:
             A Pydantic-AI tool instance.
         """
-        from pydantic_ai.tools import _function_schema, _utils
+        from pydantic_ai.tools import _function_schema, _utils  # type: ignore[attr-defined]
         from pydantic_core import SchemaValidator
         from pydantic_core import core_schema
 

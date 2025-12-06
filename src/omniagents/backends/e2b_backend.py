@@ -6,10 +6,10 @@ This module implements the ExecutionBackend for E2B sandbox execution.
 from pathlib import Path
 
 from beartype import beartype
-from e2b_code_interpreter import Sandbox
-from e2b.sandbox.filesystem.filesystem import FileType as E2BFileType
-from e2b.sandbox.commands.command_handle import CommandExitException
-from e2b.exceptions import NotFoundException
+from e2b_code_interpreter import Sandbox  # type: ignore[import-untyped]
+from e2b.sandbox.filesystem.filesystem import FileType as E2BFileType  # type: ignore[import-untyped]
+from e2b.sandbox.commands.command_handle import CommandExitException  # type: ignore[import-untyped]
+from e2b.exceptions import NotFoundException  # type: ignore[import-untyped]
 
 from omniagents.backends.execution_backend import (
     ExecutionBackend,
@@ -123,7 +123,8 @@ class E2BBackend(ExecutionBackend):
 
         sandbox_path = self._to_system_path(file_path)
         try:
-            return self._sandbox.files.read(path=str(sandbox_path))
+            result: str = self._sandbox.files.read(path=str(sandbox_path))
+            return result
         except NotFoundException as e:
             raise FileNotFoundError(str(e)) from e
 

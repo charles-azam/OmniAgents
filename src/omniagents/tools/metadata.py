@@ -17,7 +17,7 @@ class ToolMetadata:
     output_type: str
     metadata: dict[str, str | int | bool] = field(default_factory=dict)
 
-    def to_smolagents_format(self) -> dict[str, str | dict]:
+    def to_smolagents_format(self) -> dict[str, str | dict[str, dict[str, str | bool | None]]]:
         """
         Convert metadata to smolagents Tool format.
 
