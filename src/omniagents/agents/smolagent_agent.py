@@ -1,8 +1,8 @@
 """
 Smolagents-based coding agent implementation.
 """
-from smolagents import ToolCallingAgent, OpenAIModel, InferenceClientModel
-from smolagents.tools import Tool as SmolagentsTool
+from smolagents import ToolCallingAgent, OpenAIModel, InferenceClientModel  # type: ignore[import-untyped]
+from smolagents.tools import Tool as SmolagentsTool  # type: ignore[import-untyped]
 
 from omniagents.agents.base import AgentFactory
 from omniagents.tools.base_tool import CoreBackendTool
@@ -45,7 +45,7 @@ class SmolagentsAgent(AgentFactory[OpenAIModel | InferenceClientModel, Smolagent
         backend: ExecutionBackend,
         model: OpenAIModel | InferenceClientModel,
         preset: Preset | None = None,
-        extra_tool_classes: list[type[CoreBackendTool]] | None = None,
+        extra_tool_classes: list[type[CoreBackendTool]] | None = None,  # type: ignore[type-arg]
         native_tools: list[SmolagentsTool] | None = None,
         max_steps: int = 30,
     ) -> None:
@@ -58,7 +58,7 @@ class SmolagentsAgent(AgentFactory[OpenAIModel | InferenceClientModel, Smolagent
             native_tools=native_tools,
         )
 
-    def _convert_tool(self, tool: CoreBackendTool) -> SmolagentsTool:
+    def _convert_tool(self, tool: CoreBackendTool) -> SmolagentsTool:  # type: ignore[type-arg]
         return tool.to_smolagents_tool()
 
     def _run_agent(self, task: str) -> str:
@@ -73,5 +73,5 @@ class SmolagentsAgent(AgentFactory[OpenAIModel | InferenceClientModel, Smolagent
             instructions=instructions,
         )
 
-        result = agent.run(task=task)
+        result: str = agent.run(task=task)
         return result

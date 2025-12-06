@@ -19,6 +19,8 @@ from omniagents import storage_utils
 
 if TYPE_CHECKING:
     from omniagents.backends.execution_backend import ExecutionBackend
+    from github import Github
+    from github.Repository import Repository
 
 
 class StorageType(Enum):
@@ -71,7 +73,7 @@ class StateManager(ABC):
         pass
 
     @abstractmethod
-    def list_snapshots(self, project_id: str) -> list[dict]:
+    def list_snapshots(self, project_id: str) -> list[dict[str, str | int]]:
         """
         List all available snapshots with metadata.
 
@@ -149,14 +151,18 @@ class GCSStateManager(StateManager):
 
         # Download archive as bytes
         archive_path = GCP_DATA_PATH / latest_archive.name
-        archive_bytes = storage_utils.read_from_storage(file_path=archive_path, as_bytes=True)
+        archive_bytes_result = storage_utils.read_from_storage(file_path=archive_path, as_bytes=True)
+        assert isinstance(archive_bytes_result, bytes), "Expected bytes from storage"
+        archive_bytes = archive_bytes_result
 
         # Extract archive to working directory
         tar_buffer = io.BytesIO(archive_bytes)
         with tarfile.open(fileobj=tar_buffer, mode='r:gz') as tar:
             for member in tar.getmembers():
                 if member.isfile():
-                    file_content = tar.extractfile(member).read().decode('utf-8')
+                    extracted = tar.extractfile(member)
+                    assert extracted is not None, "Expected file content"
+                    file_content = extracted.read().decode('utf-8')
                     dest_path = working_dir / member.name
                     backend.write_file(file_path=dest_path, content=file_content)
 
@@ -180,7 +186,7 @@ class GCSStateManager(StateManager):
             except Exception:
                 pass
 
-    def list_snapshots(self, project_id: str) -> list[dict]:
+    def list_snapshots(self, project_id: str) -> list[dict[str, str | int]]:
         """List all archive snapshots for this project."""
         bucket = storage_utils.get_bucket()
         prefix = f"{project_id}/"
@@ -188,7 +194,7 @@ class GCSStateManager(StateManager):
         # List all archives and extract timestamps from filenames
         archives = [blob for blob in bucket.list_blobs(prefix=prefix) if blob.name.endswith('.tar.gz')]
 
-        snapshots = []
+        snapshots: list[dict[str, str | int]] = []
         for archive in archives:
             # Extract timestamp from filename: project_id/timestamp.tar.gz
             # archive.name is like "project_id/20251205_165713_634291.tar.gz"
@@ -225,7 +231,9 @@ class GitStateManager(StateManager):
             branch_prefix: Prefix for state branches (default: "state/")
             github_token: GitHub personal access token (defaults to env GITHUB_TOKEN)
         """
-        self.repo_url = repo_url or os.getenv("OMNIAGENTS_GITHUB_STATE_REPO", "charlesazam/omniagents-states")
+        repo_url_value = repo_url or os.getenv("OMNIAGENTS_GITHUB_STATE_REPO", "charlesazam/omniagents-states")
+        assert repo_url_value is not None, "repo_url must be provided or OMNIAGENTS_GITHUB_STATE_REPO env var must be set"
+        self.repo_url = repo_url_value
 
         # Normalize repo URL to full format
         if not self.repo_url.startswith("http"):
@@ -235,11 +243,13 @@ class GitStateManager(StateManager):
             self.repo_url += ".git"
 
         self.branch_prefix = branch_prefix
-        self.github_token = github_token or os.getenv("OMNIAGENTS_GITHUB_API_KEY")
+        github_token_env = os.getenv("OMNIAGENTS_GITHUB_API_KEY")
+        self.github_token = github_token or github_token_env
 
         # Extract owner/repo from URL for API calls
         # https://github.com/owner/repo.git -> owner/repo
-        self.repo_path = self.repo_url.replace("https://github.com/", "").replace(".git", "")
+        repo_path_temp = self.repo_url.replace("https://github.com/", "").replace(".git", "")
+        self.repo_path: str = repo_path_temp
 
     def _get_branch_name(self, project_id: str) -> str:
         """Convert project_id to branch name."""
@@ -388,13 +398,14 @@ class GitStateManager(StateManager):
             return False
 
     @cached_property
-    def _github_client(self):
+    def _github_client(self) -> "Github":
         """Get cached GitHub client."""
         from github import Github, Auth
-        return Github(auth=Auth.Token(token=self.github_token))
+        token = self.github_token or ""
+        return Github(auth=Auth.Token(token=token))
 
     @cached_property
-    def _github_repo(self):
+    def _github_repo(self) -> "Repository":
         """Get cached GitHub repository."""
         return self._github_client.get_repo(full_name_or_id=self.repo_path)
 
@@ -418,7 +429,7 @@ class GitStateManager(StateManager):
             # Branch doesn't exist, nothing to delete
             pass
 
-    def list_snapshots(self, project_id: str) -> list[dict]:
+    def list_snapshots(self, project_id: str) -> list[dict[str, str | int]]:
         """List all commits on the project branch."""
         if not self.github_token:
             # No token, cannot list commits
@@ -435,7 +446,7 @@ class GitStateManager(StateManager):
             branch = repo.get_branch(branch=branch_name)
             commits = repo.get_commits(sha=branch.commit.sha)
 
-            snapshots = []
+            snapshots: list[dict[str, str | int]] = []
             for commit in commits:
                 snapshots.append({
                     "id": commit.sha,
@@ -465,6 +476,6 @@ class NoOpStateManager(StateManager):
         """No-op cleanup."""
         pass
 
-    def list_snapshots(self, project_id: str) -> list[dict]:
+    def list_snapshots(self, project_id: str) -> list[dict[str, str | int]]:
         """No-op list."""
         return []

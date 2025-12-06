@@ -115,10 +115,10 @@ class ExecutionBackend(ABC):
         """
         return self._state_manager.load_latest(backend=self)
 
-    def list_snapshots(self) -> list[dict]:
+    def list_snapshots(self) -> list[dict[str, str | int]]:
         """
         List all available snapshots with metadata.
-        
+
         Used only for testing.
 
         Returns:

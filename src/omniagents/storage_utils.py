@@ -17,7 +17,7 @@ from loguru import logger
 from omniagents.common import GCP_DATA_PATH
 
 if TYPE_CHECKING:
-    from google.cloud import storage
+    from google.cloud import storage  # type: ignore[import-untyped]
 
 load_dotenv()
 
@@ -113,8 +113,10 @@ def _read_from_bucket(blob_name: str, as_bytes: bool = False) -> str | bytes:
     bucket = get_bucket()
     blob = bucket.blob(blob_name=blob_name)
     if as_bytes:
-        return blob.download_as_bytes()
-    return blob.download_as_text()
+        result: bytes = blob.download_as_bytes()
+        return result
+    result_str: str = blob.download_as_text()
+    return result_str
 
 
 def read_from_storage(file_path: Path, as_bytes: bool = False) -> str | bytes:
@@ -161,7 +163,8 @@ def file_exists_in_storage(file_path: Path, force_rewrite: bool = False) -> bool
     bucket = get_bucket()
     relative_path = file_path.relative_to(GCP_DATA_PATH)
     blob = bucket.blob(blob_name=relative_path.as_posix())
-    return blob.exists()
+    result: bool = blob.exists()
+    return result
 
 
 def delete_from_storage(file_path: Path) -> bool:

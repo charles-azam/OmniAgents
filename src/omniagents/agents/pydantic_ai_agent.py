@@ -53,7 +53,7 @@ class PydanticAIAgent(AgentFactory[OpenAIChatModel, PydanticAITool]):
         backend: ExecutionBackend,
         model: OpenAIChatModel,
         preset: Preset | None = None,
-        extra_tool_classes: list[type[CoreBackendTool]] | None = None,
+        extra_tool_classes: list[type[CoreBackendTool]] | None = None,  # type: ignore[type-arg]
         native_tools: list[PydanticAITool] | None = None,
         enable_logfire: bool = False,
     ) -> None:
@@ -66,7 +66,7 @@ class PydanticAIAgent(AgentFactory[OpenAIChatModel, PydanticAITool]):
             native_tools=native_tools,
         )
 
-    def _convert_tool(self, tool: CoreBackendTool) -> PydanticAITool:
+    def _convert_tool(self, tool: CoreBackendTool) -> PydanticAITool:  # type: ignore[type-arg]
         return tool.to_pydantic_ai_tool()
 
     def _run_agent(self, task: str) -> str:

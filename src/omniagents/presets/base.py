@@ -56,7 +56,7 @@ class Preset(ABC):
 
     name: str
     docker_image: str | None = None
-    tool_classes: tuple[type["CoreBackendTool"], ...] = ()
+    tool_classes: tuple[type["CoreBackendTool"], ...] = ()  # type: ignore[type-arg]
 
     @abstractmethod
     def initialize_project(self, backend: "ExecutionBackend") -> InitResult:

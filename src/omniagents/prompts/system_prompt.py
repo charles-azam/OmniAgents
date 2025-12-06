@@ -44,7 +44,7 @@ def get_directory_structure(backend: "ExecutionBackend", start_path: str, ignore
 
     # Create formatted string
     structure = f"- {start_path}/\n"
-    dir_structure = []
+    dir_structure: list[str] = []
     max_files = 100
     file_count = 0
 

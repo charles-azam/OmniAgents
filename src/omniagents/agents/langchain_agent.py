@@ -1,12 +1,15 @@
 """
 LangChain-based coding agent implementation.
 """
+from typing import Any
+
 from langchain_openai import ChatOpenAI
 from langchain.agents import create_agent
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.tools import BaseTool as LangChainTool
 from langsmith import traceable
 import os
+from pydantic import SecretStr
 
 from omniagents.agents.base import AgentFactory
 from omniagents.tools.base_tool import CoreBackendTool
@@ -16,7 +19,7 @@ def get_langchain_model_example(model_name: str = "openai/gpt-oss-120b:cerebras"
     if "gpt-5" in model_name:
         return ChatOpenAI(model=model_name)
     elif "gpt-oss-120b" in model_name:
-        return ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=os.environ["HF_TOKEN"], model=model_name)
+        return ChatOpenAI(base_url="https://router.huggingface.co/v1", api_key=SecretStr(os.environ["HF_TOKEN"]), model=model_name)
     else:
         raise ValueError(f"Invalid model name: {model_name}")
 
@@ -41,18 +44,19 @@ class LangChainAgent(AgentFactory[BaseChatModel, LangChainTool]):
         result = agent.run("Create a FastAPI server")
     """
 
-    def _convert_tool(self, tool: CoreBackendTool) -> LangChainTool:
+    def _convert_tool(self, tool: CoreBackendTool) -> LangChainTool:  # type: ignore[type-arg]
         return tool.to_langchain_tool()
 
     @traceable
     def _run_agent(self, task: str) -> str:
-        agent_executor = create_agent(model=self.model, tools=self.tools)
-        result = agent_executor.invoke(input={"messages": [("user", task)]})
+        agent_executor: Any = create_agent(model=self.model, tools=self.tools)
+        result: Any = agent_executor.invoke(input={"messages": [("user", task)]})
 
         if "messages" in result:
             last_message = result["messages"][-1]
             if hasattr(last_message, "content"):
-                return last_message.content
+                content: str = last_message.content
+                return content
             return str(last_message)
 
         return str(result)
