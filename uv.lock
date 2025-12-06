@@ -3663,7 +3663,7 @@ wheels = [
 ]
 
 [[package]]
-name = "anyagents"
+name = "omniagents"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

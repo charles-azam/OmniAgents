@@ -11,15 +11,15 @@ from e2b.sandbox.filesystem.filesystem import FileType as E2BFileType
 from e2b.sandbox.commands.command_handle import CommandExitException
 from e2b.exceptions import NotFoundException
 
-from anyagents.backends.execution_backend import (
+from omniagents.backends.execution_backend import (
     ExecutionBackend,
     BackendStatus,
     FileType,
     FileInfo,
     CommandResult,
 )
-from anyagents.backends.state_manager import StateManager
-from anyagents.common import GCP_DATA_PATH
+from omniagents.backends.state_manager import StateManager
+from omniagents.common import GCP_DATA_PATH
 
 DEFAULT_TIMEOUT = 120  # 2 minutes in seconds
 SANDBOX_TIMEOUT = 3600  # 1 hour for sandbox lifetime

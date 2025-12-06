@@ -10,16 +10,16 @@ Key benefits:
 - Type-safe parameter handling
 - Consistent behavior across frameworks
 """
-from anyagents.adapters.generator import (
+from omniagents.adapters.generator import (
     generate_smolagents_tools,
     generate_langchain_tools,
     generate_pydantic_ai_tools,
     get_all_core_tool_classes,
 )
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import NoOpStateManager
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import NoOpStateManager
 from dataclasses import dataclass
-from anyagents.backends.execution_backend import ExecutionBackend
+from omniagents.backends.execution_backend import ExecutionBackend
 
 
 # For Pydantic-AI, we need a dependencies class
@@ -47,8 +47,8 @@ def demo_smolagents():
         print(f"  - {tool.name}: {tool.description[:50]}...")
 
     # Or generate specific tools only
-    from anyagents.tools.write_file_tool import WriteFileTool
-    from anyagents.tools.read_file_tool import ReadFileTool
+    from omniagents.tools.write_file_tool import WriteFileTool
+    from omniagents.tools.read_file_tool import ReadFileTool
 
     subset_tools = generate_smolagents_tools(
         backend=backend,
@@ -122,7 +122,7 @@ def show_available_tools():
         print()
         
 def test():
-    from anyagents.tools.write_file_tool import WriteFileTool
+    from omniagents.tools.write_file_tool import WriteFileTool
     
     write_file_tool = WriteFileTool(backend=None)
     pass
@@ -132,7 +132,7 @@ def main():
     test()
     """Run all demos."""
     print("\n" + "#" * 60)
-    print("#  ANYAGENTS ADAPTER GENERATOR DEMO")
+    print("#  OMNIAGENTS ADAPTER GENERATOR DEMO")
     print("#  Zero-boilerplate tool generation for AI frameworks")
     print("#" * 60)
 

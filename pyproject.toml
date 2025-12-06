@@ -1,5 +1,5 @@
 [project]
-name = "anyagents"
+name = "omniagents"
 version = "0.1.0"
 description = "A multi-backend execution framework for AI coding agents"
 readme = "README.md"
@@ -36,13 +36,13 @@ dependencies = [
 ]
 
 [project.scripts]
-anyagents = "anyagents:main"
+omniagents = "omniagents:main"
 
 [tool.hatch.metadata]
 allow-direct-references = true
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/anyagents"]
+packages = ["src/omniagents"]
 
 [tool.pytest.ini_options]
 markers = [

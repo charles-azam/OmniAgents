@@ -5,9 +5,9 @@ This tool writes content to a specified file, creating it if it doesn't exist.
 """
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.backends.execution_backend import ExecutionBackend
-from anyagents.outputs.outputs import (
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import ExecutionBackend
+from omniagents.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )

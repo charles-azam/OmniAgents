@@ -7,9 +7,9 @@ Handles text, images (PNG, JPG, GIF, WEBP, SVG, BMP), and PDF files.
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.backends.execution_backend import FileType
-from anyagents.outputs.outputs import (
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import FileType
+from omniagents.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
     MediaOutputModel,

@@ -6,7 +6,7 @@ with different DISPLAY_MODE environment variable values.
 """
 import os
 
-from anyagents.outputs.outputs import (
+from omniagents.outputs.outputs import (
     TextOutputModel,
     CodeOutputModel,
     FileInfo,

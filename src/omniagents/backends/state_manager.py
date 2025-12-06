@@ -14,11 +14,11 @@ import os
 import tarfile
 import io
 
-from anyagents.common import GCP_DATA_PATH
-from anyagents import storage_utils
+from omniagents.common import GCP_DATA_PATH
+from omniagents import storage_utils
 
 if TYPE_CHECKING:
-    from anyagents.backends.execution_backend import ExecutionBackend
+    from omniagents.backends.execution_backend import ExecutionBackend
 
 
 class StorageType(Enum):
@@ -221,11 +221,11 @@ class GitStateManager(StateManager):
     ):
         """
         Args:
-            repo_url: GitHub repo URL (defaults to env ANYAGENTS_GITHUB_STATE_REPO or 'charlesazam/anyagents-states')
+            repo_url: GitHub repo URL (defaults to env OMNIAGENTS_GITHUB_STATE_REPO or 'charlesazam/omniagents-states')
             branch_prefix: Prefix for state branches (default: "state/")
             github_token: GitHub personal access token (defaults to env GITHUB_TOKEN)
         """
-        self.repo_url = repo_url or os.getenv("ANYAGENTS_GITHUB_STATE_REPO", "charlesazam/anyagents-states")
+        self.repo_url = repo_url or os.getenv("OMNIAGENTS_GITHUB_STATE_REPO", "charlesazam/omniagents-states")
 
         # Normalize repo URL to full format
         if not self.repo_url.startswith("http"):
@@ -235,7 +235,7 @@ class GitStateManager(StateManager):
             self.repo_url += ".git"
 
         self.branch_prefix = branch_prefix
-        self.github_token = github_token or os.getenv("ANYAGENTS_GITHUB_API_KEY")
+        self.github_token = github_token or os.getenv("OMNIAGENTS_GITHUB_API_KEY")
 
         # Extract owner/repo from URL for API calls
         # https://github.com/owner/repo.git -> owner/repo
@@ -296,8 +296,8 @@ class GitStateManager(StateManager):
             init_commands = (
                 f"git init && "
                 f"git remote add origin {auth_url} && "
-                f'git config user.name "Anyagents" && '
-                f'git config user.email "noreply@anyagents.ai"'
+                f'git config user.name "Omniagents" && '
+                f'git config user.email "noreply@omniagents.ai"'
             )
             backend.execute_command(command=init_commands)
 

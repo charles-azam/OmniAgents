@@ -12,8 +12,8 @@ from typing import ClassVar, TypeVar, Generic, get_args, get_origin, Any
 
 from pydantic import BaseModel
 
-from anyagents.backends.execution_backend import ExecutionBackend
-from anyagents.outputs.outputs import ToolOutputModel
+from omniagents.backends.execution_backend import ExecutionBackend
+from omniagents.outputs.outputs import ToolOutputModel
 from smolagents.tools import Tool as SmolagentsTool
 from langchain_core.tools import StructuredTool as LangChainTool
 from pydantic_ai import Tool as PydanticAITool

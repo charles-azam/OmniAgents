@@ -26,9 +26,9 @@ See `core/gemini_cli_tool.md` for complete Gemini CLI specifications.
 ### Using Core Tools Directly
 
 ```python
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import GitStateManager
-from anyagents.tools.read_file_tool import ReadFileTool
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.tools.read_file_tool import ReadFileTool
 
 # Create backend
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -45,10 +45,10 @@ output = result.handle()  # Automatically formats based on DISPLAY_MODE
 #### smolagents
 
 ```python
-from anyagents.agents.smolagents_agent import SmolagentsAgent
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import GitStateManager
-from anyagents.presets.python import PythonUVPreset
+from omniagents.agents.smolagents_agent import SmolagentsAgent
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.presets.python import PythonUVPreset
 from smolagents import HfApiModel
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
@@ -67,7 +67,7 @@ result = agent.run("List all Python files")
 #### Pydantic-AI
 
 ```python
-from anyagents.agents.pydantic_ai_agent import PydanticAIAgent
+from omniagents.agents.pydantic_ai_agent import PydanticAIAgent
 from pydantic_ai.models.openai import OpenAIModel
 
 model = OpenAIModel("gpt-4")
@@ -78,7 +78,7 @@ result = agent.run("Create a FastAPI server")
 #### LangChain
 
 ```python
-from anyagents.agents.langchain_agent import LangChainAgent
+from omniagents.agents.langchain_agent import LangChainAgent
 from langchain_openai import ChatOpenAI
 
 model = ChatOpenAI(model="gpt-4")
@@ -129,8 +129,8 @@ All tools work across any execution environment:
 | **E2BBackend** | Cloud sandbox | Production |
 
 ```python
-from anyagents.backends.docker_backend import DockerBackend
-from anyagents.backends.e2b_backend import E2BBackend
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.backends.e2b_backend import E2BBackend
 
 # Same tools, different environment
 backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
@@ -146,7 +146,7 @@ Backends support persistent state across sessions:
 ### Git Storage (Default)
 
 ```python
-from anyagents.backends.state_manager import GitStateManager
+from omniagents.backends.state_manager import GitStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()  # Loads from GitHub branch
@@ -161,7 +161,7 @@ backend.shutdown()  # Saves to GitHub branch
 ### GCS Storage
 
 ```python
-from anyagents.backends.state_manager import GCSStateManager
+from omniagents.backends.state_manager import GCSStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ```
@@ -173,7 +173,7 @@ backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
 ### No Persistence
 
 ```python
-from anyagents.backends.state_manager import NoOpStateManager
+from omniagents.backends.state_manager import NoOpStateManager
 
 backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
 ```
@@ -181,7 +181,7 @@ backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager()
 ## Directory Structure
 
 ```
-anyagents/
+omniagents/
 ├── agents/                # AI framework integrations (AgentFactory implementations)
 ├── backends/              # Execution environments (Local, Docker, E2B)
 ├── presets/               # Language/runtime presets (Python, generic, etc.)
@@ -197,9 +197,9 @@ anyagents/
 1. **Create tool file** in `tools/`:
 
 ```python
-from anyagents.tools.base_tool import CoreBackendTool
+from omniagents.tools.base_tool import CoreBackendTool
 from pydantic import BaseModel, Field
-from anyagents.outputs.outputs import TextOutputModel
+from omniagents.outputs.outputs import TextOutputModel
 
 class MyToolInput(BaseModel):
     param: str = Field(description="Parameter description")
@@ -233,7 +233,7 @@ To integrate a new AI framework:
 1. **Create agent class** inheriting from `AgentFactory`:
 
 ```python
-from anyagents.agents.base import AgentFactory
+from omniagents.agents.base import AgentFactory
 from typing import TypeVar
 
 TModel = TypeVar("TModel")  # Your framework's model type

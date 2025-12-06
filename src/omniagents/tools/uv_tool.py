@@ -5,9 +5,9 @@ This tool executes uv commands in the execution environment, ensuring uv is inst
 """
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.outputs.outputs import TextOutputModel
-from anyagents.uv_utils import ensure_uv_installed, execute_uv_command
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.outputs.outputs import TextOutputModel
+from omniagents.uv_utils import ensure_uv_installed, execute_uv_command
 
 
 class UVInput(BaseModel):

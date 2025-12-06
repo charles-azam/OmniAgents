@@ -1,14 +1,14 @@
 """
 Python development presets.
 """
-from anyagents.presets.base import Preset, InitResult
-from anyagents.tools.uv_tool import UVTool
-from anyagents.uv_utils import ensure_uv_installed, execute_uv_command
+from omniagents.presets.base import Preset, InitResult
+from omniagents.tools.uv_tool import UVTool
+from omniagents.uv_utils import ensure_uv_installed, execute_uv_command
 
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from anyagents.backends.execution_backend import ExecutionBackend
+    from omniagents.backends.execution_backend import ExecutionBackend
 
 
 class PythonUVPreset(Preset):

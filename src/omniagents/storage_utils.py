@@ -14,14 +14,14 @@ from typing import TYPE_CHECKING
 from dotenv import load_dotenv
 from loguru import logger
 
-from anyagents.common import GCP_DATA_PATH
+from omniagents.common import GCP_DATA_PATH
 
 if TYPE_CHECKING:
     from google.cloud import storage
 
 load_dotenv()
 
-BUCKET_ENV_VAR = "ANYAGENTS_BUCKET_NAME"
+BUCKET_ENV_VAR = "OMNIAGENTS_BUCKET_NAME"
 
 
 def _initialize_and_validate_storage() -> tuple["storage.Client", "storage.Bucket"]:

@@ -6,8 +6,8 @@ This tool saves and recalls information across sessions by appending to a memory
 from pathlib import Path
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.outputs.outputs import (
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.outputs.outputs import (
     TextOutputModel,
     ToolOutputModel,
 )

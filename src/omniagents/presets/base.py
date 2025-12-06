@@ -9,8 +9,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from anyagents.backends.execution_backend import ExecutionBackend
-    from anyagents.tools.base_tool import CoreBackendTool
+    from omniagents.backends.execution_backend import ExecutionBackend
+    from omniagents.tools.base_tool import CoreBackendTool
 
 
 @dataclass(frozen=True)

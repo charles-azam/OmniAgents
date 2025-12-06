@@ -3,10 +3,10 @@ Example usage of the LangChainAgent.
 
 This demonstrates how to use the LangChain agent with different backends and presets.
 """
-from anyagents.agents.langchain_agent import LangChainAgent, get_langchain_model_example
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import NoOpStateManager
-from anyagents.presets.python import PythonUVPreset
+from omniagents.agents.langchain_agent import LangChainAgent, get_langchain_model_example
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import NoOpStateManager
+from omniagents.presets.python import PythonUVPreset
 from dotenv import load_dotenv
 
 load_dotenv()

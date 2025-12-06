@@ -4,20 +4,20 @@ Abstract base class for framework-specific coding agents.
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-from anyagents.backends.execution_backend import ExecutionBackend
-from anyagents.presets.base import Preset
-from anyagents.presets.generic import GenericPreset
-from anyagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import ExecutionBackend
+from omniagents.presets.base import Preset
+from omniagents.presets.generic import GenericPreset
+from omniagents.tools.base_tool import CoreBackendTool
 
-from anyagents.tools.write_file_tool import WriteFileTool
-from anyagents.tools.read_file_tool import ReadFileTool
-from anyagents.tools.list_directory_tool import ListDirectoryTool
-from anyagents.tools.glob_tool import GlobTool
-from anyagents.tools.search_file_content_tool import SearchFileContentTool
-from anyagents.tools.replace_tool import ReplaceTool
-from anyagents.tools.run_shell_command_tool import RunShellCommandTool
-from anyagents.tools.read_many_files_tool import ReadManyFilesTool
-from anyagents.tools.save_memory_tool import SaveMemoryTool
+from omniagents.tools.write_file_tool import WriteFileTool
+from omniagents.tools.read_file_tool import ReadFileTool
+from omniagents.tools.list_directory_tool import ListDirectoryTool
+from omniagents.tools.glob_tool import GlobTool
+from omniagents.tools.search_file_content_tool import SearchFileContentTool
+from omniagents.tools.replace_tool import ReplaceTool
+from omniagents.tools.run_shell_command_tool import RunShellCommandTool
+from omniagents.tools.read_many_files_tool import ReadManyFilesTool
+from omniagents.tools.save_memory_tool import SaveMemoryTool
 
 
 CORE_TOOLS: tuple[type[CoreBackendTool], ...] = (

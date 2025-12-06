@@ -1,2 +1,2 @@
 def main() -> None:
-    print("Hello from anyagents!")
+    print("Hello from omniagents!")

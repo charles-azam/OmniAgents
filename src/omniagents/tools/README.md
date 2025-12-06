@@ -35,9 +35,9 @@ All tools follow a consistent design:
 ### Tool Structure Example
 
 ```python
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.backends.execution_backend import ExecutionBackend
-from anyagents.outputs.outputs import TextOutputModel
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import ExecutionBackend
+from omniagents.outputs.outputs import TextOutputModel
 from pydantic import BaseModel, Field
 
 class ExampleToolInput(BaseModel):
@@ -77,9 +77,9 @@ See [`../outputs/README.md`](../outputs/README.md) for details.
 ## Usage Example
 
 ```python
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import GitStateManager
-from anyagents.tools.read_file_tool import ReadFileTool
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.tools.read_file_tool import ReadFileTool
 
 backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
 backend.start()
@@ -102,8 +102,8 @@ These tools are based on Gemini CLI specifications. See `gemini_cli_tool.md` for
 1. **Create tool class** inheriting from `CoreBackendTool`:
 
 ```python
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.outputs.outputs import TextOutputModel
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.outputs.outputs import TextOutputModel
 from pydantic import BaseModel, Field
 
 class MyToolInput(BaseModel):
@@ -120,7 +120,7 @@ class MyTool(CoreBackendTool[MyToolInput, TextOutputModel]):
 
 2. **Use with any agent via `extra_tool_classes`**:
    ```python
-   from anyagents.agents.langchain_agent import LangChainAgent
+   from omniagents.agents.langchain_agent import LangChainAgent
 
    agent = LangChainAgent(
        backend=backend,

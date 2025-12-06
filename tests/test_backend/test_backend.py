@@ -1,10 +1,10 @@
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.docker_backend import DockerBackend
-from anyagents.backends.e2b_backend import E2BBackend
-from anyagents.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
-from anyagents.backends.state_manager import GCSStateManager, GitStateManager
-from anyagents.test_utils import cleanup_test_environment
-from anyagents.uv_utils import execute_uv_command
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.backends.e2b_backend import E2BBackend
+from omniagents.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
+from omniagents.backends.state_manager import GCSStateManager, GitStateManager
+from omniagents.test_utils import cleanup_test_environment
+from omniagents.uv_utils import execute_uv_command
 from pathlib import Path
 import pytest
 import os
@@ -39,8 +39,8 @@ def run_backend_e2e_test(backend: ExecutionBackend):
     Args:
         backend: An initialized (but not yet init() called) ExecutionBackend instance
     """
-    from anyagents import storage_utils
-    from anyagents.common import GCP_DATA_PATH
+    from omniagents import storage_utils
+    from omniagents.common import GCP_DATA_PATH
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment for debugging/reloading
@@ -303,7 +303,7 @@ def run_backend_e2e_test(backend: ExecutionBackend):
 
         # Test uv commands via execute_command
         # Use PythonUVPreset to initialize project (handles UV installation if needed)
-        from anyagents.presets.python import PythonUVPreset
+        from omniagents.presets.python import PythonUVPreset
 
         preset = PythonUVPreset()
         init_result = preset.initialize_project(backend=backend)
@@ -538,7 +538,7 @@ def test_docker_backend_container_reuse():
         # Ensure cleanup even if test fails
         try:
             client = docker.from_env()
-            container = client.containers.get(f"anyagents-{project_id}")
+            container = client.containers.get(f"omniagents-{project_id}")
             container.stop(timeout=0)
             container.remove()
         except:
@@ -555,7 +555,7 @@ def run_backend_git_e2e_test(backend: ExecutionBackend):
         backend: An initialized ExecutionBackend instance with StorageType.GIT
     """
     import subprocess
-    from anyagents.backends.state_manager import GitStateManager
+    from omniagents.backends.state_manager import GitStateManager
 
     # === FRESH START CLEANUP ===
     # Clean everything to ensure fresh test environment

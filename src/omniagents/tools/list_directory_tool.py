@@ -6,9 +6,9 @@ This tool lists the names of files and subdirectories within a specified directo
 from fnmatch import fnmatch
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.backends.execution_backend import FileType
-from anyagents.outputs.outputs import (
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import FileType
+from omniagents.outputs.outputs import (
     FileInfo,
     FileListOutputModel,
     ErrorOutputModel,
@@ -126,7 +126,7 @@ class ListDirectoryTool(CoreBackendTool[ListDirectoryInput, ToolOutputModel]):
             entries = filtered_entries
 
         # Convert to FileInfo output format (from outputs module)
-        from anyagents.outputs.outputs import FileInfo as OutputFileInfo
+        from omniagents.outputs.outputs import FileInfo as OutputFileInfo
 
         file_infos = []
         for entry in entries:

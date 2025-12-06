@@ -5,8 +5,8 @@ This tool searches for a regular expression pattern within file contents.
 """
 from pydantic import BaseModel, Field
 
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.outputs.outputs import (
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.outputs.outputs import (
     TextOutputModel,
     ErrorOutputModel,
     ToolOutputModel,

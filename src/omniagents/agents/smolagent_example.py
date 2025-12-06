@@ -3,10 +3,10 @@ Example usage of the SmolagentsAgent.
 
 This demonstrates how to use the smolagent agent with different backends and presets.
 """
-from anyagents.agents.smolagent_agent import SmolagentsAgent, get_smolagents_model_example
-from anyagents.backends.local_backend import LocalBackend
-from anyagents.backends.state_manager import GitStateManager
-from anyagents.presets.python import PythonUVPreset
+from omniagents.agents.smolagent_agent import SmolagentsAgent, get_smolagents_model_example
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.presets.python import PythonUVPreset
 
 
 def main() -> None:

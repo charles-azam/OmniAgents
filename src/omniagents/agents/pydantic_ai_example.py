@@ -3,10 +3,10 @@ Example usage of the PydanticAIAgent.
 
 This demonstrates how to use the pydantic_ai agent with different backends and presets.
 """
-from anyagents.agents.pydantic_ai_agent import PydanticAIAgent, get_pydantic_ai_model_example
-from anyagents.backends.docker_backend import DockerBackend
-from anyagents.backends.state_manager import GitStateManager
-from anyagents.presets.python import PythonUVPreset
+from omniagents.agents.pydantic_ai_agent import PydanticAIAgent, get_pydantic_ai_model_example
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.presets.python import PythonUVPreset
 from dotenv import load_dotenv
 
 load_dotenv()

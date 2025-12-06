@@ -4,10 +4,10 @@ Smolagents-based coding agent implementation.
 from smolagents import ToolCallingAgent, OpenAIModel, InferenceClientModel
 from smolagents.tools import Tool as SmolagentsTool
 
-from anyagents.agents.base import AgentFactory
-from anyagents.tools.base_tool import CoreBackendTool
-from anyagents.backends.execution_backend import ExecutionBackend
-from anyagents.presets.base import Preset
+from omniagents.agents.base import AgentFactory
+from omniagents.tools.base_tool import CoreBackendTool
+from omniagents.backends.execution_backend import ExecutionBackend
+from omniagents.presets.base import Preset
 
 
 def get_smolagents_model_example(model_name: str = "openai/gpt-oss-120b") -> OpenAIModel | InferenceClientModel:
@@ -24,9 +24,9 @@ class SmolagentsAgent(AgentFactory[OpenAIModel | InferenceClientModel, Smolagent
     Smolagents-based coding agent.
 
     Example:
-        from anyagents.backends.local_backend import LocalBackend
-        from anyagents.backends.state_manager import NoOpStateManager
-        from anyagents.presets.python import PythonUVPreset
+        from omniagents.backends.local_backend import LocalBackend
+        from omniagents.backends.state_manager import NoOpStateManager
+        from omniagents.presets.python import PythonUVPreset
 
         backend = LocalBackend(project_id="my-app", state_manager=NoOpStateManager())
         model = InferenceClientModel(model_id="openai/gpt-oss-120b", provider="cerebras")
@@ -62,7 +62,7 @@ class SmolagentsAgent(AgentFactory[OpenAIModel | InferenceClientModel, Smolagent
         return tool.to_smolagents_tool()
 
     def _run_agent(self, task: str) -> str:
-        from anyagents.prompts.system_prompt import get_system_prompt
+        from omniagents.prompts.system_prompt import get_system_prompt
 
         instructions = get_system_prompt(backend=self.backend, model_id="smolagents")
 
