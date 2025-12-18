@@ -33,6 +33,7 @@ dependencies = [
     "mypy>=1.11.0",
     "ruff>=0.6.0",
     "pyinstrument>=5.1.1",
+    "httpx>=0.27.0",
 ]
 
 [project.scripts]
@@ -47,6 +48,7 @@ packages = ["src/omniagents"]
 [tool.pytest.ini_options]
 markers = [
     "e2b: marks tests that require E2B backend (deselect with '-m \"not e2b\"')",
+    "fly: marks tests that require Fly.io backend (deselect with '-m \"not fly\"')",
     "llm: marks tests that call LLM APIs (deselect with '-m \"not llm\"')",
 ]
 
