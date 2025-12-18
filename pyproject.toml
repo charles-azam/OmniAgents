@@ -1,17 +1,20 @@
 [project]
 name = "omniagents"
 version = "0.1.0"
-description = "A multi-backend execution framework for AI coding agents"
+description = "A multi-backend execution framework for AI coding agents. Use any agent framework with any runtime."
 readme = "README.md"
 authors = [
     { name = "Charles Azam", email = "azamcharles0@gmail.com" }
 ]
 requires-python = ">=3.13"
 dependencies = [
-    "cadquery>=2.6.0",
+    # Core dependencies (required)
     "pydantic>=2.12.0",
+    "beartype>=0.22.7",
+    "loguru>=0.7.3",
+    "docker>=7.1.0",
+    # Agent frameworks
     "smolagents[telemetry,toolkit]",
-    "e2b-code-interpreter>=1.0.0",
     "pydantic-ai[examples]>=1.25",
     "langchain>=1.1",
     "langchain-openai>=0.2.0",
@@ -21,18 +24,37 @@ dependencies = [
     "huggingface-hub>=0.20.0",
     "openai-agents>=0.3.3",
     "litellm>=1.78.2",
-    "pytest>=8.4.2",
-    "ipykernel>=7.0.1",
+    # Cloud storage
     "google-api-python-client>=2.179.0",
     "google-cloud-secret-manager>=2.24.0",
     "google-cloud-storage>=3.3.0",
-    "loguru>=0.7.3",
-    "docker>=7.1.0",
     "pygithub>=2.5.0",
-    "beartype>=0.22.7",
+    # Dev tools
+    "pytest>=8.4.2",
+    "ipykernel>=7.0.1",
     "mypy>=1.11.0",
     "ruff>=0.6.0",
     "pyinstrument>=5.1.1",
+]
+
+[project.optional-dependencies]
+# OpenHands integration - use OpenHands runtimes with omniagents
+openhands = [
+    "openhands-ai>=0.27.0",
+]
+# E2B sandbox backend
+e2b = [
+    "e2b-code-interpreter>=1.0.0",
+]
+# CAD tools (cadquery)
+cad = [
+    "cadquery>=2.6.0",
+]
+# All optional dependencies
+all = [
+    "openhands-ai>=0.27.0",
+    "e2b-code-interpreter>=1.0.0",
+    "cadquery>=2.6.0",
 ]
 
 [project.scripts]
