@@ -1,218 +1,147 @@
 # Omniagents
 
-A multi-backend execution framework for AI coding agents. Run the same tools across local, Docker, or E2B environments with any AI framework (smolagents, Pydantic-AI, LangChain).
+A multi-backend execution framework for AI coding agents. Write tools once, run them anywhere.
 
-## Core Design Principle
+## What is Omniagents?
 
-**Write once, run anywhere**: Code tools once, execute in any environment (local/Docker/E2B), integrate with any framework (smolagents/Pydantic-AI/LangChain).
+Omniagents provides a unified interface for building AI coding agents that work across multiple execution environments (Local, Docker, E2B) and AI frameworks (smolagents, Pydantic-AI, LangChain).
+
+```python
+from omniagents.agents.langchain_agent import LangChainAgent
+from omniagents.backends.docker_backend import DockerBackend
+from omniagents.backends.state_manager import GitStateManager
+from omniagents.presets.python import PythonUVPreset
+from langchain_openai import ChatOpenAI
+
+# Create isolated Docker environment with Git-based state persistence
+backend = DockerBackend(
+    project_id="my-project",
+    state_manager=GitStateManager()
+)
+backend.start()
+
+# Create agent with Python/UV preset
+agent = LangChainAgent(
+    backend=backend,
+    model=ChatOpenAI(model="gpt-4"),
+    preset=PythonUVPreset(),
+)
+
+# Run coding task
+result = agent.run("Create a FastAPI server with a /hello endpoint")
+backend.shutdown()  # Saves state to Git
+```
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| **10 Coding Tools** | File operations, shell commands, search, replace |
+| **3 Execution Backends** | Local, Docker, E2B cloud sandboxes |
+| **3 AI Frameworks** | smolagents, Pydantic-AI, LangChain |
+| **State Persistence** | Git or GCS - restore sessions across runs |
+| **Presets** | Python/UV, Python/pip, Generic |
+
+## Installation
+
+```bash
+# Using uv (recommended)
+uv add omniagents
+
+# Using pip
+pip install omniagents
+```
+
+## Quick Start
+
+```python
+from omniagents.backends.local_backend import LocalBackend
+from omniagents.backends.state_manager import NoOpStateManager
+from omniagents.tools.write_file_tool import WriteFileTool
+from omniagents.tools.run_shell_command_tool import RunShellCommandTool
+
+# Create backend
+backend = LocalBackend(project_id="demo", state_manager=NoOpStateManager())
+backend.start()
+
+# Use tools directly
+write_tool = WriteFileTool(backend=backend)
+write_tool.execute(absolute_path="hello.py", content="print('Hello!')")
+
+shell_tool = RunShellCommandTool(backend=backend)
+result = shell_tool.execute(command="python hello.py")
+print(result.content)  # "Hello!"
+
+backend.shutdown()
+```
 
 ## Architecture
-
-Omniagents uses a **3-layer architecture**:
 
 ```
 ┌─────────────────────────────────────────┐
 │    Layer 3: Framework Integration       │
 │  smolagents, Pydantic-AI, LangChain     │
-│  - Manual tool wrappers per framework   │
 └───────────────┬─────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────┐
 │    Layer 2: Core Tools                  │
 │  10 Gemini CLI-inspired coding tools    │
-│  - Framework-agnostic business logic    │
 └───────────────┬─────────────────────────┘
                 │
 ┌───────────────▼─────────────────────────┐
 │    Layer 1: Execution Backends          │
 │  Local, Docker, E2B                     │
-│  - Primitive operations only            │
 └─────────────────────────────────────────┘
 ```
 
-**Benefits:**
-- **Mix and Match**: Any backend + any framework + any storage
-- **Write Once, Use Everywhere**: Tool logic works in all environments
-- **Independent Testing**: Mock any layer for isolated testing
+## Documentation
 
-## Features
-
-- **Multi-Backend Support**: Run code locally, in Docker containers, or E2B sandboxes
-- **Unified API**: Same tool interface across all backends
-- **Framework Agnostic**: Works with smolagents, Pydantic-AI, LangChain
-- **10 Gemini CLI Tools**: list_directory, read_file, write_file, glob, search, replace, run_shell_command, read_many_files, save_memory, uv
-- **State Persistence**: Automatic sync to GitHub or Google Cloud Storage
-- **Comprehensive Testing**: E2E tests for all backends
-
-## Quick Start
-
-### Installation
+Full documentation is available at [docs/](docs/index.md) or build locally:
 
 ```bash
-# Install uv (if not already installed)
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Install docs dependencies
+uv sync --extra docs
 
-# Install dependencies
-uv sync
+# Serve documentation locally
+uv run mkdocs serve
 ```
 
-### Basic Usage
+### Quick Links
 
-```python
-from omniagents.backends.local_backend import LocalBackend
-from omniagents.backends.state_manager import GitStateManager
-
-# Create backend with Git storage
-backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
-backend.start()
-
-# Write a file
-backend.write_file(file_path="hello.py", content="print('Hello, World!')")
-
-# Execute a command
-result = backend.execute_command(command="python hello.py")
-print(result.output)  # "Hello, World!"
-
-# Shutdown (saves state to Git)
-backend.shutdown()
-```
-
-### Using with AI Agents
-
-```python
-from omniagents.agents.smolagents_agent import SmolagentsAgent
-from omniagents.backends.local_backend import LocalBackend
-from omniagents.backends.state_manager import GitStateManager
-from omniagents.presets.python import PythonUVPreset
-
-# Create backend
-backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
-backend.start()
-
-# Create agent with Python/UV preset
-from smolagents import HfApiModel
-model = HfApiModel(model_id="Qwen/Qwen2.5-Coder-32B-Instruct")
-
-agent = SmolagentsAgent(
-    backend=backend,
-    model=model,
-    preset=PythonUVPreset(),
-)
-
-# Run task
-result = agent.run("Create a FastAPI server with a /hello endpoint")
-```
+- [Installation](docs/getting-started/installation.md)
+- [Quick Start](docs/getting-started/quickstart.md)
+- [Architecture](docs/concepts/architecture.md)
+- [Backends](docs/concepts/backends.md)
+- [Tools Reference](docs/api/tools.md)
 
 ## Backend Options
 
 | Backend | Environment | Isolation | Best For |
 |---------|-------------|-----------|----------|
-| **LocalBackend** | Host machine | None | Development, testing |
-| **DockerBackend** | Docker container | Container-level | Isolated testing |
-| **E2BBackend** | Cloud sandbox | Full sandbox | Production, scaling |
-
-### Docker Backend
-
-```python
-from omniagents.backends.docker_backend import DockerBackend
-
-backend = DockerBackend(project_id="my-project", state_manager=GitStateManager())
-backend.start()  # Creates container
-# ... use backend ...
-backend.shutdown()  # Stops container
-```
-
-### E2B Backend
-
-```python
-from omniagents.backends.e2b_backend import E2BBackend
-
-backend = E2BBackend(project_id="my-project", state_manager=GitStateManager())
-backend.start()  # Creates sandbox
-# ... use backend ...
-backend.shutdown()  # Destroys sandbox
-```
+| `LocalBackend` | Host machine | None | Development |
+| `DockerBackend` | Docker container | Container | Testing |
+| `E2BBackend` | Cloud sandbox | Full | Production |
 
 ## State Persistence
 
-### Git Storage (Default)
-
-```python
-from omniagents.backends.state_manager import GitStateManager
-
-backend = LocalBackend(project_id="my-project", state_manager=GitStateManager())
-```
-
-- Requires: `gh` CLI installed and authenticated
-- State saved to GitHub branches (e.g., `state/my-project`)
-- Free, version controlled, easy to inspect
-
-### Google Cloud Storage
-
-```python
-from omniagents.backends.state_manager import GCSStateManager
-
-backend = LocalBackend(project_id="my-project", state_manager=GCSStateManager())
-```
-
-- Requires: GCP credentials configured
-- State saved to GCS bucket with timestamps
-- Enterprise-grade, handles large files
-
-### No Persistence
-
-```python
-from omniagents.backends.state_manager import NoOpStateManager
-
-backend = LocalBackend(project_id="my-project", state_manager=NoOpStateManager())
-```
-
-## Configuration
-
-### GitHub Storage
-
-Set up GitHub personal access token with `repo` scope:
-
-```bash
-export OMNIAGENTS_GITHUB_API_KEY="ghp_your_token_here"
-export OMNIAGENTS_GITHUB_STATE_REPO="your-org/your-repo"  # Optional
-```
-
-### Google Cloud Storage
-
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS="/path/to/gcp-credentials.json"
-export BUCKET_OMNIAGENTS="your-bucket-name"
-```
-
-### E2B API Key
-
-```bash
-export E2B_API_KEY="e2b_your_api_key_here"
-```
+| Manager | Storage | Best For |
+|---------|---------|----------|
+| `NoOpStateManager` | None | Testing |
+| `GitStateManager` | GitHub branches | Version control |
+| `GCSStateManager` | Google Cloud Storage | Enterprise |
 
 ## Running Tests
 
 ```bash
-# Run all tests
-uv run python -m pytest tests/test_backend.py tests/test_tools.py -v
+# All tests
+uv run pytest tests/ -v
 
-# Run specific backend tests
-uv run python -m pytest tests/test_backend.py::test_local_backend_e2e -v
-uv run python -m pytest tests/test_backend.py::test_docker_backend_e2e -v
-uv run python -m pytest tests/test_backend.py::test_e2b_backend_e2e -v
+# Skip E2B tests (require API key)
+uv run pytest tests/ -v -m "not e2b"
+
+# Skip LLM tests (require API keys)
+uv run pytest tests/ -v -m "not llm"
 ```
-
-## Documentation
-
-- **[Tools Guide](src/omniagents/README.md)** - Tool catalog, framework integration, extension guide
-- **[Backends API Reference](src/omniagents/backends/README.md)** - Backend interface details, state management
-- **[Tools API](src/omniagents/tools/README.md)** - Tool implementation patterns
-- **[Preset Architecture](docs/api-refactoring.md)** - Preset/AgentFactory design and usage
-
-## CI/CD
-
-The project uses GitHub Actions for continuous testing. See [Setup Secrets Guide](.github/SETUP_SECRETS.md) for configuring the CI/CD pipeline.
 
 ## Contributing
 
@@ -220,4 +149,4 @@ Contributions are welcome! Please ensure all tests pass before submitting a PR.
 
 ## License
 
-See LICENSE file for details.
+MIT License - see LICENSE file for details.

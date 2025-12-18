@@ -35,6 +35,14 @@ dependencies = [
     "pyinstrument>=5.1.1",
 ]
 
+[project.optional-dependencies]
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+    "mkdocstrings[python]>=0.24.0",
+    "pymdown-extensions>=10.7.0",
+]
+
 [project.scripts]
 omniagents = "omniagents:main"
 
