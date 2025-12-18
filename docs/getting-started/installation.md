@@ -11,17 +11,14 @@
 # Install uv if not already installed
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# Add omniagents to your project
-uv add omniagents
-
-# Or install globally
-uv tool install omniagents
+# Add omniagents to your project (from GitHub)
+uv add git+https://github.com/charlesazam/omniagents.git
 ```
 
 ## Install with pip
 
 ```bash
-pip install omniagents
+pip install git+https://github.com/charlesazam/omniagents.git
 ```
 
 ## Optional Dependencies
