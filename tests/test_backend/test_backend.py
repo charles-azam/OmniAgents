@@ -1,6 +1,7 @@
 from omniagents.backends.local_backend import LocalBackend
 from omniagents.backends.docker_backend import DockerBackend
 from omniagents.backends.e2b_backend import E2BBackend
+from omniagents.backends.fly_backend import FlyBackend
 from omniagents.backends.execution_backend import ExecutionBackend, BackendStatus, FileType
 from omniagents.backends.state_manager import GCSStateManager, GitStateManager
 from omniagents.test_utils import cleanup_test_environment
@@ -712,6 +713,32 @@ def test_e2b_backend_git_storage():
     """Test E2BBackend with Git storage."""
     project_id = get_project_id(base_name="test_backend_git_e2b")
     backend = E2BBackend(project_id=project_id, state_manager=GitStateManager())
+    run_backend_git_e2e_test(backend=backend)
+
+
+@pytest.mark.fly
+def test_fly_backend_e2e():
+    """Test FlyBackend implementation using generic backend test."""
+    project_id = get_project_id(base_name="test_fly_backend_e2e")
+    app_name = os.getenv("FLY_APP_NAME", "omniagents-sandbox")
+    backend = FlyBackend(
+        project_id=project_id,
+        state_manager=GCSStateManager(),
+        app_name=app_name,
+    )
+    run_backend_e2e_test(backend=backend)
+
+
+@pytest.mark.fly
+def test_fly_backend_git_storage():
+    """Test FlyBackend with Git storage."""
+    project_id = get_project_id(base_name="test_backend_git_fly")
+    app_name = os.getenv("FLY_APP_NAME", "omniagents-sandbox")
+    backend = FlyBackend(
+        project_id=project_id,
+        state_manager=GitStateManager(),
+        app_name=app_name,
+    )
     run_backend_git_e2e_test(backend=backend)
 
 
