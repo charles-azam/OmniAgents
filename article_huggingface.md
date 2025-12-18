@@ -1,6 +1,14 @@
-# Building Multi-Tenant AI Coding Agents: What I Learned Creating Omniagents
+# I Accidentally Rebuilt OpenHands From Scratch — Here's What I Learned
 
-I spent the last few weeks building [Omniagents](https://github.com/charlesazam/omniagents), a minimalist framework for running AI coding agents in isolated environments. After finishing, I discovered OpenHands already exists and does much of the same thing. But the journey taught me a lot about what it actually takes to give each user their own coding agent — and I think the lessons are worth sharing.
+I spent weeks building a framework for multi-tenant AI coding agents. Isolated environments, persistent sessions, framework-agnostic tools — the whole thing. Then I discovered [OpenHands](https://github.com/All-Hands-AI/OpenHands) (66k stars) already does this.
+
+**I had accidentally rebuilt a chunk of OpenHands without knowing it existed.**
+
+But here's the thing: I learned more about AI coding agents in those weeks than I would have just using someone else's solution. And I ended up with something different — not better, just simpler. ~2000 lines of code you can read in a few hours.
+
+More importantly, I now deeply understand what's happening under the hood. I know where the costs come from and how to reduce them. I know how to adapt it to my specific use case — which is building an agent that generates 3D models through code. You can't do that confidently with a black-box solution.
+
+This is what I learned.
 
 ## The Problem I Was Trying to Solve
 
@@ -141,25 +149,33 @@ Each layer is swappable. Want to add a Fly.io backend? Implement the `ExecutionB
 
 ## What I Learned
 
-### 1. The Hard Part Isn't the Tools
+### You can do a lot with a few tools
 
-Writing `write_file` and `run_command` is easy. The hard parts are:
-- **Path handling** across different environments (local paths vs container paths vs sandbox paths)
-- **State synchronization** — what happens if the container crashes mid-save?
-- **Timeout management** — LLMs sometimes generate infinite loops
+All coding agents (Claude Code, Gemini CLI, Mistral Vibe, Cursor Agent, etc.) are built with a few core tools (read a file, write a file, run a command, etc.). They are all roughly the same, and yet depending on the attention to detail, the quality of the agent can vary greatly.
 
-### 2. E2B vs Docker vs Local Is a Spectrum
+Today the best agents implement these additional features:
+- **Empowering tools**: any tool that enhances the agent's capabilities (e.g., browsing agent, search engine, etc.)
+- **Task Tracker Tool (Plan Mode)**: helps the agent track its progress and stay on task — popularized by Claude Code and very effective
+- **Think Tool**: for complex tasks, the agent can think about the task and generate a plan, then execute the plan step by step
+- **Delegate Tool**: the agent can delegate tasks to sub-agents — very effective for complex multi-step tasks, and helps reduce context size
 
-| | Local | Docker | E2B |
-|--|-------|--------|-----|
-| **Setup** | None | Docker daemon | API key |
-| **Isolation** | None | Container | Full VM |
-| **Cold start** | 0ms | 2-5s | 5-10s |
-| **Cost** | Free | Free | ~$0.10/hour |
+### Agent frameworks are useless (ok no but not that useful)
 
-For development, Local is fine. For production with untrusted code, you want E2B. Docker is the middle ground for self-hosted deployments.
+There are a lot of agent frameworks out there. To name a few:
+- **smolagents**: very simple, best terminal logs in the market, but lacks powerful features. The tools don't support advanced schemas (like Pydantic models), which is a shame.
+- **LangChain**: very close to Pydantic-AI now. Probably very powerful, but once you use LangGraph you enter a world of pain.
+- **Pydantic-AI**: it flatters my software engineer soul. The telemetry is great but it is a shame the terminal logs are so hard to read.
+- **openai-agents**: great if you want to be handcuffed to OpenAI.
 
-### 3. State Persistence Is Underrated
+But the moment you want to do something more complex — like adding an image at the start of each loop, or using model-specific features — you'll want to write your own loop with minimal abstraction.
+
+### Use open source models for your personal projects
+
+If you're new to AI, you might not know the pain of building a side project with a proprietary model. You'll quickly find out that not only are they expensive, but since you're a nobody, your rate limits are very low.
+
+The best workaround is to use open source models. Check out HuggingFace — there are providers like Groq or Cerebras that offer very cheap open source models with generous rate limits.
+
+### State Persistence Is Underrated
 
 Most agent demos are stateless — run once, throw away. But real products need persistence:
 - Users expect to resume work
@@ -168,9 +184,9 @@ Most agent demos are stateless — run once, throw away. But real products need 
 
 Git-based storage turned out to be surprisingly good for small projects. Free, version-controlled, easy to inspect. GCS is better for larger files or enterprise requirements.
 
-### 4. OpenHands Exists (And That's OK)
+### OpenHands Exists (And That's OK)
 
-After building this, I discovered [OpenHands](https://github.com/All-Hands-AI/OpenHands) — a much more complete solution with 42k+ stars. It has:
+After building this, I discovered [OpenHands](https://github.com/All-Hands-AI/OpenHands) — a much more complete solution. It has:
 - More sophisticated agent logic
 - Web UI
 - More backends
@@ -185,7 +201,7 @@ So why share Omniagents at all?
 ## Try It
 
 ```bash
-pip install git+https://github.com/charlesazam/omniagents.git
+uv add git+https://github.com/charlesazam/omniagents.git
 ```
 
 ```python
@@ -219,6 +235,7 @@ I'm considering:
 - **MCP server interface** — expose the tools via Model Context Protocol for Claude Desktop integration
 - **More backends** — Fly.io, Modal, AWS Lambda
 - **Better state management** — content-addressable storage for deduplication across users
+- **Building with this**
 
 If any of this is useful to you, let me know. And if you're building multi-tenant AI agents, I'd love to hear what challenges you're facing.
 
