@@ -1,0 +1,88 @@
+site_name: Omniagents
+site_description: A multi-backend execution framework for AI coding agents
+site_url: https://omniagents.dev
+repo_url: https://github.com/charlesazam/omniagents
+repo_name: charlesazam/omniagents
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+  icon:
+    repo: fontawesome/brands/github
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+  - Concepts:
+    - Architecture: concepts/architecture.md
+    - Backends: concepts/backends.md
+    - Tools: concepts/tools.md
+    - Agents: concepts/agents.md
+    - Presets: concepts/presets.md
+    - State Management: concepts/state-management.md
+  - API Reference:
+    - Backends API: api/backends.md
+    - Tools API: api/tools.md
+    - Agents API: api/agents.md
+    - Output Models: api/outputs.md
+  - Guides:
+    - Creating Custom Tools: guides/custom-tools.md
+    - Creating Custom Backends: guides/custom-backends.md
+    - Creating Custom Presets: guides/custom-presets.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - attr_list
+  - md_in_html
+  - toc:
+      permalink: true
+
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/charlesazam/omniagents
