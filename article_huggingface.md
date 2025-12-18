@@ -4,9 +4,9 @@ I spent weeks building a framework for multi-tenant AI coding agents. Isolated e
 
 **I had accidentally rebuilt a chunk of OpenHands without knowing it existed.**
 
-But here's the thing: I learned more about AI coding agents in those weeks than I would have just using someone else's solution. And I ended up with something different — not better, just simpler. ~2000 lines of code you can read in a few hours.
+But here's the thing: I learned more about AI coding agents in those weeks than I would have just using someone else's solution. And I ended up with something different — not better, just easier to understand and tweak. ~2000 lines of code you can read in a few hours.
 
-More importantly, I now deeply understand what's happening under the hood. I know where the costs come from and how to reduce them. I know how to adapt it to my specific use case — which is building an agent that generates 3D models through code. You can't do that confidently with a black-box solution.
+More importantly, I now deeply understand what's happening under the hood. I know where the costs come from and how to reduce them. I know how to adapt it to my specific use case. You can't do that confidently with a black-box solution.
 
 This is what I learned.
 
@@ -159,21 +159,21 @@ Today the best agents implement these additional features:
 - **Think Tool**: for complex tasks, the agent can think about the task and generate a plan, then execute the plan step by step
 - **Delegate Tool**: the agent can delegate tasks to sub-agents — very effective for complex multi-step tasks, and helps reduce context size
 
-### Agent frameworks are useless (ok no but not that useful)
+### Agent frameworks help you start, not finish
 
-There are a lot of agent frameworks out there. To name a few:
-- **smolagents**: very simple, best terminal logs in the market, but lacks powerful features. The tools don't support advanced schemas (like Pydantic models), which is a shame.
-- **LangChain**: very close to Pydantic-AI now. Probably very powerful, but once you use LangGraph you enter a world of pain.
-- **Pydantic-AI**: it flatters my software engineer soul. The telemetry is great but it is a shame the terminal logs are so hard to read.
-- **openai-agents**: great if you want to be handcuffed to OpenAI.
+I tried most of the popular frameworks: smolagents, LangChain, Pydantic-AI, openai-agents. They're all fine for prototyping. But the moment you need something slightly custom — injecting an image at the start of each loop, using model-specific parameters, or controlling exactly when tools are called — you hit walls.
 
-But the moment you want to do something more complex — like adding an image at the start of each loop, or using model-specific features — you'll want to write your own loop with minimal abstraction.
+The issue isn't that frameworks are bad. It's that agent loops are simple enough that the abstraction doesn't buy you much. A basic agent is just: call the LLM, parse tool calls, execute them, repeat. That's 50 lines of code. When you own that loop, customization is trivial.
 
-### Use open source models for your personal projects
+My recommendation: use a framework to validate your idea quickly, then rewrite the core loop yourself when you need control. Keep the framework's tool schema converters if they're useful — that's the annoying boilerplate worth avoiding.
 
-If you're new to AI, you might not know the pain of building a side project with a proprietary model. You'll quickly find out that not only are they expensive, but since you're a nobody, your rate limits are very low.
+### Where the costs come from
 
-The best workaround is to use open source models. Check out HuggingFace — there are providers like Groq or Cerebras that offer very cheap open source models with generous rate limits.
+Running AI coding agents has two cost drivers: LLM inference and compute.
+
+For LLM costs, proprietary models like GPT-4 or Claude add up fast — especially when agents loop through multiple tool calls. If you're building a side project, you'll also hit rate limits quickly. The workaround is open source models via HuggingFace inference providers like Groq or Cerebras, which offer generous rate limits at a fraction of the cost.
+
+For compute, you have three main options. **E2B** handles everything — sandboxing, persistence, scaling — but it's expensive and currently Python-only. **Local Docker on EC2** (or equivalent) gives you predictable pricing and full control, but it doesn't scale up or down, and you still carry some security risk from running untrusted code on your own machines. **Fly.io or Modal** sit in between: you get per-request scaling without managing infrastructure, at a lower cost than E2B. For most side projects, I'd start with local Docker. For production multi-tenant systems, Fly.io is worth exploring.
 
 ### State Persistence Is Underrated
 
@@ -186,15 +186,11 @@ Git-based storage turned out to be surprisingly good for small projects. Free, v
 
 ### OpenHands Exists (And That's OK)
 
-After building this, I discovered [OpenHands](https://github.com/All-Hands-AI/OpenHands) — a much more complete solution. It has:
-- More sophisticated agent logic
-- Web UI
-- More backends
-- Active community
+After building this, I discovered [OpenHands](https://github.com/All-Hands-AI/OpenHands) — a much more complete solution with sophisticated agent logic, a web UI, more backends, and an active community.
 
-So why share Omniagents at all?
+So why not just contribute to OpenHands instead?
 
-**Because it's simpler.** OpenHands is an application. Omniagents is a library. If you want a ready-to-use coding agent, use OpenHands. If you want primitives to build your own thing — maybe with custom tools, custom prompts, or embedded in a larger system — Omniagents might be easier to understand and modify.
+OpenHands is an **application** — a full product you deploy and use. Omniagents is a **library** — primitives you import and compose. Different goals. If you want a ready-to-use coding agent, use OpenHands. If you want to embed coding tools into your own system with your own agent loop, prompts, and UI, Omniagents gives you the building blocks without the opinions.
 
 ~2000 lines of code. No magic. Read it in an afternoon.
 
@@ -231,13 +227,9 @@ The [documentation](https://github.com/charlesazam/omniagents/tree/main/docs) co
 
 ## What's Next?
 
-I'm considering:
-- **MCP server interface** — expose the tools via Model Context Protocol for Claude Desktop integration
-- **More backends** — Fly.io, Modal, AWS Lambda
-- **Better state management** — content-addressable storage for deduplication across users
-- **Building with this**
+I'm using this to build my own product. Along the way, I'll likely add a Fly.io backend and an MCP server interface for Claude Desktop integration.
 
-If any of this is useful to you, let me know. And if you're building multi-tenant AI agents, I'd love to hear what challenges you're facing.
+If you're building multi-tenant AI agents, I'd love to hear what challenges you're facing.
 
 ---
 
