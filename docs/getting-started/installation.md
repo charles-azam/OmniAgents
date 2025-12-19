@@ -12,13 +12,13 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Add omniagents to your project (from GitHub)
-uv add git+https://github.com/charlesazam/omniagents.git
+uv add git+https://github.com/charles-azam/omniagents.git
 ```
 
 ## Install with pip
 
 ```bash
-pip install git+https://github.com/charlesazam/omniagents.git
+pip install git+https://github.com/charles-azam/omniagents.git
 ```
 
 ## Optional Dependencies
@@ -86,7 +86,7 @@ To contribute or modify omniagents:
 
 ```bash
 # Clone the repository
-git clone https://github.com/charlesazam/omniagents.git
+git clone https://github.com/charles-azam/omniagents.git
 cd omniagents
 
 # Install dependencies

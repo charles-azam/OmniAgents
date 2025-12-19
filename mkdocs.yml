@@ -1,7 +1,7 @@
 site_name: Omniagents
 site_description: A multi-backend execution framework for AI coding agents
 site_url: https://omniagents.dev
-repo_url: https://github.com/charlesazam/omniagents
+repo_url: https://github.com/charles-azam/omniagents
 repo_name: charlesazam/omniagents
 
 theme:
@@ -85,4 +85,4 @@ plugins:
 extra:
   social:
     - icon: fontawesome/brands/github
-      link: https://github.com/charlesazam/omniagents
+      link: https://github.com/charles-azam/omniagents

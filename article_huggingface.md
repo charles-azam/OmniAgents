@@ -197,7 +197,7 @@ OpenHands is an **application** — a full product you deploy and use. Omniagent
 ## Try It
 
 ```bash
-uv add git+https://github.com/charlesazam/omniagents.git
+uv add git+https://github.com/charles-azam/omniagents.git
 ```
 
 ```python
@@ -219,7 +219,7 @@ print(result.content)  # "Hello from Omniagents!"
 backend.shutdown()
 ```
 
-The [documentation](https://github.com/charlesazam/omniagents/tree/main/docs) covers:
+The [documentation](https://github.com/charles-azam/omniagents/tree/main/docs) covers:
 - All 10 tools
 - Backend comparison
 - State management deep dive
@@ -233,4 +233,4 @@ If you're building multi-tenant AI agents, I'd love to hear what challenges you'
 
 ---
 
-*[Omniagents on GitHub](https://github.com/charlesazam/omniagents)*
+*[Omniagents on GitHub](https://github.com/charles-azam/omniagents)*

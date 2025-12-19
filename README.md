@@ -2,6 +2,12 @@
 
 A multi-backend execution framework for AI coding agents. Write tools once, run them anywhere.
 
+## Install
+
+```bash
+uv add git+https://github.com/charles-azam/omniagents.git
+```
+
 ## What is Omniagents?
 
 Omniagents provides a unified interface for building AI coding agents that work across multiple execution environments (Local, Docker, E2B) and AI frameworks (smolagents, Pydantic-AI, LangChain).

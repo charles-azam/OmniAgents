@@ -171,9 +171,9 @@ agent = SmolagentsAgent(backend=backend, model=model, preset=preset)
 ## Installation
 
 ```bash
-uv add git+https://github.com/charlesazam/omniagents.git
+uv add git+https://github.com/charles-azam/omniagents.git
 # or
-pip install git+https://github.com/charlesazam/omniagents.git
+pip install git+https://github.com/charles-azam/omniagents.git
 ```
 
 ### Required Credentials
