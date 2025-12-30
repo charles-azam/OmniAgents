@@ -48,15 +48,6 @@ backend.shutdown()  # Saves state to Git
 | **State Persistence** | Git or GCS - restore sessions across runs |
 | **Presets** | Python/UV, Python/pip, Generic |
 
-## Installation
-
-```bash
-# Using uv (recommended)
-uv add omniagents
-
-# Using pip
-pip install omniagents
-```
 
 ## Quick Start
 
